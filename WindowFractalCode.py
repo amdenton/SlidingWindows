@@ -1195,7 +1195,7 @@ def main():
 
     #return f_out
 
-#main()
+main()
 #testSakakawea()
 #createTestPlot()
 #testWindowRegressionArray()
