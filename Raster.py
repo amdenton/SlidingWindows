@@ -1,32 +1,46 @@
 from osgeo import gdal
 from PIL import Image
 import sys
+# this allows GDAL to throw Python Exceptions
+gdal.UseExceptions()
 
 class Raster:
 
     def __init__(self, imgSource):
         self.imgSource = imgSource
-        self.img = gdal.Open(self.imgSource)
-        self.bandCount = self.img.RasterCount
-        self.bandDict = {}
-        if self.img is None:
-            print('Unable to open' + self.imgSource)
+        try:
+            self.img = gdal.Open(imgSource)
+        except RuntimeError as e:
+            print('Unable to open INPUT.tif')
+            print(e)
             sys.exit(1)
-        self.createBands()
 
-    def createBands(self):
-       for band in range(self.img.RasterCount):
-           band += 1
-           self.bandDict[gdal.GetColorInterpretationName(self.img.GetRasterBand(band).GetColorInterpretation())] = self.img.GetRasterBand(band)
+        self.bandCount = self.img.RasterCount
+        self.bandNames = []
+        self.createBandColorInterpretations()
 
-    def getImgSource(self):
-        return self.imgSource
-        
-    def getBandCount(self):
-        return self.bandCount
+    def createBandColorInterpretations(self):
+        for band in range(self.bandCount):
+            band += 1
+            self.bandNames.append(self.img.GetRasterBand(band).GetColorInterpretation())
+
+    def GetColorInterpretationName(self, bandColorNum):
+        return gdal.GetColorInterpretationName(bandColorNum)
+
+    def getBand(self, bandColorNum):
+        try:
+            srcband = self.img.GetRasterBand(bandColorNum)
+        except RuntimeError as e:
+            print('Band ( %i ) not found' % bandColorNum)
+            print(e)
+            sys.exit(1)
+        return srcband
+
+    def get1DBandArray(self, bandColorNum):
+        return self.img.GetRasterBand(bandColorNum).ReadAsArray().flatten() 
 
     def getInfo(self):
         return gdal.Info(self.img)
-    
-    def getBands(self):
-        return self.bandDict
+
+    def getMetadata(self):
+        return self.img.GetMetadata()
