@@ -97,7 +97,7 @@ def printCorrelation (a_in,b_in):
     for i in range(0,256):
         count = np.count_nonzero(a_in == i)
         print((i, count, np.sum(a_in[a_in == i]*b_in[a_in == i])))
-
+ 
 # Creates composite graphs with x_rep different images left to right and y_rep top to bottom
 # Each view assumes that the original image had width x_max wide and height y_max
 def createImageRGB (x_max,y_max,x_rep,y_rep):
@@ -968,6 +968,7 @@ def testSakakawea():
     x_max = 3000
     y_max = 800
     power_target = 5
+    # create empty arrays
     b_in = np.empty((x_max+1)*(y_max+1))
     c_in = np.empty((x_max+1)*(y_max+1))
     readImageNoConv('Sakaka_RED2.tiff',b_in,2200,3300,x_max+1,y_max+1)

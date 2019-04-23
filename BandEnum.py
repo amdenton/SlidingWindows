@@ -2,7 +2,7 @@ import enum
 
 #detertmine band order of img file
 class BandEnum(enum.Enum):
-    Red = 1
-    Green = 2
-    Blue = 3
-    IR = 4
+    red = 1
+    green = 2
+    blue = 3
+    ir = 4
