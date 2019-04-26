@@ -14,11 +14,11 @@ slide_window = SlidingWindow(rast.img.meta['height'], rast.img.meta['width'], 1)
 # arr = np.array([[1,1,1,0],[0,1,0,1],[0,0,1,1],[1,0,1,1]])
 img = rast.img.read(BandEnum.red.value )
 img = rast.create_binary_image(img, 127)
-img = slide_window.analyze(img, 'sum')
+img2 = slide_window.analyze_number_two(img, 'sum')
 
 # rast.create_ndvi()
 
-plt.imshow(img)
+plt.imshow(img2)
 plt.show()
 
 # indexing practice
