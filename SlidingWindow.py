@@ -2,32 +2,26 @@ import numpy as np
 import time
 
 class SlidingWindow:
-    def __init__(self, y_max, x_max, power_target):
-        self.y_max = y_max
-        self.x_max = x_max
-        self.power_target = power_target
+    def __init__(self, max_delta_power):
+        self.max_delta_power = max_delta_power
 
     # assumption: img_array is 2-dimensional
-    # assumption: img_array is black and white, i.e. binary
     # TODO throw errors if assumptions are not met
-    def analyze_test(self, img_array, operation):
+    def analyze_bad(self, img_array, operation):
         start = time.time()  # TODO remove time
         y_max = img_array.shape[0]
         x_max = img_array.shape[1]
-        array = np.array(img_array)
-        max_delta_power = 5
+        array = np.array(img_array).astype(float) # TODO change dtype later?
 
-        for i in range(max_delta_power+1):
+        for i in range(self.max_delta_power+1):
             delta = 2**i
             y_max -= delta
             x_max -= delta
 
-            new_array = np.zeros((y_max, x_max))
+            new_array = np.zeros((y_max, x_max), dtype=array.dtype)
             for y in range(y_max):
                 for x in range(x_max):
-                    sum = array[y, x] + array[y, x+delta] + array[y+delta, x] + array[y+delta, x+delta]
-                    new_array[y, x] = sum
-
+                    new_array[y, x] = array[y, x] + array[y, x+delta] + array[y+delta, x] + array[y+delta, x+delta]
             array = new_array
 
         end = time.time() # TODO remove time
@@ -37,45 +31,40 @@ class SlidingWindow:
 
 
     # assumption: img_array is 2-dimensional
-    # assumption: img_array is black and white, i.e. binary
     # TODO throw errors if assumptions are not met
     def analyze(self, img_array, operation):
         start = time.time()  # TODO remove time
         y_max = img_array.shape[0]
         x_max = img_array.shape[1]
-        array = img_array.flatten()
-        max_delta_power = 5
+        array = img_array.flatten().astype(float) # TODO change dtype later?
         
         # calculate sliding window for each value of delta
-        # delta is in powers of 2
-        for x in range(max_delta_power+1):
+        for x in range(self.max_delta_power+1):
             delta = 2**x
             size = array.shape[0]
 
-            # create 4 offset arrays such that element wise operations operate on the four corners of a square of size delta+1
-            # first array is truncated, second array is offset for top right corner, third for bottom left, fourth for bottom right
-            # if that makes sense
-            array1 = array[0: size - (delta*x_max + delta)]
-            array2 = array[delta: size - (x_max*delta)]
-            array3 = array[delta*x_max: size - (delta)]
-            array4 = array[delta*x_max + delta: size]
+            # create offset slices of the array to aggregate elements
+            arrTopLeft = array[0: size - (delta*x_max + delta)]
+            arrTopRight = array[delta: size - (x_max*delta)]
+            arrBottomLeft = array[delta*x_max: size - (delta)]
+            arrBottomRight = array[delta*x_max + delta: size]
 
-            # operate on four arrays
+            # operate on arrays
             if operation.upper() == 'SUM':
-                array = array1 + array2 + array3 + array4
+                array = arrTopLeft + arrTopRight + arrBottomLeft + arrBottomRight
             elif operation.upper() == 'MAX':
-                array = np.maximum(np.maximum(np.maximum(array1, array2), array3), array4)
+                array = np.maximum(np.maximum(np.maximum(arrTopLeft, arrTopRight), arrBottomLeft), arrBottomRight)
             else:
                 raise Exception('not valid operation')
 
-            # array has shrunk
-            y_max -= delta
-
-        pad_num = 2**max_delta_power * 2 - 1
-        # pad to reshape into two dimensional array
-        array = np.pad(array, pad_num, 'constant')[pad_num:]
+        # number of rows and columns removed from the ends of the array
+        pad_num = 2**(self.max_delta_power+1) - 1
+        # truncate last pad_num rows
+        y_max -= pad_num
+        # pad to make array square
+        array = np.pad(array, (0, pad_num), 'constant')
         array = np.reshape(array, (y_max, x_max))
-        # truncate last pad_num rows, which are not valid
+        # truncate last pad_num columns
         array = np.delete(array, np.s_[-pad_num:], 1)
 
         end = time.time() # TODO remove time
