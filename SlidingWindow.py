@@ -8,6 +8,9 @@ class SlidingWindow:
     # assumption: img_array is 2-dimensional
     # TODO throw errors if assumptions are not met
     def analyze_bad(self, img_array, operation):
+        if (operation.upper() != 'SUM' and operation.upper() != 'MAX'):
+            raise Exception('not valid operation')
+
         start = time.time()  # TODO remove time
         y_max = img_array.shape[0]
         x_max = img_array.shape[1]
@@ -21,7 +24,10 @@ class SlidingWindow:
             new_array = np.zeros((y_max, x_max), dtype=array.dtype)
             for y in range(y_max):
                 for x in range(x_max):
-                    new_array[y, x] = array[y, x] + array[y, x+delta] + array[y+delta, x] + array[y+delta, x+delta]
+                    if (operation.upper() == 'SUM'):
+                        new_array[y, x] = array[y, x] + array[y, x+delta] + array[y+delta, x] + array[y+delta, x+delta]
+                    elif (operation.upper() == 'MAX'):
+                        new_array[y, x] = np.maximum(np.maximum(np.maximum(array[y, x], array[y, x+delta]), array[y+delta, x]), array[y+delta, x+delta])
             array = new_array
 
         end = time.time() # TODO remove time
@@ -33,6 +39,9 @@ class SlidingWindow:
     # assumption: img_array is 2-dimensional
     # TODO throw errors if assumptions are not met
     def analyze(self, img_array, operation):
+        if (operation.upper() != 'SUM' and operation.upper() != 'MAX'):
+            raise Exception('not valid operation')
+        
         start = time.time()  # TODO remove time
         y_max = img_array.shape[0]
         x_max = img_array.shape[1]
@@ -54,8 +63,6 @@ class SlidingWindow:
                 array = arrTopLeft + arrTopRight + arrBottomLeft + arrBottomRight
             elif operation.upper() == 'MAX':
                 array = np.maximum(np.maximum(np.maximum(arrTopLeft, arrTopRight), arrBottomLeft), arrBottomRight)
-            else:
-                raise Exception('not valid operation')
 
         # number of rows and columns removed from the ends of the array
         pad_num = 2**(self.max_delta_power+1) - 1
