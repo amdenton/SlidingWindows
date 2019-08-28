@@ -13,7 +13,7 @@ out
 node_modules
 *.pyc
 *.vsix
-**/.vscode/.ropeproject/**
+**/.vscode
 **/testFiles/**/.cache/**
 *.noseids
 .nyc_output
