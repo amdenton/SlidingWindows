@@ -2,14 +2,17 @@ import numpy as np
 import time
 
 class SlidingWindow:
+
+    valid_ops = {'SUM', 'MAX'}
+
     def __init__(self, max_delta_power):
         self.max_delta_power = max_delta_power
 
     # assumption: img_array is 2-dimensional
     # TODO throw errors if assumptions are not met
     def analyze_bad(self, img_array, operation):
-        if (operation.upper() != 'SUM' and operation.upper() != 'MAX'):
-            raise Exception('not valid operation')
+        if (operation.upper() not in self.valid_ops):
+            raise ValueError('operation must be one of %r.' % self.valid_ops)
 
         start = time.time()  # TODO remove time
         y_max = img_array.shape[0]
@@ -39,8 +42,8 @@ class SlidingWindow:
     # assumption: img_array is 2-dimensional
     # TODO throw errors if assumptions are not met
     def analyze(self, img_array, operation):
-        if (operation.upper() != 'SUM' and operation.upper() != 'MAX'):
-            raise Exception('not valid operation')
+        if (operation.upper() not in self.valid_ops):
+            raise ValueError('operation must be one of %r.' % self.valid_ops)
         
         start = time.time()  # TODO remove time
         y_max = img_array.shape[0]
