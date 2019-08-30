@@ -1,18 +1,12 @@
 import numpy as np
-from Raster import Raster
 from SlidingWindow import SlidingWindow
 import matplotlib.pyplot as plt
+from BandEnum import rgbIr
 
-from BandEnum import BandEnum
+slide_window = SlidingWindow('m_4509601_ne_14_1_20120705.tif', rgbIr)
 
-rast = Raster("m_4509601_ne_14_1_20120705.tif")
-slide_window = SlidingWindow(5)
-
-# img = np.random.randint(0, 2, (7700, 5650), np.uint8)
-img = rast.img.read(BandEnum.red.value)
-img = rast.create_binary_image(img, 127)
-print('HEIGHT: ', img.shape[0])
-print('WIDTH: ', img.shape[1])
-imgGood = slide_window.analyze(img, 'max')
-imgBad = slide_window.analyze_bad(img, 'max')
+print('VEC SLIDING WINDOW')
+imgGood = slide_window.sliding_window_vec('red', 'sum', 5)
+print('BAD SLIDING WINDOW')
+imgBad = slide_window.sliding_window_bad('red', 'sum', 5)
 print('EQUAL? ', np.array_equal(imgGood, imgBad))
