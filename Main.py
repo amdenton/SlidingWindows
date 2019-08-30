@@ -1,6 +1,5 @@
 import numpy as np
 from SlidingWindow import SlidingWindow
-import matplotlib.pyplot as plt
 from BandEnum import rgbIr
 
 slide_window = SlidingWindow('m_4509601_ne_14_1_20120705.tif', rgbIr)
