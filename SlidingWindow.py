@@ -1,21 +1,35 @@
 import numpy as np
 import rasterio
+import inspect
 import time
 
 class SlidingWindow:
 
-    valid_ops = {'SUM', 'MAX'}
-
-    def __init__(self, img_source, band_enum):
-        self.img = rasterio.open(img_source)
+    def __init__(self, file_path, band_enum):
+        self.file_path = file_path
+        self.img = rasterio.open(file_path)
         self.band_enum = band_enum
 
+    __valid_ops = {'SUM', 'MAX'}
+    @property
+    def valid_ops(self):
+        return self.__valid_ops
+
+    def __create_tif(self, img_arr):
+        profile = self.img.profile
+        profile.update(count=1)
+        caller_name = inspect.stack()[1].function
+        with rasterio.open(caller_name + '_' + self.file_path, 'w', **profile) as dst:
+            dst.write(img_arr, 1)
+
+
+
     def sliding_window_bad(self, band, operation, max_delta_power):
-        if (operation.upper() not in self.valid_ops):
-            raise ValueError('operation must be one of %r.' % self.valid_ops)
+        if (operation.upper() not in self.__valid_ops):
+            raise ValueError('operation must be one of %r.' % self.__valid_ops)
 
         start = time.time()  # TODO remove time
-        pixels = self.img.read(self.band_enum[band].value).astype(float) # TODO change dtype later?
+        pixels = self.img.read(self.band_enum[band].value).astype(float)
         y_max = pixels.shape[0]
         x_max = pixels.shape[1]
 
@@ -36,17 +50,24 @@ class SlidingWindow:
         end = time.time() # TODO remove time
         print('BAD TIME: ', end-start)
 
-        return pixels
+        # TODO remove later
+        # for testing purposed to convert float to uint8
+        max_val = np.amax(pixels)
+        min_val = np.amin(pixels)
+        pixels = ((pixels - min_val)/(max_val - min_val)) * 255
+        pixels = pixels.astype(np.uint8)
+
+        self.__create_tif(pixels)
 
     def sliding_window_vec(self, band, operation, max_delta_power):
-        if (operation.upper() not in self.valid_ops):
-            raise ValueError('operation must be one of %r.' % self.valid_ops)
+        if (operation.upper() not in self.__valid_ops):
+            raise ValueError('operation must be one of %r.' % self.__valid_ops)
         
         start = time.time()  # TODO remove time
-        pixels = self.img.read(self.band_enum[band].value).astype(float) # TODO change dtype later?
+        pixels = self.img.read(self.band_enum[band].value).astype(float)
         y_max = pixels.shape[0]
         x_max = pixels.shape[1]
-        pixels = pixels.flatten() # TODO change dtype later?
+        pixels = pixels.flatten()
         
         # calculate sliding window for each value of delta
         for x in range(max_delta_power+1):
@@ -79,22 +100,30 @@ class SlidingWindow:
         end = time.time() # TODO remove time
         print('GOOD TIME: ', end-start)
 
-        return pixels
+        # TODO remove later
+        # for testing purposed to convert float to uint8
+        max_val = np.amax(pixels)
+        min_val = np.amin(pixels)
+        pixels = ((pixels - min_val)/(max_val - min_val)) * 255
+        pixels = pixels.astype(np.uint8)
+
+        self.__create_tif(pixels)
 
     # i.e. Normalized Difference Vegetation Index
     # for viewing live green vegetation
-    def create_ndvi(self):
-        red_band = self.img.read(self.band_enum.red.value)
-        ir_band = self.img.read(self.band_enum.ir.value)
+    def ndvi(self):
+        red = self.img.read(self.band_enum.red.value)
+        ir = self.img.read(self.band_enum.ir.value)
         # Allow division by zero
         np.seterr(divide='ignore', invalid='ignore')
-        ndvi_band = (ir_band.astype(float) - red_band.astype(float)) / (ir_band + red_band)
-        return ndvi_band
+        ndvi = ((ir.astype(float) - red.astype(float)) / (ir + red)).astype(np.uint8)
+
+        self.__create_tif(ndvi)
 
         
     # turn image into black and white
     # pixels are black if below threshold, white if greater than or equal to threshold
-    def create_binary_image(self, img, threshold):
+    def binary_image(self, img, threshold):
         binary_image = np.array(img)
         binary_image[binary_image < threshold] = 0
         binary_image[binary_image >= threshold] = 255
