@@ -17,7 +17,7 @@ img_bad = rasterio.open('sliding_window_bad_m_4509601_ne_14_1_20120705.tif')
 
 plt.imshow(img_og.read(1))
 plt.show()
-plt.imshow(img_ndvi.read(1))
+plt.imshow(img_good.read(1))
 plt.show()
 
 # print('EQUAL? ', np.array_equal(img_good.read(1), img_bad.read(1)))
