@@ -22,8 +22,6 @@ class SlidingWindow:
         with rasterio.open(caller_name + '_' + self.file_path, 'w', **profile) as dst:
             dst.write(img_arr, 1)
 
-
-
     def sliding_window_bad(self, band, operation, max_delta_power):
         if (operation.upper() not in self.__valid_ops):
             raise ValueError('operation must be one of %r.' % self.__valid_ops)
@@ -122,9 +120,7 @@ class SlidingWindow:
 
         
     # turn image into black and white
-    # pixels are black if below threshold, white if greater than or equal to threshold
-    def binary_image(self, img, threshold):
-        binary_image = np.array(img)
-        binary_image[binary_image < threshold] = 0
-        binary_image[binary_image >= threshold] = 255
-        return binary_image
+    def binary(self, band, threshold):
+        img = self.img.read(self.band_enum[band].value)
+        binary = np.where(img < threshold, 0, 255).astype(np.uint8)
+        self.__create_tif(binary)
