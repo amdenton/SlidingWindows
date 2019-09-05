@@ -118,14 +118,22 @@ class SlidingWindow:
 
         return arr
 
-    # Regression paper
     # Create an array of window-based regression slopes for precalculated sums of x (a) and y (b), sums of squares of x (aa) and sums of xy (ab)
-    # Uses the original image dimensions x_max and y_max and window size delta.  Note that the actual array sizes are smaller than x_max*y_max
-    def __regression(self, a, b, aa, ab, x_max, y_max, delta):
-        # TODO implement this
+    def __regression(self, a, b, aa, ab, num_aggre):
+        size = a.size
+        count = (num_aggre*2)**2
+        m = np.empty(size)
+        if (size != b.size) or (size != aa.size) or (size != ab.size):
+            print('a size: ', size, '  b size: ', b.size, '  aa size: ', aa.size, '  ab.size: ', ab.size)
+            raise ValueError('Size of a, b, aa, and/or ab inconsistent. Must be identical')
+
+        numerator = count * ab - a * b
+        denominator = count * aa - a * a
+        m = numerator/denominator
+        return m
 
     # Does one window-aggregation step of a 2d pixel array arr
-    def __windowSum (self, arr, delta):
+    def __windowSum(self, arr, delta):
         y_max = arr.shape[0]
         x_max = arr.shape[1]
         y_max_out = y_max-delta
@@ -153,20 +161,16 @@ class SlidingWindow:
     # Regression paper
     # Do num_aggre aggregations and return the regression slope
     def windowRegression(self, band1, band2, num_aggre):
-        arr1 = self.img.read(self.band_enum[band1].value).astype(float)
-        arr2 = self.img.read(self.band_enum[band2].value).astype(float)
-        y_max = arr1.shape[0]
-        x_max = arr1.shape[1]
+        arr_a = self.img.read(self.band_enum[band1].value).astype(float)
+        arr_b = self.img.read(self.band_enum[band2].value).astype(float)
 
-        arr11 = arr1*arr1
-        arr22 = arr2*arr2
-        arr12 = arr1*arr2
+        arr_aa = arr_a*arr_a
+        arr_ab = arr_a*arr_b
 
-        arr1 = self.__window_agg(arr1, 'sum', num_aggre)
-        arr2 = self.__window_agg(arr2, 'sum', num_aggre)
-        arr11 = self.__window_agg(arr11, 'sum', num_aggre)
-        arr22 = self.__window_agg(arr22, 'sum', num_aggre)
-        arr12 = self.__window_agg(arr12, 'sum', num_aggre)
+        arr_a = self.__window_agg(arr_a, 'sum', num_aggre)
+        arr_b = self.__window_agg(arr_b, 'sum', num_aggre)
+        arr_aa = self.__window_agg(arr_aa, 'sum', num_aggre)
+        arr_ab = self.__window_agg(arr_ab, 'sum', num_aggre)
 
-        m = self.__regression(arr1, arr2 , arr11 , arr12, x_max, y_max, num_aggre*2)
+        m = self.__regression(arr_a, arr_b, arr_aa, arr_ab, num_aggre)
         return m
