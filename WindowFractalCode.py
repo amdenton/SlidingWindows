@@ -272,6 +272,21 @@ def windowCollectSumWindowNoMin (a_in,x_max,y_max,power_start,power_target):
     
     return a_out
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Regression paper
 # Create an array of window-based regression slopes for precalculated sums of x (a) and y (b), sums of squares of x (aa) and sums of xy (ab)
 # Uses the original image dimensions x_max and y_max and window size w.  Note that the actual array sizes are smaller than x_max*y_max
@@ -544,6 +559,24 @@ def blue(f_out0,f_error):
 
 def fractality(f_out0,f_error):
     return 2*np.exp(-10*f_error)*np.sin(f_out0*np.pi)**2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Example Application
 def createTestPlot():
