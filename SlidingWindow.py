@@ -32,15 +32,22 @@ class SlidingWindow:
         binary = np.where(img < threshold, 0, 255).astype(np.uint8)
         self.__create_tif(binary)
 
-    def __create_tif(self, img_arr):
+    def __create_tif(self, arr):
         profile = self.img.profile
         profile.update(count=1)
         caller_name = inspect.stack()[1].function
         with rasterio.open(caller_name + '_' + self.file_path, 'w', **profile) as dst:
-            dst.write(img_arr, 1)
+            dst.write(arr, 1)
+
+    def __arr_float_to_uint8(self, arr):
+        max_val = np.amax(arr)
+        min_val = np.amin(arr)
+        arr = ((arr - min_val)/(max_val - min_val)) * 255
+        arr = arr.astype(np.uint8)
+        return arr
 
     # do num_aggre aggregations on window
-    def _window_agg_brute(self, band, operation, num_aggre):
+    def _aggregation_brute(self, band, operation, num_aggre):
         if (operation.upper() not in self.__valid_ops):
             raise ValueError('operation must be one of %r.' % self.__valid_ops)
 
@@ -59,24 +66,20 @@ class SlidingWindow:
                 arr = self.__windowMax(arr, delta)
 
         # TODO remove later
-        # for testing purposed to convert float to uint8
-        max_val = np.amax(arr)
-        min_val = np.amin(arr)
-        arr = ((arr - min_val)/(max_val - min_val)) * 255
-        arr = arr.astype(np.uint8)
+        arr = self.__arr_float_to_uint8(arr)
 
         self.__create_tif(arr)
 
     # convert band into array, then call actual aggregation function
-    def window_agg(self, band, operation, num_aggre):
+    def aggregation(self, band, operation, num_aggre):
         if (operation.upper() not in self.__valid_ops):
             raise ValueError('operation must be one of %r.' % self.__valid_ops)
         arr = self.img.read(self.band_enum[band].value).astype(float)
-        arr = self.__window_agg(arr, operation, num_aggre)
+        arr = self.__aggregation(arr, operation, num_aggre)
         self.__create_tif(arr)
 
     # do num_aggre aggregations on window
-    def __window_agg(self, arr, operation, num_aggre):        
+    def __aggregation(self, arr, operation, num_aggre):        
         y_max = arr.shape[0]
         x_max = arr.shape[1]
         arr = arr.flatten()
@@ -110,11 +113,7 @@ class SlidingWindow:
         arr = np.delete(arr, np.s_[-pad_num:], 1)
 
         # TODO remove later
-        # for testing purposed to convert float to uint8
-        max_val = np.amax(arr)
-        min_val = np.amin(arr)
-        arr = ((arr - min_val)/(max_val - min_val)) * 255
-        arr = arr.astype(np.uint8)
+        arr = self.__arr_float_to_uint8(arr)
 
         return arr
 
@@ -160,17 +159,21 @@ class SlidingWindow:
 
     # Regression paper
     # Do num_aggre aggregations and return the regression slope
-    def windowRegression(self, band1, band2, num_aggre):
+    def regression(self, band1, band2, num_aggre):
         arr_a = self.img.read(self.band_enum[band1].value).astype(float)
         arr_b = self.img.read(self.band_enum[band2].value).astype(float)
 
         arr_aa = arr_a*arr_a
         arr_ab = arr_a*arr_b
 
-        arr_a = self.__window_agg(arr_a, 'sum', num_aggre)
-        arr_b = self.__window_agg(arr_b, 'sum', num_aggre)
-        arr_aa = self.__window_agg(arr_aa, 'sum', num_aggre)
-        arr_ab = self.__window_agg(arr_ab, 'sum', num_aggre)
+        arr_a = self.__aggregation(arr_a, 'sum', num_aggre)
+        arr_b = self.__aggregation(arr_b, 'sum', num_aggre)
+        arr_aa = self.__aggregation(arr_aa, 'sum', num_aggre)
+        arr_ab = self.__aggregation(arr_ab, 'sum', num_aggre)
 
-        m = self.__regression(arr_a, arr_b, arr_aa, arr_ab, num_aggre)
-        return m
+        arr_m = self.__regression(arr_a, arr_b, arr_aa, arr_ab, num_aggre)
+
+        # TODO remove later
+        arr_m = self.__arr_float_to_uint8(arr_m)
+
+        self.__create_tif(arr_m)
