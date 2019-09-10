@@ -81,6 +81,10 @@ class SlidingWindow:
             raise ValueError('operation must be one of %r.' % self.__valid_ops)
         arr = self.img.read(self.band_enum[band].value).astype(float)
         arr = self.__aggregation(arr, operation, num_aggre)
+
+        # TODO remove later
+        arr = self.__arr_float_to_uint8(arr)
+        
         self.__create_tif(arr)
 
     # do num_aggre aggregations on window
@@ -117,9 +121,6 @@ class SlidingWindow:
         # truncate last pad_num columns
         arr = np.delete(arr, np.s_[-pad_num:], 1)
 
-        # TODO remove later
-        arr = self.__arr_float_to_uint8(arr)
-
         return arr
 
     # Does one window-aggregation step of a 2d pixel array arr
@@ -148,12 +149,10 @@ class SlidingWindow:
                 arr_out[j, i] = max(max(max(arr[j, i], arr[j, i+delta]), arr[j+delta, i]), arr[j+delta, i+delta])
         return arr_out
 
-    # Regression paper
-    # Do num_aggre aggregations and return the regression slope
+    # Do num_aggre aggregations and return the regression slope between two bands
     def regression(self, band1, band2, num_aggre):
         arr_a = self.img.read(self.band_enum[band1].value).astype(float)
         arr_b = self.img.read(self.band_enum[band2].value).astype(float)
-
         arr_aa = arr_a*arr_a
         arr_ab = arr_a*arr_b
 
@@ -162,43 +161,19 @@ class SlidingWindow:
         arr_aa = self.__aggregation(arr_aa, 'sum', num_aggre)
         arr_ab = self.__aggregation(arr_ab, 'sum', num_aggre)
 
-        arr_m = self.__regression(arr_a, arr_b, arr_aa, arr_ab, num_aggre)
+        # Allow division by zero
+        # TODO is this necessary? denominator is only zero when x is constant
+        np.seterr(divide='ignore', invalid='ignore')
 
-        # TODO remove later, fix infinite values
-        arr_m = np.where(np.isfinite(arr_m), arr_m, np.nan)
-        max = np.nanmax(arr_m)
-        arr_m = np.where(np.isfinite(arr_m), arr_m, max)
+        # total pixels aggregated per pixel
+        count = (2**num_aggre)**2
+        numerator = count * arr_ab - arr_a * arr_b
+        denominator = count * arr_aa - arr_a * arr_a
+        # regression coefficient of linear least squares fitting
+        # m = cov(a,b) / var(x)
+        arr_m = numerator/denominator
+
+        # TODO remove later
         arr_m = self.__arr_float_to_uint8(arr_m)
 
         self.__create_tif(arr_m)
-
-    # Create an array of window-based regression slopes for precalculated sums of x (a) and y (b), sums of squares of x (aa) and sums of xy (ab)
-    def __regression(self, a, b, aa, ab, num_aggre):
-        size = a.size
-        count = (2**num_aggre)**2
-        m = np.empty(size)
-        if (size != b.size) or (size != aa.size) or (size != ab.size):
-            print('a size: ', size, '  b size: ', b.size, '  aa size: ', aa.size, '  ab.size: ', ab.size)
-            raise ValueError('Size of a, b, aa, and/or ab inconsistent. Must be identical')
-
-        # Allow division by zero
-        np.seterr(divide='ignore', invalid='ignore')
-
-        numerator = count * ab - a * b
-        denominator = count * aa - a * a
-
-        # TODO remove, zero denominator debugging
-        a_zero = 0
-        a_nonzero = 0
-        for y in range(denominator.shape[0]):
-            for x in range(denominator.shape[1]):
-                if (denominator[y][x] == 0):
-                    if (numerator[y][x] == 0):
-                        a_zero = a_zero + 1
-                    else:
-                        a_nonzero = a_nonzero + 1
-        print("ZEROS: ", a_zero)
-        print("NONZEROS: ", a_nonzero)
-
-        m = numerator/denominator
-        return m
