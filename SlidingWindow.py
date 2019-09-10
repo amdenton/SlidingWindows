@@ -34,11 +34,16 @@ class SlidingWindow:
 
     def __create_tif(self, arr):
         profile = self.img.profile
-        profile.update(count=1)
+        profile.update(
+            count=1,
+            height=arr.shape[0],
+            width=arr.shape[1]
+            )
         caller_name = inspect.stack()[1].function
         with rasterio.open(caller_name + '_' + self.file_path, 'w', **profile) as dst:
             dst.write(arr, 1)
 
+    # TODO fix later, not the best way to do this
     def __arr_float_to_uint8(self, arr):
         max_val = np.amax(arr)
         min_val = np.amin(arr)
@@ -87,7 +92,7 @@ class SlidingWindow:
         # calculate sliding window for each value of delta
         for x in range(num_aggre):
             delta = 2**x
-            size = arr.shape[0]
+            size = arr.size
 
             # create offset slices of the array to aggregate elements
             # aggregates the corners of squares of length delta+1
@@ -116,20 +121,6 @@ class SlidingWindow:
         arr = self.__arr_float_to_uint8(arr)
 
         return arr
-
-    # Create an array of window-based regression slopes for precalculated sums of x (a) and y (b), sums of squares of x (aa) and sums of xy (ab)
-    def __regression(self, a, b, aa, ab, num_aggre):
-        size = a.size
-        count = (num_aggre*2)**2
-        m = np.empty(size)
-        if (size != b.size) or (size != aa.size) or (size != ab.size):
-            print('a size: ', size, '  b size: ', b.size, '  aa size: ', aa.size, '  ab.size: ', ab.size)
-            raise ValueError('Size of a, b, aa, and/or ab inconsistent. Must be identical')
-
-        numerator = count * ab - a * b
-        denominator = count * aa - a * a
-        m = numerator/denominator
-        return m
 
     # Does one window-aggregation step of a 2d pixel array arr
     def __windowSum(self, arr, delta):
@@ -173,7 +164,41 @@ class SlidingWindow:
 
         arr_m = self.__regression(arr_a, arr_b, arr_aa, arr_ab, num_aggre)
 
-        # TODO remove later
+        # TODO remove later, fix infinite values
+        arr_m = np.where(np.isfinite(arr_m), arr_m, np.nan)
+        max = np.nanmax(arr_m)
+        arr_m = np.where(np.isfinite(arr_m), arr_m, max)
         arr_m = self.__arr_float_to_uint8(arr_m)
 
         self.__create_tif(arr_m)
+
+    # Create an array of window-based regression slopes for precalculated sums of x (a) and y (b), sums of squares of x (aa) and sums of xy (ab)
+    def __regression(self, a, b, aa, ab, num_aggre):
+        size = a.size
+        count = (2**num_aggre)**2
+        m = np.empty(size)
+        if (size != b.size) or (size != aa.size) or (size != ab.size):
+            print('a size: ', size, '  b size: ', b.size, '  aa size: ', aa.size, '  ab.size: ', ab.size)
+            raise ValueError('Size of a, b, aa, and/or ab inconsistent. Must be identical')
+
+        # Allow division by zero
+        np.seterr(divide='ignore', invalid='ignore')
+
+        numerator = count * ab - a * b
+        denominator = count * aa - a * a
+
+        # TODO remove, zero denominator debugging
+        a_zero = 0
+        a_nonzero = 0
+        for y in range(denominator.shape[0]):
+            for x in range(denominator.shape[1]):
+                if (denominator[y][x] == 0):
+                    if (numerator[y][x] == 0):
+                        a_zero = a_zero + 1
+                    else:
+                        a_nonzero = a_nonzero + 1
+        print("ZEROS: ", a_zero)
+        print("NONZEROS: ", a_nonzero)
+
+        m = numerator/denominator
+        return m
