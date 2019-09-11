@@ -24,24 +24,26 @@ class SlidingWindow:
         np.seterr(divide='ignore', invalid='ignore')
         ndvi = ((ir.astype(float) - red.astype(float)) / (ir + red)).astype(np.uint8)
 
-        self.__create_tif(ndvi)
+        self.__create_tif(1, [ndvi])
         
     # turn image into black and white
     def binary(self, band, threshold):
         img = self.img.read(self.band_enum[band].value)
         binary = np.where(img < threshold, 0, 255).astype(np.uint8)
-        self.__create_tif(binary)
+        self.__create_tif(1, [binary])
 
-    def __create_tif(self, arr):
+    # create tif with array of image bands
+    def __create_tif(self, num_bands, arr):
         profile = self.img.profile
         profile.update(
-            count=1,
-            height=arr.shape[0],
-            width=arr.shape[1]
+            count=num_bands,
+            height=len(arr[0]),
+            width=len(arr[0][0])
             )
         caller_name = inspect.stack()[1].function
         with rasterio.open(caller_name + '_' + self.file_path, 'w', **profile) as dst:
-            dst.write(arr, 1)
+            for x in range(num_bands): 
+                dst.write(arr[x], x+1)
 
     # TODO fix later, not the best way to do this
     def __arr_float_to_uint8(self, arr):
@@ -73,19 +75,23 @@ class SlidingWindow:
         # TODO remove later
         arr = self.__arr_float_to_uint8(arr)
 
-        self.__create_tif(arr)
+        self.__create_tif(1, [arr])
 
     # convert band into array, then call actual aggregation function
-    def aggregation(self, band, operation, num_aggre):
+    def aggregation(self, operation, num_aggre):
         if (operation.upper() not in self.__valid_ops):
             raise ValueError('operation must be one of %r.' % self.__valid_ops)
-        arr = self.img.read(self.band_enum[band].value).astype(float)
-        arr = self.__aggregation(arr, operation, num_aggre)
-
-        # TODO remove later
-        arr = self.__arr_float_to_uint8(arr)
         
-        self.__create_tif(arr)
+        arr = []
+        num_bands = len(self.band_enum)
+        for x in range(num_bands):
+            arr.append(self.img.read(x+1).astype(float))
+            arr[x] = self.__aggregation(arr[x], operation, num_aggre)
+
+            # TODO remove later
+            arr[x] = self.__arr_float_to_uint8(arr[x])
+        
+        self.__create_tif(num_bands, arr)
 
     # do num_aggre aggregations on window
     def __aggregation(self, arr, operation, num_aggre):        
@@ -97,7 +103,6 @@ class SlidingWindow:
         for x in range(num_aggre):
             delta = 2**x
             size = arr.size
-
             # create offset slices of the array to aggregate elements
             # aggregates the corners of squares of length delta+1
             top_left = arr[0: size - (delta*x_max + delta)]
@@ -105,21 +110,18 @@ class SlidingWindow:
             bottom_left = arr[delta*x_max: size - (delta)]
             bottom_right = arr[delta*x_max + delta: size]
 
-            # operate on arrays
             if operation.upper() == 'SUM':
                 arr = top_left + top_right + bottom_left + bottom_right
             elif operation.upper() == 'MAX':
                 arr = np.maximum(np.maximum(np.maximum(top_left, top_right), bottom_left), bottom_right)
 
-        # number of rows and columns removed from the ends of the array
-        pad_num = 2**num_aggre - 1
-        # last pad_num rows already removed
-        y_max -= pad_num
+        # remove last removal_num rows and columns
+        removal_num = 2**num_aggre - 1
+        y_max -= removal_num
         # pad to make array square
-        arr = np.pad(arr, (0, pad_num), 'constant')
+        arr = np.pad(arr, (0, removal_num), 'constant')
         arr = np.reshape(arr, (y_max, x_max))
-        # truncate last pad_num columns
-        arr = np.delete(arr, np.s_[-pad_num:], 1)
+        arr = np.delete(arr, np.s_[-removal_num:], 1)
 
         return arr
 
@@ -176,4 +178,4 @@ class SlidingWindow:
         # TODO remove later
         arr_m = self.__arr_float_to_uint8(arr_m)
 
-        self.__create_tif(arr_m)
+        self.__create_tif(1, [arr_m])
