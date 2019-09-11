@@ -1,30 +1,20 @@
 import unittest
-import hashlib
-import WindowFractalCode as wfrac
+from SlidingWindow import SlidingWindow
+import BandEnum
+import numpy as np
+import rasterio
 
-class TestWindowFractalCode(unittest.TestCase):
+class TestSlidingWindow(unittest.TestCase):
 
-    def test_image_output(self):
-        wfrac.main()
-        expected = 'e0a230836666691a6be3cb6cad8785b10af41ba8073e17bd4d10abfb662881f7'
-        result = self.hash_image('result.tif')
-        #print(f'expected: {expected}')
-        #print(f'  result: {result}')
-        self.assertEqual(expected, result)
+    test_path = 'test.tif'
 
-
-    def hash_image(self, filename):
-        """Image def borrowed from
-        https://www.pythoncentral.io/hashing-files-with-python/"""
-        BLOCKSIZE=65536
-        hasher = hashlib.sha256()
-        with open(filename, 'rb') as afile:
-            buf = afile.read(BLOCKSIZE)
-            while len(buf) > 0:
-                hasher.update(buf)
-                buf = afile.read(BLOCKSIZE)
-        
-        return(hasher.hexdigest())
+    def test_aggregation(self):
+        slide_window = SlidingWindow(self.test_path, BandEnum.rgbIr)
+        img = rasterio.open(self.test_path)
+        arr = img.read(1)
+        arr_vec = slide_window._aggregation(arr.astype(float), 'sum', 6)
+        arr_brute = slide_window._aggregation_brute(arr.astype(float), 'sum', 6)
+        self.assertTrue(np.array_equal(arr_vec, arr_brute))
 
 if __name__ == '__main__':
     unittest.main()

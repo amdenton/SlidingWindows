@@ -54,11 +54,10 @@ class SlidingWindow:
         return arr
 
     # do num_aggre aggregations on window
-    def _aggregation_brute(self, band, operation, num_aggre):
+    def _aggregation_brute(self, arr, operation, num_aggre):
         if (operation.upper() not in self.__valid_ops):
             raise ValueError('operation must be one of %r.' % self.__valid_ops)
 
-        arr = self.img.read(self.band_enum[band].value).astype(float)
         y_max = arr.shape[0]
         x_max = arr.shape[1]
 
@@ -72,10 +71,7 @@ class SlidingWindow:
             elif (operation.upper() == 'MAX'):
                 arr = self.__windowMax(arr, delta)
 
-        # TODO remove later
-        arr = self.__arr_float_to_uint8(arr)
-
-        self.__create_tif(1, [arr])
+        return arr
 
     # convert band into array, then call actual aggregation function
     def aggregation(self, operation, num_aggre):
@@ -86,7 +82,7 @@ class SlidingWindow:
         num_bands = len(self.band_enum)
         for x in range(num_bands):
             arr.append(self.img.read(x+1).astype(float))
-            arr[x] = self.__aggregation(arr[x], operation, num_aggre)
+            arr[x] = self._aggregation(arr[x], operation, num_aggre)
 
             # TODO remove later
             arr[x] = self.__arr_float_to_uint8(arr[x])
@@ -94,7 +90,7 @@ class SlidingWindow:
         self.__create_tif(num_bands, arr)
 
     # do num_aggre aggregations on window
-    def __aggregation(self, arr, operation, num_aggre):        
+    def _aggregation(self, arr, operation, num_aggre):        
         y_max = arr.shape[0]
         x_max = arr.shape[1]
         arr = arr.flatten()
@@ -158,10 +154,10 @@ class SlidingWindow:
         arr_aa = arr_a*arr_a
         arr_ab = arr_a*arr_b
 
-        arr_a = self.__aggregation(arr_a, 'sum', num_aggre)
-        arr_b = self.__aggregation(arr_b, 'sum', num_aggre)
-        arr_aa = self.__aggregation(arr_aa, 'sum', num_aggre)
-        arr_ab = self.__aggregation(arr_ab, 'sum', num_aggre)
+        arr_a = self._aggregation(arr_a, 'sum', num_aggre)
+        arr_b = self._aggregation(arr_b, 'sum', num_aggre)
+        arr_aa = self._aggregation(arr_aa, 'sum', num_aggre)
+        arr_ab = self._aggregation(arr_ab, 'sum', num_aggre)
 
         # Allow division by zero
         # TODO is this necessary? denominator is only zero when x is constant
