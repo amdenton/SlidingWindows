@@ -8,13 +8,29 @@ class TestSlidingWindow(unittest.TestCase):
 
     test_path = 'test.tif'
 
-    def test_aggregation(self):
+    def no_test_aggregation(self):
         slide_window = SlidingWindow(self.test_path, BandEnum.rgbIr)
         img = rasterio.open(self.test_path)
-        arr = img.read(1)
-        arr_vec = slide_window._aggregation(arr.astype(float), 'sum', 6)
-        arr_brute = slide_window._aggregation_brute(arr.astype(float), 'sum', 6)
-        self.assertTrue(np.array_equal(arr_vec, arr_brute))
+        arr = img.read(1).astype(float)
+
+        arr_good = slide_window._aggregation(arr, 'sum', 6)
+        arr_brute = slide_window._aggregation_brute(arr, 'sum', 6)\
+
+        self.assertTrue(np.array_equal(arr_good, arr_brute))
+
+    def no_test_regressions(self):
+        slide_window = SlidingWindow(self.test_path, BandEnum.rgbIr)
+        img = rasterio.open(self.test_path)
+        arr1 = img.read(1).astype(float)
+        arr2 = img.read(2).astype(float)
+
+        arr_good = slide_window._regression(arr1, arr2, 6)
+        arr_brute = slide_window._regression_brute(arr1, arr2, 6)
+
+        self.assertTrue(np.array_equal(arr_good, arr_brute))
+
+    def test_pass(self):
+        self.assertTrue(False)
 
 if __name__ == '__main__':
     unittest.main()

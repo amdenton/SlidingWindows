@@ -1,7 +1,6 @@
 import numpy as np
 import rasterio
 import inspect
-import time
 
 class SlidingWindow:
 
@@ -53,7 +52,6 @@ class SlidingWindow:
         arr = arr.astype(np.uint8)
         return arr
 
-    # do num_aggre aggregations on window
     def _aggregation_brute(self, arr, operation, num_aggre):
         if (operation.upper() not in self.__valid_ops):
             raise ValueError('operation must be one of %r.' % self.__valid_ops)
@@ -67,9 +65,9 @@ class SlidingWindow:
             x_max -= delta
 
             if (operation.upper() == 'SUM'):
-                arr = self.__windowSum(arr, delta)
+                arr = self.__window_sum(arr, delta)
             elif (operation.upper() == 'MAX'):
-                arr = self.__windowMax(arr, delta)
+                arr = self.__window_max(arr, delta)
 
         return arr
 
@@ -122,7 +120,7 @@ class SlidingWindow:
         return arr
 
     # Does one window-aggregation step of a 2d pixel array arr
-    def __windowSum(self, arr, delta):
+    def __window_sum(self, arr, delta):
         y_max = arr.shape[0]
         x_max = arr.shape[1]
         y_max_out = y_max-delta
@@ -135,7 +133,7 @@ class SlidingWindow:
         return arr_out
 
     # Does one window-aggregation step of a 2d pixel array arr
-    def __windowMax (self, arr, delta):
+    def __window_max (self, arr, delta):
         y_max = arr.shape[0]
         x_max = arr.shape[1]
         y_max_out = y_max-delta
@@ -147,11 +145,19 @@ class SlidingWindow:
                 arr_out[j, i] = max(max(max(arr[j, i], arr[j, i+delta]), arr[j+delta, i]), arr[j+delta, i+delta])
         return arr_out
 
-    # Do num_aggre aggregations and return the regression slope between two bands
     def regression(self, band1, band2, num_aggre):
         arr_a = self.img.read(self.band_enum[band1].value).astype(float)
         arr_b = self.img.read(self.band_enum[band2].value).astype(float)
-        arr_aa = arr_a*arr_a
+        arr_m = self._regression(arr_a, arr_b, num_aggre)
+
+        # TODO remove later
+        arr_m = self.__arr_float_to_uint8(arr_m)
+
+        self.__create_tif(1, [arr_m])
+
+    # Do num_aggre aggregations and return the regression slope between two bands
+    def _regression(self, arr_a, arr_b, num_aggre):
+        arr_aa = arr_a**2
         arr_ab = arr_a*arr_b
 
         arr_a = self._aggregation(arr_a, 'sum', num_aggre)
@@ -165,13 +171,75 @@ class SlidingWindow:
 
         # total pixels aggregated per pixel
         count = (2**num_aggre)**2
+
+        # regression coefficient, i.e. slope of best fit line
         numerator = count * arr_ab - arr_a * arr_b
         denominator = count * arr_aa - arr_a * arr_a
-        # regression coefficient of linear least squares fitting
-        # m = cov(a,b) / var(x)
         arr_m = numerator/denominator
 
-        # TODO remove later
-        arr_m = self.__arr_float_to_uint8(arr_m)
+        return arr_m
 
-        self.__create_tif(1, [arr_m])
+    # Do num_aggre aggregations and return the pearson coorelation between two bands
+    def pearson(self, band1, band2, num_aggre):
+        arr_a = self.img.read(self.band_enum[band1].value).astype(float)
+        arr_b = self.img.read(self.band_enum[band2].value).astype(float)
+        arr_r = self._pearson(arr_a, arr_b, num_aggre)
+
+        # TODO remove later
+        arr_r = self.__arr_float_to_uint8(arr_r)
+
+        self.__create_tif(1, [arr_r])
+
+    # Do num_aggre aggregations and return the regression slope between two bands
+    def _pearson(self, arr_a, arr_b, num_aggre):
+        arr_aa = arr_a**2
+        arr_bb = arr_b**2
+        arr_ab = arr_a*arr_b
+
+        arr_a = self._aggregation(arr_a, 'sum', num_aggre)
+        arr_b = self._aggregation(arr_b, 'sum', num_aggre)
+        arr_aa = self._aggregation(arr_aa, 'sum', num_aggre)
+        arr_bb = self._aggregation(arr_bb, 'sum', num_aggre)
+        arr_ab = self._aggregation(arr_ab, 'sum', num_aggre)
+
+        # Allow division by zero
+        # TODO is this necessary? denominator is only zero when x is constant
+        np.seterr(divide='ignore', invalid='ignore')
+
+        # total pixels aggregated per pixel
+        count = (2**num_aggre)**2
+
+        # pearson correlation
+        numerator = count*arr_ab - arr_a*arr_b
+        denominator = np.sqrt(count * arr_aa - arr_a**2) * np.sqrt(count * arr_bb - arr_b**2)
+        arr_r = numerator / denominator
+        
+        return arr_r
+
+    def _regression_brute(self, arr_a, arr_b, num_aggre):
+        w_out = 2**num_aggre
+        aggre_count = w_out*w_out
+        y_max =  arr_a.shape[0] - (w_out-1)
+        x_max = arr_a.shape[1] - (w_out-1)
+        arr_m = np.empty([x_max, y_max])
+        
+        for j in range (0, y_max):
+            for i in range (0, x_max):
+                sum_a, sum_b, sum_aa, sum_bb, sum_ab = tuple(np.float(0) for i in range(5))
+                
+                # TODO does this really need testing? already implemented in aggregation
+                for jw in range (0, w_out):
+                    for iw in range (0, w_out):
+                        a = arr_a[j+jw][i+iw]
+                        b = arr_b[j+jw][i+iw]
+                        sum_a += a
+                        sum_b += b
+                        sum_aa += a*a
+                        sum_bb += b*b
+                        sum_ab += a*b
+            
+                numerator = aggre_count * sum_ab - sum_a * sum_b
+                denominator = aggre_count * sum_aa - sum_a * sum_a
+                arr_m[j][i] = numerator/denominator
+
+        return arr_m
