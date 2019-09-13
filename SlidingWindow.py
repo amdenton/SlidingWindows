@@ -92,6 +92,8 @@ class SlidingWindow:
     def _partial_aggregation(self, arr, power_start, power_target, operation):
         if (operation.upper() not in self.__valid_ops):
             raise ValueError('operation must be one of %r.' % self.__valid_ops)
+        if (power_start < 0 or power_start >= power_target):
+            raise ValueError('power_start must be nonzero and less than power_target')
 
         y_max = arr.shape[0]
         x_max = arr.shape[1]
@@ -245,6 +247,8 @@ class SlidingWindow:
         return arr_m
 
     def fractal(self, band, power_start, power_target):
+        if (power_start < 0 or power_start >= power_target):
+            raise ValueError('power_start must be nonzero and less than power_target')
         arr = self.img.read(self.band_enum[band].value).astype(float)
         arr, residuals = self.__fractal(arr, power_start, power_target)
 
@@ -254,24 +258,27 @@ class SlidingWindow:
         self.__create_tif(1, [arr])
 
     def __fractal(self, arr, power_start, power_target):
-        arr_out = np.array(arr)
+        if (power_start < 0 or power_start >= power_target):
+            raise ValueError('power_start must be nonzero and less than power_target')
+        arr_init = np.array(arr)
         y_max = arr.shape[0]-(2**power_target-1)
         x_max = arr.shape[1]-(2**power_target-1)
         denom_regress = np.empty(power_target-power_start)
         num_regress = np.empty((power_target-power_start, x_max*y_max))
         
-        arr_out = self._partial_aggregation(arr_out, 0, power_start, 'max')
+        if (power_start>0):
+            arr_init = self._partial_aggregation(arr_init, 0, power_start, 'max')
 
         for i in range(power_start, power_target):
-            sum_array = self._partial_aggregation(arr_out, i, power_target, 'sum')
-            sum_array = np.maximum(sum_array, 1)
+            arr_sum = self._partial_aggregation(arr_init, i, power_target, 'sum')
+            arr_sum = np.maximum(arr_sum, 1)
 
-            num_array = np.log(sum_array)/np.log(2)
+            arr_sum = np.log(arr_sum)/np.log(2)
             denom = power_target-i
             denom_regress[i-power_start] = denom
-            num_regress[i-power_start,] = num_array.flatten()
+            num_regress[i-power_start,] = arr_sum.flatten()
             if i < power_target-1:
-                arr_out = self._partial_aggregation(arr_out, i, i+1, 'max')
+                arr_init = self._partial_aggregation(arr_init, i, i+1, 'max')
 
         arr_out, residuals, rank, singular_values, rcond = np.polyfit(denom_regress, num_regress, 1, full=True)
         arr_out = np.reshape(arr_out[0], (y_max, x_max))
