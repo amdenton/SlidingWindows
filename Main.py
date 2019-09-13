@@ -6,9 +6,10 @@ import time
 
 slide_window = SlidingWindow('test.tif', rgbIr)
 
+slide_window.fractal('red', 3, 6)
 # slide_window.binary('red', 127)
 # slide_window.regression('red', 'green', 6)
-slide_window.pearson('red', 'green', 6)
+# slide_window.pearson('red', 'green', 6)
 # slide_window.aggregation('sum', 6)
 
 # img_og = rasterio.open('m_4509601_ne_14_1_20120705.tif')

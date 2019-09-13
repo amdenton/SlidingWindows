@@ -80,21 +80,25 @@ class SlidingWindow:
         num_bands = len(self.band_enum)
         for x in range(num_bands):
             arr.append(self.img.read(x+1).astype(float))
-            arr[x] = self._aggregation(arr[x], operation, num_aggre)
+            arr[x] = self._partial_aggregation(arr[x], 0, num_aggre, operation)
 
             # TODO remove later
             arr[x] = self.__arr_float_to_uint8(arr[x])
         
         self.__create_tif(num_bands, arr)
 
-    # do num_aggre aggregations on window
-    def _aggregation(self, arr, operation, num_aggre):        
+    # do power_target-power_start aggregations on window
+    # starting with delta=2**power_start
+    def _partial_aggregation(self, arr, power_start, power_target, operation):
+        if (operation.upper() not in self.__valid_ops):
+            raise ValueError('operation must be one of %r.' % self.__valid_ops)
+
         y_max = arr.shape[0]
         x_max = arr.shape[1]
         arr = arr.flatten()
         
         # calculate sliding window for each value of delta
-        for x in range(num_aggre):
+        for x in range(power_start, power_target):
             delta = 2**x
             size = arr.size
             # create offset slices of the array to aggregate elements
@@ -110,38 +114,34 @@ class SlidingWindow:
                 arr = np.maximum(np.maximum(np.maximum(top_left, top_right), bottom_left), bottom_right)
 
         # remove last removal_num rows and columns
-        removal_num = 2**num_aggre - 1
+        removal_num = 2**power_target - 2**power_start
         y_max -= removal_num
         # pad to make array square
         arr = np.pad(arr, (0, removal_num), 'constant')
         arr = np.reshape(arr, (y_max, x_max))
         arr = np.delete(arr, np.s_[-removal_num:], 1)
-
+        
         return arr
 
     # Does one window-aggregation step of a 2d pixel array arr
     def __window_sum(self, arr, delta):
-        y_max = arr.shape[0]
-        x_max = arr.shape[1]
-        y_max_out = y_max-delta
-        x_max_out = x_max-delta
-        arr_out = np.empty([y_max_out, x_max_out])
+        y_max = arr.shape[0]-delta
+        x_max = arr.shape[1]-delta
+        arr_out = np.empty([y_max, x_max])
 
-        for j in range (y_max_out):
-            for i in range (x_max_out):
+        for j in range (y_max):
+            for i in range (x_max):
                 arr_out[j, i] = arr[j, i] + arr[j, i+delta] + arr[j+delta, i] + arr[j+delta, i+delta]
         return arr_out
 
     # Does one window-aggregation step of a 2d pixel array arr
     def __window_max (self, arr, delta):
-        y_max = arr.shape[0]
-        x_max = arr.shape[1]
-        y_max_out = y_max-delta
-        x_max_out = x_max-delta
-        arr_out = np.empty([y_max_out, x_max_out])
+        y_max = arr.shape[0]-delta
+        x_max = arr.shape[1]-delta
+        arr_out = np.empty([y_max, x_max])
 
-        for j in range (y_max_out):
-            for i in range (x_max_out):
+        for j in range (y_max):
+            for i in range (x_max):
                 arr_out[j, i] = max(max(max(arr[j, i], arr[j, i+delta]), arr[j+delta, i]), arr[j+delta, i+delta])
         return arr_out
 
@@ -160,10 +160,10 @@ class SlidingWindow:
         arr_aa = arr_a**2
         arr_ab = arr_a*arr_b
 
-        arr_a = self._aggregation(arr_a, 'sum', num_aggre)
-        arr_b = self._aggregation(arr_b, 'sum', num_aggre)
-        arr_aa = self._aggregation(arr_aa, 'sum', num_aggre)
-        arr_ab = self._aggregation(arr_ab, 'sum', num_aggre)
+        arr_a = self._partial_aggregation(arr_a, 0, num_aggre, 'sum')
+        arr_b = self._partial_aggregation(arr_b, 0, num_aggre, 'sum')
+        arr_aa = self._partial_aggregation(arr_aa, 0, num_aggre, 'sum')
+        arr_ab = self._partial_aggregation(arr_ab, 0, num_aggre, 'sum')
 
         # Allow division by zero
         # TODO is this necessary? denominator is only zero when x is constant
@@ -196,11 +196,11 @@ class SlidingWindow:
         arr_bb = arr_b**2
         arr_ab = arr_a*arr_b
 
-        arr_a = self._aggregation(arr_a, 'sum', num_aggre)
-        arr_b = self._aggregation(arr_b, 'sum', num_aggre)
-        arr_aa = self._aggregation(arr_aa, 'sum', num_aggre)
-        arr_bb = self._aggregation(arr_bb, 'sum', num_aggre)
-        arr_ab = self._aggregation(arr_ab, 'sum', num_aggre)
+        arr_a = self._partial_aggregation(arr_a, 0, num_aggre, 'sum')
+        arr_b = self._partial_aggregation(arr_b, 0, num_aggre, 'sum')
+        arr_aa = self._partial_aggregation(arr_aa, 0, num_aggre, 'sum')
+        arr_bb = self._partial_aggregation(arr_bb, 0, num_aggre, 'sum')
+        arr_ab = self._partial_aggregation(arr_ab, 0, num_aggre, 'sum')
 
         # Allow division by zero
         # TODO is this necessary? denominator is only zero when x is constant
@@ -243,3 +243,36 @@ class SlidingWindow:
                 arr_m[j][i] = numerator/denominator
 
         return arr_m
+
+    def fractal(self, band, power_start, power_target):
+        arr = self.img.read(self.band_enum[band].value).astype(float)
+        arr, residuals = self.__fractal(arr, power_start, power_target)
+
+        # TODO remove later
+        arr = self.__arr_float_to_uint8(arr)
+
+        self.__create_tif(1, [arr])
+
+    def __fractal(self, arr, power_start, power_target):
+        arr_out = np.array(arr)
+        y_max = arr.shape[0]-(2**power_target-1)
+        x_max = arr.shape[1]-(2**power_target-1)
+        denom_regress = np.empty(power_target-power_start)
+        num_regress = np.empty((power_target-power_start, x_max*y_max))
+        
+        arr_out = self._partial_aggregation(arr_out, 0, power_start, 'max')
+
+        for i in range(power_start, power_target):
+            sum_array = self._partial_aggregation(arr_out, i, power_target, 'sum')
+            sum_array = np.maximum(sum_array, 1)
+
+            num_array = np.log(sum_array)/np.log(2)
+            denom = power_target-i
+            denom_regress[i-power_start] = denom
+            num_regress[i-power_start,] = num_array.flatten()
+            if i < power_target-1:
+                arr_out = self._partial_aggregation(arr_out, i, i+1, 'max')
+
+        arr_out, residuals, rank, singular_values, rcond = np.polyfit(denom_regress, num_regress, 1, full=True)
+        arr_out = np.reshape(arr_out[0], (y_max, x_max))
+        return arr_out, residuals
