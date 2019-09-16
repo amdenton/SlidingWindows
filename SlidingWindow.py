@@ -26,6 +26,7 @@ class SlidingWindow:
         self.__create_tif(1, [ndvi])
         
     # turn image into black and white
+    # values greater than or equal to threshold are white
     def binary(self, band, threshold):
         img = self.img.read(self.band_enum[band].value)
         binary = np.where(img < threshold, 0, 255).astype(np.uint8)
@@ -56,13 +57,8 @@ class SlidingWindow:
         if (operation.upper() not in self.__valid_ops):
             raise ValueError('operation must be one of %r.' % self.__valid_ops)
 
-        y_max = arr.shape[0]
-        x_max = arr.shape[1]
-
         for i in range(num_aggre):
             delta = 2**i
-            y_max -= delta
-            x_max -= delta
 
             if (operation.upper() == 'SUM'):
                 arr = self.__window_sum(arr, delta)
@@ -167,7 +163,7 @@ class SlidingWindow:
         arr_aa = self._partial_aggregation(arr_aa, 0, num_aggre, 'sum')
         arr_ab = self._partial_aggregation(arr_ab, 0, num_aggre, 'sum')
 
-        # total pixels aggregated per pixel
+        # total input pixels aggregated per output pixel
         count = (2**num_aggre)**2
 
         # regression coefficient, i.e. slope of best fit line

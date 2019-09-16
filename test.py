@@ -11,12 +11,18 @@ class TestSlidingWindow(unittest.TestCase):
     def test_aggregation(self):
         slide_window = SlidingWindow(self.test_path, BandEnum.rgbIr)
         img = rasterio.open(self.test_path)
-        arr = img.read(1).astype(float)[0:1024, 0:1024]
+        arr = img.read(1).astype(float)[0:512, 0:512]
 
-        arr_good = slide_window._partial_aggregation(arr, 0, 6, 'sum')
-        arr_brute = slide_window._aggregation_brute(arr, 'sum', 6)
+        arr_good = slide_window._partial_aggregation(arr, 0, 7, 'sum')
+
+        arr_good_partial = slide_window._partial_aggregation(arr, 0, 2, 'sum')
+        arr_good_partial = slide_window._partial_aggregation(arr_good_partial, 2, 3, 'sum')
+        arr_good_partial = slide_window._partial_aggregation(arr_good_partial, 3, 7, 'sum')
+
+        arr_brute = slide_window._aggregation_brute(arr, 'sum', 7)
 
         self.assertTrue(np.array_equal(arr_good, arr_brute))
+        self.assertTrue(np.array_equal(arr_good_partial, arr_brute))
 
     def test_regression(self):
         slide_window = SlidingWindow(self.test_path, BandEnum.rgbIr)
