@@ -167,19 +167,19 @@ class SlidingWindow:
         arr_aa = self._partial_aggregation(arr_aa, 0, num_aggre, 'sum')
         arr_ab = self._partial_aggregation(arr_ab, 0, num_aggre, 'sum')
 
-        # Allow division by zero
-        # TODO is this necessary? denominator is only zero when x is constant
-        np.seterr(divide='ignore', invalid='ignore')
-
         # total pixels aggregated per pixel
         count = (2**num_aggre)**2
 
         # regression coefficient, i.e. slope of best fit line
         numerator = count * arr_ab - arr_a * arr_b
         denominator = count * arr_aa - arr_a * arr_a
+        # avoid division by zero
+        denominator = np.maximum(denominator, 1)
         arr_m = numerator/denominator
 
         return arr_m
+
+    # TODO potentially add R squared method?
 
     # Do num_aggre aggregations and return the pearson coorelation between two bands
     def pearson(self, band1, band2, num_aggre):
@@ -204,16 +204,14 @@ class SlidingWindow:
         arr_bb = self._partial_aggregation(arr_bb, 0, num_aggre, 'sum')
         arr_ab = self._partial_aggregation(arr_ab, 0, num_aggre, 'sum')
 
-        # Allow division by zero
-        # TODO is this necessary? denominator is only zero when x is constant
-        np.seterr(divide='ignore', invalid='ignore')
-
         # total pixels aggregated per pixel
         count = (2**num_aggre)**2
 
         # pearson correlation
         numerator = count*arr_ab - arr_a*arr_b
         denominator = np.sqrt(count * arr_aa - arr_a**2) * np.sqrt(count * arr_bb - arr_b**2)
+        # avoid division by zero
+        denominator = np.maximum(denominator, 1)
         arr_r = numerator / denominator
         
         return arr_r
@@ -253,8 +251,7 @@ class SlidingWindow:
         denom_regress = np.empty(power_target-power_start)
         num_regress = np.empty((power_target-power_start, x_max*y_max))
         
-        if (power_start>0):
-            arr_init = self._partial_aggregation(arr_init, 0, power_start, 'max')
+        arr_init = self._partial_aggregation(arr_init, 0, power_start, 'max')
 
         for i in range(power_start, power_target):
             arr_sum = self._partial_aggregation(arr_init, i, power_target, 'sum')
