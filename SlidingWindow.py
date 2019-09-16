@@ -220,29 +220,16 @@ class SlidingWindow:
 
     def _regression_brute(self, arr_a, arr_b, num_aggre):
         w_out = 2**num_aggre
-        aggre_count = w_out*w_out
         y_max =  arr_a.shape[0] - (w_out-1)
         x_max = arr_a.shape[1] - (w_out-1)
         arr_m = np.empty([x_max, y_max])
         
-        for j in range (0, y_max):
-            for i in range (0, x_max):
-                sum_a, sum_b, sum_aa, sum_bb, sum_ab = tuple(np.float(0) for i in range(5))
-                
-                # TODO does this really need testing? already implemented in aggregation
-                for jw in range (0, w_out):
-                    for iw in range (0, w_out):
-                        a = arr_a[j+jw][i+iw]
-                        b = arr_b[j+jw][i+iw]
-                        sum_a += a
-                        sum_b += b
-                        sum_aa += a*a
-                        sum_bb += b*b
-                        sum_ab += a*b
-            
-                numerator = aggre_count * sum_ab - sum_a * sum_b
-                denominator = aggre_count * sum_aa - sum_a * sum_a
-                arr_m[j][i] = numerator/denominator
+        for j in range (y_max):
+            for i in range (x_max):
+                arr_1 = arr_a[j:j+w_out, i:i+w_out].flatten()
+                arr_2 = arr_b[j:j+w_out, i:i+w_out].flatten()
+                arr_out = np.polyfit(arr_1, arr_2, 1)[0]
+                arr_m[j][i] = arr_out
 
         return arr_m
 
