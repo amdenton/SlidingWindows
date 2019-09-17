@@ -6,7 +6,8 @@ import time
 
 slide_window = SlidingWindow('test.tif', rgbIr)
 
-slide_window.fractal('red', 3, 6)
+# slide_window.fractal_3d('red', 6)
+# slide_window.fractal('red', 3, 6)
 # slide_window.binary('red', 127)
 # slide_window.regression('red', 'green', 6)
 # slide_window.pearson('red', 'green', 6)

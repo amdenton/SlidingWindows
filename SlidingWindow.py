@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.polynomial import polynomial as poly
 import rasterio
 import inspect
 
@@ -9,7 +10,7 @@ class SlidingWindow:
         self.img = rasterio.open(file_path)
         self.band_enum = band_enum
 
-    __valid_ops = {'SUM', 'MAX'}
+    __valid_ops = {'SUM', 'MAX', 'MIN'}
     @property
     def valid_ops(self):
         return self.__valid_ops
@@ -28,44 +29,58 @@ class SlidingWindow:
     # turn image into black and white
     # values greater than or equal to threshold are white
     def binary(self, band, threshold):
-        img = self.img.read(self.band_enum[band].value)
-        binary = np.where(img < threshold, 0, 255).astype(np.uint8)
-        self.__create_tif(1, [binary])
+        arr = self.img.read(self.band_enum[band].value)
+        arr = self.__binary(arr, threshold)
+        self.__create_tif(1, [arr])
+
+    def __binary(self, arr, threshold):
+        return np.where(arr < threshold, 0, 255).astype(np.uint8)
 
     # create tif with array of image bands
-    def __create_tif(self, num_bands, arr):
+    def __create_tif(self, num_bands, arr_in):
         profile = self.img.profile
         profile.update(
             count=num_bands,
-            height=len(arr[0]),
-            width=len(arr[0][0])
+            height=len(arr_in[0]),
+            width=len(arr_in[0][0])
             )
         caller_name = inspect.stack()[1].function
         with rasterio.open(caller_name + '_' + self.file_path, 'w', **profile) as dst:
             for x in range(num_bands): 
-                dst.write(arr[x], x+1)
+                dst.write(arr_in[x], x+1)
 
     # TODO fix later, not the best way to do this
-    def __arr_float_to_uint8(self, arr):
-        max_val = np.amax(arr)
-        min_val = np.amin(arr)
-        arr = ((arr - min_val)/(max_val - min_val)) * 255
-        arr = arr.astype(np.uint8)
-        return arr
+    def __arr_float_to_uint8(self, arr_in):
+        max_val = np.amax(arr_in)
+        min_val = np.amin(arr_in)
+        arr_out = ((arr_in - min_val)/(max_val - min_val)) * 255
+        arr_out = arr_out.astype(np.uint8)
+        return arr_out
 
-    def _aggregation_brute(self, arr, operation, num_aggre):
+    def _aggregation_brute(self, arr_in, operation, num_aggre):
         if (operation.upper() not in self.__valid_ops):
             raise ValueError('operation must be one of %r.' % self.__valid_ops)
 
+        y_max = arr_in.shape[0]
+        x_max = arr_in.shape[1]
+        arr_out = np.array(arr_in)
         for i in range(num_aggre):
             delta = 2**i
+            y_max -= delta
+            x_max -= delta
+            arr = np.empty([y_max, x_max])
 
-            if (operation.upper() == 'SUM'):
-                arr = self.__window_sum(arr, delta)
-            elif (operation.upper() == 'MAX'):
-                arr = self.__window_max(arr, delta)
+            for j in range (y_max):
+                for i in range (x_max):
+                    if (operation.upper() == 'SUM'):
+                        arr[j, i] = arr_out[j, i] + arr_out[j, i+delta] + arr_out[j+delta, i] + arr_out[j+delta, i+delta]
+                    elif (operation.upper() == 'MAX'):
+                        arr[j, i] = max(max(max(arr_out[j, i], arr_out[j, i+delta]), arr_out[j+delta, i]), arr_out[j+delta, i+delta])
+                    elif (operation.upper() == 'MIN'):
+                        arr[j, i] = min(min(min(arr_out[j, i], arr_out[j, i+delta]), arr_out[j+delta, i]), arr_out[j+delta, i+delta])
+            arr_out = arr
 
-        return arr
+        return arr_out
 
     # convert band into array, then call actual aggregation function
     def aggregation(self, operation, num_aggre):
@@ -85,62 +100,42 @@ class SlidingWindow:
 
     # do power_target-power_start aggregations on window
     # starting with delta=2**power_start
-    def _partial_aggregation(self, arr, power_start, power_target, operation):
+    def _partial_aggregation(self, arr_in, power_start, power_target, operation):
         if (operation.upper() not in self.__valid_ops):
             raise ValueError('operation must be one of %r.' % self.__valid_ops)
         if (power_start < 0 or power_start >= power_target):
             raise ValueError('power_start must be nonzero and less than power_target')
 
-        y_max = arr.shape[0]
-        x_max = arr.shape[1]
-        arr = arr.flatten()
+        y_max = arr_in.shape[0]
+        x_max = arr_in.shape[1]
+        arr_out = arr_in.flatten()
         
         # calculate sliding window for each value of delta
-        for x in range(power_start, power_target):
-            delta = 2**x
-            size = arr.size
+        for i in range(power_start, power_target):
+            delta = 2**i
+            size = arr_out.size
             # create offset slices of the array to aggregate elements
             # aggregates the corners of squares of length delta+1
-            top_left = arr[0: size - (delta*x_max + delta)]
-            top_right = arr[delta: size - (x_max*delta)]
-            bottom_left = arr[delta*x_max: size - (delta)]
-            bottom_right = arr[delta*x_max + delta: size]
+            top_left = arr_out[0: size - (delta*x_max + delta)]
+            top_right = arr_out[delta: size - (x_max*delta)]
+            bottom_left = arr_out[delta*x_max: size - (delta)]
+            bottom_right = arr_out[delta*x_max + delta: size]
 
             if operation.upper() == 'SUM':
-                arr = top_left + top_right + bottom_left + bottom_right
+                arr_out = top_left + top_right + bottom_left + bottom_right
             elif operation.upper() == 'MAX':
-                arr = np.maximum(np.maximum(np.maximum(top_left, top_right), bottom_left), bottom_right)
+                arr_out = np.maximum(np.maximum(np.maximum(top_left, top_right), bottom_left), bottom_right)
+            elif operation.upper() == 'MIN':
+                arr_out = np.minimum(np.minimum(np.minimum(top_left, top_right), bottom_left), bottom_right)
 
         # remove last removal_num rows and columns
         removal_num = 2**power_target - 2**power_start
         y_max -= removal_num
         # pad to make array square
-        arr = np.pad(arr, (0, removal_num), 'constant')
-        arr = np.reshape(arr, (y_max, x_max))
-        arr = np.delete(arr, np.s_[-removal_num:], 1)
+        arr_out = np.pad(arr_out, (0, removal_num), 'constant')
+        arr_out = np.reshape(arr_out, (y_max, x_max))
+        arr_out = np.delete(arr_out, np.s_[-removal_num:], 1)
         
-        return arr
-
-    # Does one window-aggregation step of a 2d pixel array arr
-    def __window_sum(self, arr, delta):
-        y_max = arr.shape[0]-delta
-        x_max = arr.shape[1]-delta
-        arr_out = np.empty([y_max, x_max])
-
-        for j in range (y_max):
-            for i in range (x_max):
-                arr_out[j, i] = arr[j, i] + arr[j, i+delta] + arr[j+delta, i] + arr[j+delta, i+delta]
-        return arr_out
-
-    # Does one window-aggregation step of a 2d pixel array arr
-    def __window_max (self, arr, delta):
-        y_max = arr.shape[0]-delta
-        x_max = arr.shape[1]-delta
-        arr_out = np.empty([y_max, x_max])
-
-        for j in range (y_max):
-            for i in range (x_max):
-                arr_out[j, i] = max(max(max(arr[j, i], arr[j, i+delta]), arr[j+delta, i]), arr[j+delta, i+delta])
         return arr_out
 
     def regression(self, band1, band2, num_aggre):
@@ -222,44 +217,124 @@ class SlidingWindow:
             for i in range (x_max):
                 arr_1 = arr_a[j:j+w_out, i:i+w_out].flatten()
                 arr_2 = arr_b[j:j+w_out, i:i+w_out].flatten()
-                arr_out = np.polyfit(arr_1, arr_2, 1)[0]
-                arr_m[j][i] = arr_out
+                arr_coef = poly.polyfit(arr_1, arr_2, 1)
+                arr_m[j][i] = arr_coef[1]
 
         return arr_m
 
     def fractal(self, band, power_start, power_target):
         if (power_start < 0 or power_start >= power_target):
             raise ValueError('power_start must be nonzero and less than power_target')
+
         arr = self.img.read(self.band_enum[band].value).astype(float)
-        arr, residuals = self.__fractal(arr, power_start, power_target)
+        arr = self._fractal(arr, power_start, power_target)
 
         # TODO remove later
         arr = self.__arr_float_to_uint8(arr)
 
         self.__create_tif(1, [arr])
 
-    def __fractal(self, arr, power_start, power_target):
+    # TODO do I need a binary image?
+    def _fractal(self, arr_in, power_start, power_target):
         if (power_start < 0 or power_start >= power_target):
             raise ValueError('power_start must be nonzero and less than power_target')
-        arr_init = np.array(arr)
-        y_max = arr.shape[0]-(2**power_target-1)
-        x_max = arr.shape[1]-(2**power_target-1)
+
+        y_max = arr_in.shape[0]-(2**power_target-1)
+        x_max = arr_in.shape[1]-(2**power_target-1)
+        arr = np.array(arr_in)
         denom_regress = np.empty(power_target-power_start)
-        num_regress = np.empty((power_target-power_start, x_max*y_max))
+        num_regress = np.empty([power_target-power_start, x_max*y_max])
         
-        arr_init = self._partial_aggregation(arr_init, 0, power_start, 'max')
+        if power_start > 0:
+            arr = self._partial_aggregation(arr, 0, power_start, 'max')
 
         for i in range(power_start, power_target):
-            arr_sum = self._partial_aggregation(arr_init, i, power_target, 'sum')
+            arr_sum = self._partial_aggregation(arr, i, power_target, 'sum')
             arr_sum = np.maximum(arr_sum, 1)
 
             arr_sum = np.log(arr_sum)/np.log(2)
-            denom = power_target-i
-            denom_regress[i-power_start] = denom
+            denom_regress[i-power_start] = power_target-i
             num_regress[i-power_start,] = arr_sum.flatten()
             if i < power_target-1:
-                arr_init = self._partial_aggregation(arr_init, i, i+1, 'max')
+                arr = self._partial_aggregation(arr, i, i+1, 'max')
 
-        arr_out, residuals, rank, singular_values, rcond = np.polyfit(denom_regress, num_regress, 1, full=True)
-        arr_out = np.reshape(arr_out[0], (y_max, x_max))
-        return arr_out, residuals
+        arr_coef = poly.polyfit(denom_regress, num_regress, 1)
+        arr_out = np.reshape(arr_coef[1], (y_max, x_max))
+        return arr_out
+
+    # This is for the 3D fractal dimension that is between 2 and 3, but it isn't tested yet
+    def __boxed_array(self, arr_in, power_target):
+        arr_min = np.min(arr_in)
+        arr_max = np.max(arr_in)
+        arr_out = np.zeros(arr_in.size)
+        if (arr_max > arr_min):
+            n_boxes = 2**power_target-1
+            buffer = (arr_in-arr_min)/(arr_max-arr_min)
+            arr_out = np.floor(n_boxes * buffer)
+        return arr_out
+
+    def fractal_3d(self, band, power_target):
+        if (power_target <= 0):
+            raise ValueError('power_target must be greater than zero')
+
+        arr = self.img.read(self.band_enum[band].value).astype(float)
+        arr = self._fractal_3d(arr, power_target)
+
+        # TODO remove later
+        arr = self.__arr_float_to_uint8(arr)
+
+        self.__create_tif(1, [arr])
+
+    def _fractal_3d(self, arr_in, power_target):
+        y_max = arr_in.shape[0] - (2**power_target-1)
+        x_max = arr_in.shape[1] - (2**power_target-1)
+        arr_box = self.__boxed_array(arr_in, power_target)
+        # TODO should this be power_target or arr.size?
+        # what is the correct way to organize these arrays?
+        denom_regress = np.empty(power_target)
+        num_regress = np.empty([power_target, x_max*y_max])
+        
+        for i in range(0, power_target):
+            arr_min = np.array(arr_box)
+            arr_max = np.array(arr_box)
+            if (i > 0):
+                arr_min = self._partial_aggregation(arr_min, 0, i, 'min')
+                arr_max = self._partial_aggregation(arr_max, 0, i, 'max')
+            arr_sum = self._partial_aggregation(arr_max-arr_min+1, i, power_target, 'sum')
+
+            arr_num = np.log(arr_sum)/np.log(2)
+            denom_regress[i] = power_target - i
+            num_regress[i,] = arr_num.flatten()
+            # TODO should this be box_arr?
+            arr_box = arr_box / 2
+
+        arr_coef = poly.polyfit(denom_regress, num_regress, 1)
+        arr_out = np.reshape(arr_coef[1], (y_max, x_max))
+        return arr_out
+
+    def _fractal_brute(self, arr_in, power_start, power_target):
+        if (power_start < 0 or power_start >= power_target):
+            raise ValueError('power_start must be nonzero and less than power_target')
+
+        y_max = arr_in.shape[0] - (2**power_target - 1)
+        x_max = arr_in.shape[1] - (2**power_target - 1)
+        arr = self.__binary(arr_in, np.mean(arr_in))
+        denom_regress = np.empty(power_target-power_start)
+        num_regress = np.zeros([power_target-power_start, x_max*y_max])
+        
+        if power_start > 0:
+            arr = self._partial_aggregation(arr, 0, power_start, 'max')
+        
+        for i in range(power_start, power_target):
+            arr_sum = self._partial_aggregation(arr, i, power_target, 'sum')
+            arr_sum = np.maximum(arr_sum, 1)
+            num_array = np.log(arr_sum)/np.log(2)
+            denom = power_target-i
+            denom_regress[i-power_start] = denom
+            num_regress[i-power_start,] = num_array.flatten()
+            if i < power_target-1:
+                arr = self._partial_aggregation(arr, i, i+1, 'max')
+        
+        arr_coef = poly.polyfit(denom_regress, num_regress, 1)
+        arr_out = np.reshape(arr_coef[1], (y_max, x_max))
+        return arr_out
