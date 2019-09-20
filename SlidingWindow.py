@@ -12,7 +12,7 @@ class SlidingWindow:
         self.img = rasterio.open(file_path)
         self.band_enum = band_enum
 
-    __valid_ops = {'ARITHMETIC++++', 'ARITHMETIC--++', 'ARITHMETIC-+-+', 'MAX', 'MIN'}
+    __valid_ops = {'ARITHMETIC++++', 'ARITHMETIC--++', 'ARITHMETIC-+-+', 'ARITHMETIC+--+', 'MAX', 'MIN'}
     @property
     def valid_ops(self):
         return self.__valid_ops
@@ -84,6 +84,8 @@ class SlidingWindow:
                         arr[j, i] = -arr_out[j, i] - arr_out[j, i+delta] + arr_out[j+delta, i] + arr_out[j+delta, i+delta]
                     if (operation.upper() == 'ARITHMETIC-+-+'):
                         arr[j, i] = -arr_out[j, i] + arr_out[j, i+delta] - arr_out[j+delta, i] + arr_out[j+delta, i+delta]
+                    if (operation.upper() == 'ARITHMETIC+--+'):
+                        arr[j, i] = arr_out[j, i] - arr_out[j, i+delta] - arr_out[j+delta, i] + arr_out[j+delta, i+delta]
                     elif (operation.upper() == 'MAX'):
                         arr[j, i] = max(max(max(arr_out[j, i], arr_out[j, i+delta]), arr_out[j+delta, i]), arr_out[j+delta, i+delta])
                     elif (operation.upper() == 'MIN'):
@@ -137,6 +139,8 @@ class SlidingWindow:
                 arr_out = -top_left - top_right + bottom_left + bottom_right
             if operation.upper() == 'ARITHMETIC-+-+':
                 arr_out = -top_left + top_right - bottom_left + bottom_right
+            if operation.upper() == 'ARITHMETIC+--+':
+                arr_out = top_left - top_right - bottom_left + bottom_right
             elif operation.upper() == 'MAX':
                 arr_out = np.maximum(np.maximum(np.maximum(top_left, top_right), bottom_left), bottom_right)
             elif operation.upper() == 'MIN':
@@ -358,8 +362,7 @@ class SlidingWindow:
         arr_dic = self.__initialize_arrays(arr)
 
         for i in range(1):
-            delta = 2**i
-            self.__double_w(delta, arr_dic)
+            self.__double_w(i, arr_dic)
             self.__window_mean(i, arr_dic)
 
     def __window_mean(self, w, arr_dic):
@@ -395,46 +398,33 @@ class SlidingWindow:
         arr_dic = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz, 'geo_t':geo_t, 'orig_height': z.shape[0], 'orig_width': z.shape[1]}
         return arr_dic
 
-    def __double_w(self, delta, arr_dic):
-        z, xz, yz, xxz, yyz, xyz = [arr_dic[i] for i in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz')]
-        x_max = z.shape[0] - delta
-        y_max = z.shape[1] - delta
-        z_new, xz_new, yz_new, xxz_new, yyz_new, xyz_new = [np.zeros([y_max, x_max]) for _ in range(6)]
+    def __double_w(self, delta_power, arr_dic):
+        delta = 2**delta_power
+        x_max = arr_dic['z'].shape[0] - delta
+        y_max = arr_dic['z'].shape[1] - delta
+        z, xz, yz, xxz, yyz, xyz = [np.zeros([y_max, x_max]) for _ in range(6)]
+
+        xxz_sum_all = self._partial_aggregation(arr_dic['xxz'], delta_power, delta_power+1, 'arithmetic++++')
+        yyz_sum_all = self._partial_aggregation(arr_dic['yyz'], delta_power, delta_power+1, 'arithmetic++++')
+        xyz_sum_all = self._partial_aggregation(arr_dic['xyz'], delta_power, delta_power+1, 'arithmetic++++')
+        xz_sum_all = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, 'arithmetic++++')
+        xz_diff_top_sum_bottom = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, 'arithmetic--++')
+        xz_diff_left_sum_right = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, 'arithmetic-+-+')
+        yz_diff_top_sum_bottom = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, 'arithmetic--++')
+        yz_diff_left_sum_right = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, 'arithmetic-+-+')
+        z_sum_all = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, 'arithmetic++++')
+        z_diff_top_sum_bottom = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, 'arithmeti--++')
+        z_diff_left_sum_right = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, 'arithmeti-+-+')
+        z_diff_anti_diag_sum_main_diag = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, 'arithmetic+--+')
 
         for j in range (0, y_max):
             for i in range (0, x_max):
-                xxz_new[j,i] = (
-                    (xxz[j,i] + xxz[j,i+delta] + xxz[j+delta,i] + xxz[j+delta,i+delta]) +
-                    (-xz[j,i] + xz[j,i+delta] - xz[j+delta,i] + xz[j+delta,i+delta]) * delta +
-                    (z[j,i] + z[j,i+delta] + z[j+delta,i] + z[j+delta,i+delta]) * 0.25 * (delta**2)
-                ) * 0.25
-
-                yyz_new[j,i] = (
-                    (yyz[j,i] + yyz[j,i+delta] + yyz[j+delta,i] + yyz[j+delta,i+delta]) +
-                    (-yz[j,i] - yz[j,i+delta] + yz[j+delta,i] + yz[j+delta,i+delta]) * delta +
-                    (z[j,i] + z[j,i+delta] + z[j+delta,i] + z[j+delta,i+delta]) * 0.25 * (delta**2)
-                ) * 0.25
-
-                xyz_new[j,i] = (
-                    (xyz[j,i] + xyz[j,i+delta] + xyz[j+delta,i] + xyz[j+delta,i+delta]) +
-                    (
-                        (-xz[j,i] - xz[j,i+delta] + xz[j+delta,i] + xz[j+delta,i+delta]) +
-                        (-yz[j,i] + yz[j,i+delta] - yz[j+delta,i] + yz[j+delta,i+delta])
-                    ) * 0.5 * delta * +
-                    (z[j,i] - z[j,i+delta] - z[j+delta,i] + z[j+delta,i+delta]) * 0.25 * (delta**2)
-                ) * 0.25
-
-                xz_new[j,i] = (
-                    (xz[j,i] + xz[j,i+delta] + xz[j+delta,i] + xz[j+delta,i+delta]) +
-                    (-z[j,i] + z[j,i+delta] - z[j+delta,i] + z[j+delta,i+delta]) * 0.5 * delta
-                ) * 0.25
-
-                yz_new[j,i] = (
-                    (yz[j,i] + yz[j,i+delta] + yz[j+delta,i] + yz[j+delta,i+delta]) +
-                    (-z[j,i] - z[j,i+delta] + z[j+delta,i] + z[j+delta,i+delta]) * 0.5 * delta
-                ) * 0.25
-
-                z_new[j,i] = (z[j,i] + z[j,i+delta] + z[j+delta,i] + z[j+delta,i+delta]) * 0.25
+                xxz = ( xxz_sum_all + xz_diff_left_sum_right*delta + z_sum_all*0.25*(delta**2) )*0.25
+                yyz = ( yyz_sum_all + yz_diff_top_sum_bottom*delta + z_sum_all*0.25*(delta**2) )*0.25
+                xyz = ( xyz_sum_all + (xz_diff_top_sum_bottom + yz_diff_left_sum_right)*0.5*delta + z_diff_anti_diag_sum_main_diag*0.25*(delta**2) )*0.25
+                xz = ( xz_sum_all + z_diff_left_sum_right*0.5*delta )*0.25
+                yz = ( yz[j,i] + yz[j,i+delta] + yz[j+delta,i] + yz[j+delta,i+delta] + z_diff_top_sum_bottom*0.5*delta )*0.25
+                z = z_sum_all * 0.25
         
-        for i in (['z', z_new], ['xz', xz_new], ['yz', yz_new], ['xxz', xxz_new], ['yyz', yyz_new], ['xyz', xyz_new]):
+        for i in (['z', z], ['xz', xz], ['yz', yz], ['xxz', xxz], ['yyz', yyz], ['xyz', xyz]):
             arr_dic[i[0]] = i[1]
