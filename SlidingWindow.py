@@ -2,15 +2,17 @@ import numpy as np
 from numpy.polynomial import polynomial as poly
 import rasterio
 import inspect
+import os
+import math
 
 class SlidingWindow:
 
     def __init__(self, file_path, band_enum):
-        self.file_path = file_path
+        self.file_name = os.path.split(file_path)[-1]
         self.img = rasterio.open(file_path)
         self.band_enum = band_enum
 
-    __valid_ops = {'SUM', 'MAX', 'MIN'}
+    __valid_ops = {'ARITHMETIC++++', 'ARITHMETIC--++', 'ARITHMETIC-+-+', 'MAX', 'MIN'}
     @property
     def valid_ops(self):
         return self.__valid_ops
@@ -37,15 +39,19 @@ class SlidingWindow:
         return np.where(arr < threshold, 0, 255).astype(np.uint8)
 
     # create tif with array of image bands
-    def __create_tif(self, num_bands, arr_in):
+    def __create_tif(self, num_bands, arr_in, fn=None):
         profile = self.img.profile
         profile.update(
             count=num_bands,
             height=len(arr_in[0]),
             width=len(arr_in[0][0])
             )
-        caller_name = inspect.stack()[1].function
-        with rasterio.open(caller_name + '_' + self.file_path, 'w', **profile) as dst:
+
+        if (fn == None):
+            caller_name = inspect.stack()[1].function
+            fn = os.path.splitext(self.file_name)[0] + '_' + caller_name + '.tif'
+            
+        with rasterio.open(fn, 'w', **profile) as dst:
             for x in range(num_bands): 
                 dst.write(arr_in[x], x+1)
 
@@ -72,8 +78,12 @@ class SlidingWindow:
 
             for j in range (y_max):
                 for i in range (x_max):
-                    if (operation.upper() == 'SUM'):
+                    if (operation.upper() == 'ARITHMETIC++++'):
                         arr[j, i] = arr_out[j, i] + arr_out[j, i+delta] + arr_out[j+delta, i] + arr_out[j+delta, i+delta]
+                    if (operation.upper() == 'ARITHMETIC--++'):
+                        arr[j, i] = -arr_out[j, i] - arr_out[j, i+delta] + arr_out[j+delta, i] + arr_out[j+delta, i+delta]
+                    if (operation.upper() == 'ARITHMETIC-+-+'):
+                        arr[j, i] = -arr_out[j, i] + arr_out[j, i+delta] - arr_out[j+delta, i] + arr_out[j+delta, i+delta]
                     elif (operation.upper() == 'MAX'):
                         arr[j, i] = max(max(max(arr_out[j, i], arr_out[j, i+delta]), arr_out[j+delta, i]), arr_out[j+delta, i+delta])
                     elif (operation.upper() == 'MIN'):
@@ -121,8 +131,12 @@ class SlidingWindow:
             bottom_left = arr_out[delta*x_max: size - (delta)]
             bottom_right = arr_out[delta*x_max + delta: size]
 
-            if operation.upper() == 'SUM':
+            if operation.upper() == 'ARITHMETIC++++':
                 arr_out = top_left + top_right + bottom_left + bottom_right
+            if operation.upper() == 'ARITHMETIC--++':
+                arr_out = -top_left - top_right + bottom_left + bottom_right
+            if operation.upper() == 'ARITHMETIC-+-+':
+                arr_out = -top_left + top_right - bottom_left + bottom_right
             elif operation.upper() == 'MAX':
                 arr_out = np.maximum(np.maximum(np.maximum(top_left, top_right), bottom_left), bottom_right)
             elif operation.upper() == 'MIN':
@@ -153,10 +167,10 @@ class SlidingWindow:
         arr_aa = arr_a**2
         arr_ab = arr_a*arr_b
 
-        arr_a = self._partial_aggregation(arr_a, 0, num_aggre, 'sum')
-        arr_b = self._partial_aggregation(arr_b, 0, num_aggre, 'sum')
-        arr_aa = self._partial_aggregation(arr_aa, 0, num_aggre, 'sum')
-        arr_ab = self._partial_aggregation(arr_ab, 0, num_aggre, 'sum')
+        arr_a = self._partial_aggregation(arr_a, 0, num_aggre, 'arithmetic++++')
+        arr_b = self._partial_aggregation(arr_b, 0, num_aggre, 'arithmetic++++')
+        arr_aa = self._partial_aggregation(arr_aa, 0, num_aggre, 'arithmetic++++')
+        arr_ab = self._partial_aggregation(arr_ab, 0, num_aggre, 'arithmetic++++')
 
         # total input pixels aggregated per output pixel
         count = (2**num_aggre)**2
@@ -189,11 +203,11 @@ class SlidingWindow:
         arr_bb = arr_b**2
         arr_ab = arr_a*arr_b
 
-        arr_a = self._partial_aggregation(arr_a, 0, num_aggre, 'sum')
-        arr_b = self._partial_aggregation(arr_b, 0, num_aggre, 'sum')
-        arr_aa = self._partial_aggregation(arr_aa, 0, num_aggre, 'sum')
-        arr_bb = self._partial_aggregation(arr_bb, 0, num_aggre, 'sum')
-        arr_ab = self._partial_aggregation(arr_ab, 0, num_aggre, 'sum')
+        arr_a = self._partial_aggregation(arr_a, 0, num_aggre, 'arithmetic++++')
+        arr_b = self._partial_aggregation(arr_b, 0, num_aggre, 'arithmetic++++')
+        arr_aa = self._partial_aggregation(arr_aa, 0, num_aggre, 'arithmetic++++')
+        arr_bb = self._partial_aggregation(arr_bb, 0, num_aggre, 'arithmetic++++')
+        arr_ab = self._partial_aggregation(arr_ab, 0, num_aggre, 'arithmetic++++')
 
         # total pixels aggregated per pixel
         count = (2**num_aggre)**2
@@ -249,7 +263,7 @@ class SlidingWindow:
             arr = self._partial_aggregation(arr, 0, power_start, 'max')
 
         for i in range(power_start, power_target):
-            arr_sum = self._partial_aggregation(arr, i, power_target, 'sum')
+            arr_sum = self._partial_aggregation(arr, i, power_target, 'arithmetic++++')
             arr_sum = np.maximum(arr_sum, 1)
 
             arr_sum = np.log(arr_sum)/np.log(2)
@@ -300,7 +314,7 @@ class SlidingWindow:
             if (i > 0):
                 arr_min = self._partial_aggregation(arr_min, 0, i, 'min')
                 arr_max = self._partial_aggregation(arr_max, 0, i, 'max')
-            arr_sum = self._partial_aggregation(arr_max-arr_min+1, i, power_target, 'sum')
+            arr_sum = self._partial_aggregation(arr_max-arr_min+1, i, power_target, 'arithmetic++++')
 
             arr_num = np.log(arr_sum)/np.log(2)
             denom_regress[i] = power_target - i
@@ -326,7 +340,7 @@ class SlidingWindow:
             arr = self._partial_aggregation(arr, 0, power_start, 'max')
         
         for i in range(power_start, power_target):
-            arr_sum = self._partial_aggregation(arr, i, power_target, 'sum')
+            arr_sum = self._partial_aggregation(arr, i, power_target, 'arithmetic++++')
             arr_sum = np.maximum(arr_sum, 1)
             num_array = np.log(arr_sum)/np.log(2)
             denom = power_target-i
@@ -340,40 +354,68 @@ class SlidingWindow:
         return arr_out
 
     def dem_utils(self, num_aggre):
-        arr = self.img.read(1).astype(float)[0:128, 0:128]
+        arr = self.img.read(1).astype(float)
         arr_dic = self.__initialize_arrays(arr)
 
-        for i in range(num_aggre):
+        for i in range(1):
             delta = 2**i
             self.__double_w(delta, arr_dic)
+            self.__window_mean(i, arr_dic)
+
+    def __window_mean(self, w, arr_dic):
+        z = arr_dic['z']
+        z_min = np.min(z)
+        z_max = np.max(z)
+        n = ((z - z_min) / (z_max - z_min) * np.iinfo(np.uint16).max).astype('uint16')
+        fn = os.path.splitext(self.file_name)[0] +'_mean_w'+ str(w) +'.tif'
+        self.__create_tif(1, [n], fn)
+        
+        self.__print_display_tfw(fn, w, arr_dic, 0)
+
+    def __print_display_tfw(self, fn, w, arr_dic, column):
+        geo_t = arr_dic['geo_t']
+        display_diff = 20
+        topLeftPixelCenterX = geo_t[0] + (w*geo_t[1])/2 # Top left corner of original image is now in center of window
+        topLeftPixelCenterY = geo_t[3] + (w*geo_t[5])/2 # Note that this still works for w=1, because TFW requires center of first pixel
+
+        row = w
+        tfw = open(os.path.splitext(fn)[0] +'.tfw', 'wt')
+        tfw.write("%0.8f\n" % geo_t[1]) # pixel width
+        tfw.write("%0.8f\n" % geo_t[2]) # 0 for unrotated frame
+        tfw.write("%0.8f\n" % geo_t[4]) # 0 for unrotated frame
+        tfw.write("%0.8f\n" % geo_t[5]) # pixel height
+        tfw.write("%0.8f\n" % (topLeftPixelCenterX + (arr_dic['orig_width']+display_diff)*geo_t[1]*column))
+        tfw.write("%0.8f\n" % (topLeftPixelCenterY + (arr_dic['orig_height']+display_diff)*geo_t[5]*row))
+        tfw.close()
 
     # initialize z, xz, yz, xxz, yyz, xyz
     def __initialize_arrays(self, z):
         xz, yz, xxz, yyz, xyz = tuple(np.zeros(z.shape) for _ in range(5))
         geo_t = self.img.profile['transform']
-        arr_dic = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz, 'geo_t':geo_t}
+        arr_dic = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz, 'geo_t':geo_t, 'orig_height': z.shape[0], 'orig_width': z.shape[1]}
         return arr_dic
 
     def __double_w(self, delta, arr_dic):
         z, xz, yz, xxz, yyz, xyz = [arr_dic[i] for i in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz')]
         x_max = z.shape[0] - delta
         y_max = z.shape[1] - delta
+        z_new, xz_new, yz_new, xxz_new, yyz_new, xyz_new = [np.zeros([y_max, x_max]) for _ in range(6)]
 
         for j in range (0, y_max):
             for i in range (0, x_max):
-                xxz[j,i] = (
+                xxz_new[j,i] = (
                     (xxz[j,i] + xxz[j,i+delta] + xxz[j+delta,i] + xxz[j+delta,i+delta]) +
                     (-xz[j,i] + xz[j,i+delta] - xz[j+delta,i] + xz[j+delta,i+delta]) * delta +
                     (z[j,i] + z[j,i+delta] + z[j+delta,i] + z[j+delta,i+delta]) * 0.25 * (delta**2)
                 ) * 0.25
 
-                yyz[j,i] = (
+                yyz_new[j,i] = (
                     (yyz[j,i] + yyz[j,i+delta] + yyz[j+delta,i] + yyz[j+delta,i+delta]) +
                     (-yz[j,i] - yz[j,i+delta] + yz[j+delta,i] + yz[j+delta,i+delta]) * delta +
                     (z[j,i] + z[j,i+delta] + z[j+delta,i] + z[j+delta,i+delta]) * 0.25 * (delta**2)
                 ) * 0.25
 
-                xyz[j,i] = (
+                xyz_new[j,i] = (
                     (xyz[j,i] + xyz[j,i+delta] + xyz[j+delta,i] + xyz[j+delta,i+delta]) +
                     (
                         (-xz[j,i] - xz[j,i+delta] + xz[j+delta,i] + xz[j+delta,i+delta]) +
@@ -382,14 +424,17 @@ class SlidingWindow:
                     (z[j,i] - z[j,i+delta] - z[j+delta,i] + z[j+delta,i+delta]) * 0.25 * (delta**2)
                 ) * 0.25
 
-                xz[j,i] = (
+                xz_new[j,i] = (
                     (xz[j,i] + xz[j,i+delta] + xz[j+delta,i] + xz[j+delta,i+delta]) +
                     (-z[j,i] + z[j,i+delta] - z[j+delta,i] + z[j+delta,i+delta]) * 0.5 * delta
                 ) * 0.25
 
-                yz[j,i] = (
+                yz_new[j,i] = (
                     (yz[j,i] + yz[j,i+delta] + yz[j+delta,i] + yz[j+delta,i+delta]) +
                     (-z[j,i] - z[j,i+delta] + z[j+delta,i] + z[j+delta,i+delta]) * 0.5 * delta
                 ) * 0.25
 
-                z[j,i] = (z[j,i] + z[j,i+delta] + z[j+delta,i] + z[j+delta,i+delta]) * 0.25
+                z_new[j,i] = (z[j,i] + z[j,i+delta] + z[j+delta,i] + z[j+delta,i+delta]) * 0.25
+        
+        for i in (['z', z_new], ['xz', xz_new], ['yz', yz_new], ['xxz', xxz_new], ['yyz', yyz_new], ['xyz', xyz_new]):
+            arr_dic[i[0]] = i[1]
