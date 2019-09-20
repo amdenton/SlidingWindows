@@ -338,3 +338,58 @@ class SlidingWindow:
         arr_coef = poly.polyfit(denom_regress, num_regress, 1)
         arr_out = np.reshape(arr_coef[1], (y_max, x_max))
         return arr_out
+
+    def dem_utils(self, num_aggre):
+        arr = self.img.read(1).astype(float)[0:128, 0:128]
+        arr_dic = self.__initialize_arrays(arr)
+
+        for i in range(num_aggre):
+            delta = 2**i
+            self.__double_w(delta, arr_dic)
+
+    # initialize z, xz, yz, xxz, yyz, xyz
+    def __initialize_arrays(self, z):
+        xz, yz, xxz, yyz, xyz = tuple(np.zeros(z.shape) for _ in range(5))
+        geo_t = self.img.profile['transform']
+        arr_dic = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz, 'geo_t':geo_t}
+        return arr_dic
+
+    def __double_w(self, delta, arr_dic):
+        z, xz, yz, xxz, yyz, xyz = [arr_dic[i] for i in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz')]
+        x_max = z.shape[0] - delta
+        y_max = z.shape[1] - delta
+
+        for j in range (0, y_max):
+            for i in range (0, x_max):
+                xxz[j,i] = (
+                    (xxz[j,i] + xxz[j,i+delta] + xxz[j+delta,i] + xxz[j+delta,i+delta]) +
+                    (-xz[j,i] + xz[j,i+delta] - xz[j+delta,i] + xz[j+delta,i+delta]) * delta +
+                    (z[j,i] + z[j,i+delta] + z[j+delta,i] + z[j+delta,i+delta]) * 0.25 * (delta**2)
+                ) * 0.25
+
+                yyz[j,i] = (
+                    (yyz[j,i] + yyz[j,i+delta] + yyz[j+delta,i] + yyz[j+delta,i+delta]) +
+                    (-yz[j,i] - yz[j,i+delta] + yz[j+delta,i] + yz[j+delta,i+delta]) * delta +
+                    (z[j,i] + z[j,i+delta] + z[j+delta,i] + z[j+delta,i+delta]) * 0.25 * (delta**2)
+                ) * 0.25
+
+                xyz[j,i] = (
+                    (xyz[j,i] + xyz[j,i+delta] + xyz[j+delta,i] + xyz[j+delta,i+delta]) +
+                    (
+                        (-xz[j,i] - xz[j,i+delta] + xz[j+delta,i] + xz[j+delta,i+delta]) +
+                        (-yz[j,i] + yz[j,i+delta] - yz[j+delta,i] + yz[j+delta,i+delta])
+                    ) * 0.5 * delta * +
+                    (z[j,i] - z[j,i+delta] - z[j+delta,i] + z[j+delta,i+delta]) * 0.25 * (delta**2)
+                ) * 0.25
+
+                xz[j,i] = (
+                    (xz[j,i] + xz[j,i+delta] + xz[j+delta,i] + xz[j+delta,i+delta]) +
+                    (-z[j,i] + z[j,i+delta] - z[j+delta,i] + z[j+delta,i+delta]) * 0.5 * delta
+                ) * 0.25
+
+                yz[j,i] = (
+                    (yz[j,i] + yz[j,i+delta] + yz[j+delta,i] + yz[j+delta,i+delta]) +
+                    (-z[j,i] - z[j,i+delta] + z[j+delta,i] + z[j+delta,i+delta]) * 0.5 * delta
+                ) * 0.25
+
+                z[j,i] = (z[j,i] + z[j,i+delta] + z[j+delta,i] + z[j+delta,i+delta]) * 0.25

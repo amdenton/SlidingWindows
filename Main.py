@@ -2,10 +2,11 @@ import numpy as np
 from SlidingWindow import SlidingWindow
 from BandEnum import rgbIr
 import rasterio
-import time
 
-slide_window = SlidingWindow('test.tif', rgbIr)
+# slide_window = SlidingWindow('test.tif', rgbIr)
+slide_window = SlidingWindow('dem/gunsite_dem-2-1.tif', rgbIr)
 
+slide_window.dem_utils(5)
 # slide_window.fractal_3d('red', 6)
 # slide_window.fractal('red', 3, 6)
 # slide_window.binary('red', 127)
