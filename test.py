@@ -13,30 +13,59 @@ class TestSlidingWindow(unittest.TestCase):
         img = rasterio.open(self.test_path)
         arr = img.read(1).astype(float)[0:512, 0:512]
 
-        arr_good_sum = slide_window._partial_aggregation(arr, 0, 7, 'arithmetic++++')
-        arr_good_max = slide_window._partial_aggregation(arr, 0, 7, 'max')
-        arr_good_min = slide_window._partial_aggregation(arr, 0, 7, 'min')
+        sum_all = slide_window._partial_aggregation(arr, 0, 7, '++++')
+        partial_sum_all = slide_window._partial_aggregation(arr, 0, 2, '++++')
+        partial_sum_all = slide_window._partial_aggregation(partial_sum_all, 2, 3, '++++')
+        partial_sum_all = slide_window._partial_aggregation(partial_sum_all, 3, 7, '++++')
+        brute_sum_all = slide_window._aggregation_brute(arr, '++++', 7)
 
-        arr_good_partial_sum = slide_window._partial_aggregation(arr, 0, 2, 'arithmetic++++')
-        arr_good_partial_sum = slide_window._partial_aggregation(arr_good_partial_sum, 2, 3, 'arithmetic++++')
-        arr_good_partial_sum = slide_window._partial_aggregation(arr_good_partial_sum, 3, 7, 'arithmetic++++')
-        arr_good_partial_max = slide_window._partial_aggregation(arr, 0, 2, 'max')
-        arr_good_partial_max = slide_window._partial_aggregation(arr_good_partial_max, 2, 3, 'max')
-        arr_good_partial_max = slide_window._partial_aggregation(arr_good_partial_max, 3, 7, 'max')
-        arr_good_partial_min = slide_window._partial_aggregation(arr, 0, 2, 'min')
-        arr_good_partial_min = slide_window._partial_aggregation(arr_good_partial_min, 2, 3, 'min')
-        arr_good_partial_min = slide_window._partial_aggregation(arr_good_partial_min, 3, 7, 'min')
+        sum_bottom = slide_window._partial_aggregation(arr, 0, 7, '--++')
+        partial_sum_bottom = slide_window._partial_aggregation(arr, 0, 2, '--++')
+        partial_sum_bottom = slide_window._partial_aggregation(partial_sum_bottom, 2, 3, '--++')
+        partial_sum_bottom = slide_window._partial_aggregation(partial_sum_bottom, 3, 7, '--++')
+        brute_sum_bottom = slide_window._aggregation_brute(arr, '--++', 7)
 
-        arr_brute_sum = slide_window._aggregation_brute(arr, 'arithmetic++++', 7)
-        arr_brute_max = slide_window._aggregation_brute(arr, 'max', 7)
-        arr_brute_min = slide_window._aggregation_brute(arr, 'min', 7)
+        sum_right = slide_window._partial_aggregation(arr, 0, 7, '-+-+')
+        partial_sum_right = slide_window._partial_aggregation(arr, 0, 2, '-+-+')
+        partial_sum_right = slide_window._partial_aggregation(partial_sum_right, 2, 3, '-+-+')
+        partial_sum_right = slide_window._partial_aggregation(partial_sum_right, 3, 7, '-+-+')
+        brute_sum_right = slide_window._aggregation_brute(arr, '-+-+', 7)
 
-        self.assertTrue(np.array_equal(arr_good_sum, arr_brute_sum))
-        self.assertTrue(np.array_equal(arr_good_max, arr_brute_max))
-        self.assertTrue(np.array_equal(arr_good_min, arr_brute_min))
-        self.assertTrue(np.array_equal(arr_good_partial_sum, arr_brute_sum))
-        self.assertTrue(np.array_equal(arr_good_partial_max, arr_brute_max))
-        self.assertTrue(np.array_equal(arr_good_partial_min, arr_brute_min))
+        sum_main_diag = slide_window._partial_aggregation(arr, 0, 7, '+--+')
+        partial_sum_main_diag = slide_window._partial_aggregation(arr, 0, 2, '+--+')
+        partial_sum_main_diag = slide_window._partial_aggregation(partial_sum_main_diag, 2, 3, '+--+')
+        partial_sum_main_diag = slide_window._partial_aggregation(partial_sum_main_diag, 3, 7, '+--+')
+        brute_sum_main_diag = slide_window._aggregation_brute(arr, '+--+', 7)
+
+        maximum = slide_window._partial_aggregation(arr, 0, 7, 'max')
+        partial_maximum = slide_window._partial_aggregation(arr, 0, 2, 'max')
+        partial_maximum = slide_window._partial_aggregation(partial_maximum, 2, 3, 'max')
+        partial_maximum = slide_window._partial_aggregation(partial_maximum, 3, 7, 'max')
+        brute_maximum = slide_window._aggregation_brute(arr, 'max', 7)
+
+        minimum = slide_window._partial_aggregation(arr, 0, 7, 'min')
+        partial_minimum = slide_window._partial_aggregation(arr, 0, 2, 'min')
+        partial_minimum = slide_window._partial_aggregation(partial_minimum, 2, 3, 'min')
+        partial_minimum = slide_window._partial_aggregation(partial_minimum, 3, 7, 'min')
+        brute_minimum = slide_window._aggregation_brute(arr, 'min', 7)
+
+        self.assertTrue(np.array_equal(sum_all, brute_sum_all))
+        self.assertTrue(np.array_equal(partial_sum_all, brute_sum_all))
+
+        self.assertTrue(np.array_equal(sum_bottom, brute_sum_bottom))
+        self.assertTrue(np.array_equal(partial_sum_bottom, brute_sum_bottom))
+
+        self.assertTrue(np.array_equal(sum_right, brute_sum_right))
+        self.assertTrue(np.array_equal(partial_sum_right, brute_sum_right))
+
+        self.assertTrue(np.array_equal(sum_main_diag, brute_sum_main_diag))
+        self.assertTrue(np.array_equal(partial_sum_main_diag, brute_sum_main_diag))
+
+        self.assertTrue(np.array_equal(maximum, brute_maximum))
+        self.assertTrue(np.array_equal(partial_maximum, brute_maximum))
+
+        self.assertTrue(np.array_equal(minimum, brute_minimum))
+        self.assertTrue(np.array_equal(partial_minimum, brute_minimum))
 
     def test_regression(self):
         slide_window = SlidingWindow(self.test_path, BandEnum.rgbIr)

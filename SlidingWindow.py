@@ -411,23 +411,23 @@ class SlidingWindow:
         xyz_sum_all = self._partial_aggregation(arr_dic['xyz'], delta_power, delta_power+1, '++++')
 
         xz_sum_all = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, '++++')
-        xz_diff_top_sum_bottom = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, '--++')
-        xz_diff_left_sum_right = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, '-+-+')
+        xz_sum_bottom = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, '--++')
+        xz_sum_right = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, '-+-+')
 
         yz_sum_all = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, '++++')
-        yz_diff_top_sum_bottom = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, '--++')
-        yz_diff_left_sum_right = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, '-+-+')
+        yz_sum_bottom = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, '--++')
+        yz_sum_right = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, '-+-+')
 
         z_sum_all = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '++++')
-        z_diff_top_sum_bottom = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '--++')
-        z_diff_left_sum_right = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '-+-+')
-        z_diff_anti_diag_sum_main_diag = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '+--+')
+        z_sum_bottom = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '--++')
+        z_sum_right = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '-+-+')
+        z_sum_main_diag = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '+--+')
 
-        xxz = ( xxz_sum_all + xz_diff_left_sum_right*delta + z_sum_all*0.25*(delta**2) )*0.25
-        yyz = ( yyz_sum_all + yz_diff_top_sum_bottom*delta + z_sum_all*0.25*(delta**2) )*0.25
-        xyz = ( xyz_sum_all + (xz_diff_top_sum_bottom + yz_diff_left_sum_right)*0.5*delta + z_diff_anti_diag_sum_main_diag*0.25*(delta**2) )*0.25
-        xz = ( xz_sum_all + z_diff_left_sum_right*0.5*delta )*0.25
-        yz = ( yz_sum_all + z_diff_top_sum_bottom*0.5*delta )*0.25
+        xxz = ( xxz_sum_all + xz_sum_right*delta + z_sum_all*0.25*(delta**2) )*0.25
+        yyz = ( yyz_sum_all + yz_sum_bottom*delta + z_sum_all*0.25*(delta**2) )*0.25
+        xyz = ( xyz_sum_all + (xz_sum_bottom + yz_sum_right)*0.5*delta + z_sum_main_diag*0.25*(delta**2) )*0.25
+        xz = ( xz_sum_all + z_sum_right*0.5*delta )*0.25
+        yz = ( yz_sum_all + z_sum_bottom*0.5*delta )*0.25
         z = z_sum_all * 0.25
         
         for i in (['z', z], ['xz', xz], ['yz', yz], ['xxz', xxz], ['yyz', yyz], ['xyz', xyz]):
