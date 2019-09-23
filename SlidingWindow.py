@@ -12,7 +12,7 @@ class SlidingWindow:
         self.img = rasterio.open(file_path)
         self.band_enum = band_enum
 
-    __valid_ops = {'ARITHMETIC++++', 'ARITHMETIC--++', 'ARITHMETIC-+-+', 'ARITHMETIC+--+', 'MAX', 'MIN'}
+    __valid_ops = {'++++', '--++', '-+-+', '+--+', 'MAX', 'MIN'}
     @property
     def valid_ops(self):
         return self.__valid_ops
@@ -78,13 +78,13 @@ class SlidingWindow:
 
             for j in range (y_max):
                 for i in range (x_max):
-                    if (operation.upper() == 'ARITHMETIC++++'):
+                    if (operation.upper() == '++++'):
                         arr[j, i] = arr_out[j, i] + arr_out[j, i+delta] + arr_out[j+delta, i] + arr_out[j+delta, i+delta]
-                    if (operation.upper() == 'ARITHMETIC--++'):
+                    if (operation.upper() == '--++'):
                         arr[j, i] = -arr_out[j, i] - arr_out[j, i+delta] + arr_out[j+delta, i] + arr_out[j+delta, i+delta]
-                    if (operation.upper() == 'ARITHMETIC-+-+'):
+                    if (operation.upper() == '-+-+'):
                         arr[j, i] = -arr_out[j, i] + arr_out[j, i+delta] - arr_out[j+delta, i] + arr_out[j+delta, i+delta]
-                    if (operation.upper() == 'ARITHMETIC+--+'):
+                    if (operation.upper() == '+--+'):
                         arr[j, i] = arr_out[j, i] - arr_out[j, i+delta] - arr_out[j+delta, i] + arr_out[j+delta, i+delta]
                     elif (operation.upper() == 'MAX'):
                         arr[j, i] = max(max(max(arr_out[j, i], arr_out[j, i+delta]), arr_out[j+delta, i]), arr_out[j+delta, i+delta])
@@ -133,13 +133,13 @@ class SlidingWindow:
             bottom_left = arr_out[delta*x_max: size - (delta)]
             bottom_right = arr_out[delta*x_max + delta: size]
 
-            if operation.upper() == 'ARITHMETIC++++':
+            if operation.upper() == '++++':
                 arr_out = top_left + top_right + bottom_left + bottom_right
-            if operation.upper() == 'ARITHMETIC--++':
+            if operation.upper() == '--++':
                 arr_out = -top_left - top_right + bottom_left + bottom_right
-            if operation.upper() == 'ARITHMETIC-+-+':
+            if operation.upper() == '-+-+':
                 arr_out = -top_left + top_right - bottom_left + bottom_right
-            if operation.upper() == 'ARITHMETIC+--+':
+            if operation.upper() == '+--+':
                 arr_out = top_left - top_right - bottom_left + bottom_right
             elif operation.upper() == 'MAX':
                 arr_out = np.maximum(np.maximum(np.maximum(top_left, top_right), bottom_left), bottom_right)
@@ -171,10 +171,10 @@ class SlidingWindow:
         arr_aa = arr_a**2
         arr_ab = arr_a*arr_b
 
-        arr_a = self._partial_aggregation(arr_a, 0, num_aggre, 'arithmetic++++')
-        arr_b = self._partial_aggregation(arr_b, 0, num_aggre, 'arithmetic++++')
-        arr_aa = self._partial_aggregation(arr_aa, 0, num_aggre, 'arithmetic++++')
-        arr_ab = self._partial_aggregation(arr_ab, 0, num_aggre, 'arithmetic++++')
+        arr_a = self._partial_aggregation(arr_a, 0, num_aggre, '++++')
+        arr_b = self._partial_aggregation(arr_b, 0, num_aggre, '++++')
+        arr_aa = self._partial_aggregation(arr_aa, 0, num_aggre, '++++')
+        arr_ab = self._partial_aggregation(arr_ab, 0, num_aggre, '++++')
 
         # total input pixels aggregated per output pixel
         count = (2**num_aggre)**2
@@ -207,11 +207,11 @@ class SlidingWindow:
         arr_bb = arr_b**2
         arr_ab = arr_a*arr_b
 
-        arr_a = self._partial_aggregation(arr_a, 0, num_aggre, 'arithmetic++++')
-        arr_b = self._partial_aggregation(arr_b, 0, num_aggre, 'arithmetic++++')
-        arr_aa = self._partial_aggregation(arr_aa, 0, num_aggre, 'arithmetic++++')
-        arr_bb = self._partial_aggregation(arr_bb, 0, num_aggre, 'arithmetic++++')
-        arr_ab = self._partial_aggregation(arr_ab, 0, num_aggre, 'arithmetic++++')
+        arr_a = self._partial_aggregation(arr_a, 0, num_aggre, '++++')
+        arr_b = self._partial_aggregation(arr_b, 0, num_aggre, '++++')
+        arr_aa = self._partial_aggregation(arr_aa, 0, num_aggre, '++++')
+        arr_bb = self._partial_aggregation(arr_bb, 0, num_aggre, '++++')
+        arr_ab = self._partial_aggregation(arr_ab, 0, num_aggre, '++++')
 
         # total pixels aggregated per pixel
         count = (2**num_aggre)**2
@@ -267,7 +267,7 @@ class SlidingWindow:
             arr = self._partial_aggregation(arr, 0, power_start, 'max')
 
         for i in range(power_start, power_target):
-            arr_sum = self._partial_aggregation(arr, i, power_target, 'arithmetic++++')
+            arr_sum = self._partial_aggregation(arr, i, power_target, '++++')
             arr_sum = np.maximum(arr_sum, 1)
 
             arr_sum = np.log(arr_sum)/np.log(2)
@@ -318,7 +318,7 @@ class SlidingWindow:
             if (i > 0):
                 arr_min = self._partial_aggregation(arr_min, 0, i, 'min')
                 arr_max = self._partial_aggregation(arr_max, 0, i, 'max')
-            arr_sum = self._partial_aggregation(arr_max-arr_min+1, i, power_target, 'arithmetic++++')
+            arr_sum = self._partial_aggregation(arr_max-arr_min+1, i, power_target, '++++')
 
             arr_num = np.log(arr_sum)/np.log(2)
             denom_regress[i] = power_target - i
@@ -344,7 +344,7 @@ class SlidingWindow:
             arr = self._partial_aggregation(arr, 0, power_start, 'max')
         
         for i in range(power_start, power_target):
-            arr_sum = self._partial_aggregation(arr, i, power_target, 'arithmetic++++')
+            arr_sum = self._partial_aggregation(arr, i, power_target, '++++')
             arr_sum = np.maximum(arr_sum, 1)
             num_array = np.log(arr_sum)/np.log(2)
             denom = power_target-i
@@ -404,27 +404,31 @@ class SlidingWindow:
         y_max = arr_dic['z'].shape[1] - delta
         z, xz, yz, xxz, yyz, xyz = [np.zeros([y_max, x_max]) for _ in range(6)]
 
-        xxz_sum_all = self._partial_aggregation(arr_dic['xxz'], delta_power, delta_power+1, 'arithmetic++++')
-        yyz_sum_all = self._partial_aggregation(arr_dic['yyz'], delta_power, delta_power+1, 'arithmetic++++')
-        xyz_sum_all = self._partial_aggregation(arr_dic['xyz'], delta_power, delta_power+1, 'arithmetic++++')
-        xz_sum_all = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, 'arithmetic++++')
-        xz_diff_top_sum_bottom = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, 'arithmetic--++')
-        xz_diff_left_sum_right = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, 'arithmetic-+-+')
-        yz_diff_top_sum_bottom = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, 'arithmetic--++')
-        yz_diff_left_sum_right = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, 'arithmetic-+-+')
-        z_sum_all = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, 'arithmetic++++')
-        z_diff_top_sum_bottom = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, 'arithmeti--++')
-        z_diff_left_sum_right = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, 'arithmeti-+-+')
-        z_diff_anti_diag_sum_main_diag = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, 'arithmetic+--+')
+        xxz_sum_all = self._partial_aggregation(arr_dic['xxz'], delta_power, delta_power+1, '++++')
 
-        for j in range (0, y_max):
-            for i in range (0, x_max):
-                xxz = ( xxz_sum_all + xz_diff_left_sum_right*delta + z_sum_all*0.25*(delta**2) )*0.25
-                yyz = ( yyz_sum_all + yz_diff_top_sum_bottom*delta + z_sum_all*0.25*(delta**2) )*0.25
-                xyz = ( xyz_sum_all + (xz_diff_top_sum_bottom + yz_diff_left_sum_right)*0.5*delta + z_diff_anti_diag_sum_main_diag*0.25*(delta**2) )*0.25
-                xz = ( xz_sum_all + z_diff_left_sum_right*0.5*delta )*0.25
-                yz = ( yz[j,i] + yz[j,i+delta] + yz[j+delta,i] + yz[j+delta,i+delta] + z_diff_top_sum_bottom*0.5*delta )*0.25
-                z = z_sum_all * 0.25
+        yyz_sum_all = self._partial_aggregation(arr_dic['yyz'], delta_power, delta_power+1, '++++')
+
+        xyz_sum_all = self._partial_aggregation(arr_dic['xyz'], delta_power, delta_power+1, '++++')
+
+        xz_sum_all = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, '++++')
+        xz_diff_top_sum_bottom = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, '--++')
+        xz_diff_left_sum_right = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, '-+-+')
+
+        yz_sum_all = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, '++++')
+        yz_diff_top_sum_bottom = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, '--++')
+        yz_diff_left_sum_right = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, '-+-+')
+
+        z_sum_all = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '++++')
+        z_diff_top_sum_bottom = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '--++')
+        z_diff_left_sum_right = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '-+-+')
+        z_diff_anti_diag_sum_main_diag = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '+--+')
+
+        xxz = ( xxz_sum_all + xz_diff_left_sum_right*delta + z_sum_all*0.25*(delta**2) )*0.25
+        yyz = ( yyz_sum_all + yz_diff_top_sum_bottom*delta + z_sum_all*0.25*(delta**2) )*0.25
+        xyz = ( xyz_sum_all + (xz_diff_top_sum_bottom + yz_diff_left_sum_right)*0.5*delta + z_diff_anti_diag_sum_main_diag*0.25*(delta**2) )*0.25
+        xz = ( xz_sum_all + z_diff_left_sum_right*0.5*delta )*0.25
+        yz = ( yz_sum_all + z_diff_top_sum_bottom*0.5*delta )*0.25
+        z = z_sum_all * 0.25
         
         for i in (['z', z], ['xz', xz], ['yz', yz], ['xxz', xxz], ['yyz', yyz], ['xyz', xyz]):
             arr_dic[i[0]] = i[1]
