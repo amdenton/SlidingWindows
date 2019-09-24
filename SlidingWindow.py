@@ -39,9 +39,11 @@ class SlidingWindow:
         return np.where(arr < threshold, 0, 255).astype(np.uint8)
 
     # create tif with array of image bands
-    def __create_tif(self, num_bands, arr_in, fn=None):
+    def __create_tif(self, num_bands, arr_in, fn=None, dtype='uint8'):
         profile = self.img.profile
         profile.update(
+            nodata=0,
+            dtype=dtype,
             count=num_bands,
             height=len(arr_in[0]),
             width=len(arr_in[0][0])
@@ -361,7 +363,7 @@ class SlidingWindow:
         arr = self.img.read(1).astype(float)
         arr_dic = self.__initialize_arrays(arr)
 
-        for i in range(1):
+        for i in range(num_aggre):
             self.__double_w(i, arr_dic)
             self.__window_mean(i, arr_dic)
 
@@ -369,26 +371,26 @@ class SlidingWindow:
         z = arr_dic['z']
         z_min = np.min(z)
         z_max = np.max(z)
-        n = ((z - z_min) / (z_max - z_min) * np.iinfo(np.uint16).max).astype('uint16')
+        n = ((z - z_min) / (z_max - z_min) * np.iinfo(np.uint16).max).astype(np.uint16)
         fn = os.path.splitext(self.file_name)[0] +'_mean_w'+ str(w) +'.tif'
-        self.__create_tif(1, [n], fn)
+        self.__create_tif(1, [n], fn, 'uint16')
         
-        self.__print_display_tfw(fn, w, arr_dic, 0)
+        # self.__print_display_tfw(fn, w, arr_dic, 0)
 
     def __print_display_tfw(self, fn, w, arr_dic, column):
         geo_t = arr_dic['geo_t']
         display_diff = 20
-        topLeftPixelCenterX = geo_t[0] + (w*geo_t[1])/2 # Top left corner of original image is now in center of window
-        topLeftPixelCenterY = geo_t[3] + (w*geo_t[5])/2 # Note that this still works for w=1, because TFW requires center of first pixel
+        topLeftPixelCenterX = geo_t[2] + ((2**(w+1))*geo_t[0])/2 # Top left corner of original image is now in center of window
+        topLeftPixelCenterY = geo_t[5] + ((2**(w+1))*geo_t[4])/2 # Note that this still works for w=1, because TFW requires center of first pixel
 
         row = w
         tfw = open(os.path.splitext(fn)[0] +'.tfw', 'wt')
-        tfw.write("%0.8f\n" % geo_t[1]) # pixel width
-        tfw.write("%0.8f\n" % geo_t[2]) # 0 for unrotated frame
-        tfw.write("%0.8f\n" % geo_t[4]) # 0 for unrotated frame
-        tfw.write("%0.8f\n" % geo_t[5]) # pixel height
-        tfw.write("%0.8f\n" % (topLeftPixelCenterX + (arr_dic['orig_width']+display_diff)*geo_t[1]*column))
-        tfw.write("%0.8f\n" % (topLeftPixelCenterY + (arr_dic['orig_height']+display_diff)*geo_t[5]*row))
+        tfw.write("%0.8f\n" % geo_t[0]) # pixel width
+        tfw.write("%0.8f\n" % geo_t[1]) # 0 for unrotated frame
+        tfw.write("%0.8f\n" % geo_t[3]) # 0 for unrotated frame
+        tfw.write("%0.8f\n" % geo_t[4]) # pixel height
+        tfw.write("%0.8f\n" % (topLeftPixelCenterX + (arr_dic['orig_width']+display_diff)*geo_t[0]*column))
+        tfw.write("%0.8f\n" % (topLeftPixelCenterY + (arr_dic['orig_height']+display_diff)*geo_t[4]*row))
         tfw.close()
 
     # initialize z, xz, yz, xxz, yyz, xyz
