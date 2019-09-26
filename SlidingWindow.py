@@ -36,6 +36,19 @@ class SlidingWindow:
     def __binary(self, arr, threshold):
         return np.where(arr < threshold, 0, 255).astype(np.uint8)
 
+    def __is_binary(self, arr_in):
+        dtype = arr_in.dtype
+        max_val = 0
+        min_val = 0
+        if (np.issubdtype(dtype, np.floating)):
+            max_val = np.finfo(dtype).max
+            min_val = np.finfo(dtype).min
+        else:
+            max_val = np.iinfo(dtype).max
+            min_val = np.iinfo(dtype).min
+
+        return ((arr_in==min_val) | (arr_in==max_val)).all()
+
     # create tif with array of image bands
     def __create_tif(self, num_bands, arr_in):
         profile = self.img.profile
@@ -222,20 +235,22 @@ class SlidingWindow:
 
         return arr_m
 
+    # TODO specify binary image
     def fractal(self, band, power_start, power_target):
         if (power_start < 0 or power_start >= power_target):
             raise ValueError('power_start must be nonzero and less than power_target')
 
         arr = self.img.read(self.band_enum[band].value).astype(float)
-        arr = self._fractal(arr, power_start, power_target)
+        arr = self._fractal(self.__binary(arr, 127), power_start, power_target)
 
         # TODO remove later
         arr = self.__arr_float_to_uint8(arr)
 
         self.__create_tif(1, [arr])
 
-    # TODO do I need a binary image?
     def _fractal(self, arr_in, power_start, power_target):
+        if (not self.__is_binary(arr_in)):
+            raise ValueError('array must be binary')
         if (power_start < 0 or power_start >= power_target):
             raise ValueError('power_start must be nonzero and less than power_target')
 
@@ -273,6 +288,7 @@ class SlidingWindow:
             arr_out = np.floor(n_boxes * buffer)
         return arr_out
 
+    # TODO does this need to be binary too?
     def fractal_3d(self, band, power_target):
         if (power_target <= 0):
             raise ValueError('power_target must be greater than zero')
