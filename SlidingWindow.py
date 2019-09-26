@@ -397,8 +397,7 @@ class SlidingWindow:
     # initialize z, xz, yz, xxz, yyz, xyz
     def __initialize_arrays(self, z):
         xz, yz, xxz, yyz, xyz = tuple(np.zeros(z.shape) for _ in range(5))
-        geo_t = self.img.profile['transform']
-        arr_dic = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz, 'geo_t':geo_t, 'orig_height': z.shape[0], 'orig_width': z.shape[1]}
+        arr_dic = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz, orig_height': z.shape[0], 'orig_width': z.shape[1]}
         return arr_dic
 
     def __double_w(self, delta_power, arr_dic):
