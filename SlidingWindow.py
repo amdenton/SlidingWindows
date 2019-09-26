@@ -4,6 +4,7 @@ import rasterio
 import inspect
 import os
 import math
+import affine
 
 class SlidingWindow:
 
@@ -39,10 +40,28 @@ class SlidingWindow:
         return np.where(arr < threshold, 0, 255).astype(np.uint8)
 
     # create tif with array of image bands
-    def __create_tif(self, num_bands, arr_in, fn=None, dtype='uint8'):
+    def __create_tif(self, num_bands, arr_in, pixels_aggre=1, fn=None, dtype='uint8'):
         profile = self.img.profile
+
+        # update transform with aggregated pixels
+        transform = profile['transform']
+        temp = np.empty(6)
+
+        pixel_width = math.sqrt(transform[0]**2 + transform[3]**2)
+        pixel_height = math.sqrt(transform[1]**2 + transform[4]**2)
+        temp[2] = transform[2] + (pixels_aggre-1) * pixel_width / 2
+        temp[5] = transform[5] - (pixels_aggre-1) * pixel_height / 2
+
+        temp[0] = transform[0] * pixels_aggre
+        temp[1] = transform[1] * pixels_aggre
+        temp[3] = transform[3] * pixels_aggre
+        temp[4] = transform[4] * pixels_aggre
+
+        new_transform = affine.Affine(temp[0], temp[1], temp[2], temp[3] , temp[4], temp[5])
+
         profile.update(
             nodata=0,
+            transform=new_transform,
             dtype=dtype,
             count=num_bands,
             height=len(arr_in[0]),
@@ -110,7 +129,7 @@ class SlidingWindow:
             # TODO remove later
             arr[x] = self.__arr_float_to_uint8(arr[x])
         
-        self.__create_tif(num_bands, arr)
+        self.__create_tif(num_bands, arr, 2**num_aggre)
 
     # do power_target-power_start aggregations on window
     # starting with delta=2**power_start
@@ -149,7 +168,7 @@ class SlidingWindow:
                 arr_out = np.minimum(np.minimum(np.minimum(top_left, top_right), bottom_left), bottom_right)
 
         # remove last removal_num rows and columns
-        removal_num = 2**power_target - 2**power_start
+        removal_num = (2**power_target) - (2**power_start)
         y_max -= removal_num
         # pad to make array square
         arr_out = np.pad(arr_out, (0, removal_num), 'constant')
@@ -166,7 +185,7 @@ class SlidingWindow:
         # TODO remove later
         arr_m = self.__arr_float_to_uint8(arr_m)
 
-        self.__create_tif(1, [arr_m])
+        self.__create_tif(1, [arr_m], 2**num_aggre)
 
     # Do num_aggre aggregations and return the regression slope between two bands
     def _regression(self, arr_a, arr_b, num_aggre):
@@ -201,7 +220,7 @@ class SlidingWindow:
         # TODO remove later
         arr_r = self.__arr_float_to_uint8(arr_r)
 
-        self.__create_tif(1, [arr_r])
+        self.__create_tif(1, [arr_r], 2**num_aggre)
 
     # Do num_aggre aggregations and return the regression slope between two bands
     def _pearson(self, arr_a, arr_b, num_aggre):
@@ -252,7 +271,7 @@ class SlidingWindow:
         # TODO remove later
         arr = self.__arr_float_to_uint8(arr)
 
-        self.__create_tif(1, [arr])
+        self.__create_tif(1, [arr], (2**power_target)-(2**power_start))
 
     # TODO do I need a binary image?
     def _fractal(self, arr_in, power_start, power_target):
@@ -293,37 +312,37 @@ class SlidingWindow:
             arr_out = np.floor(n_boxes * buffer)
         return arr_out
 
-    def fractal_3d(self, band, power_target):
-        if (power_target <= 0):
-            raise ValueError('power_target must be greater than zero')
+    def fractal_3d(self, band, num_aggre):
+        if (num_aggre <= 0):
+            raise ValueError('number of aggregations must be greater than zero')
 
         arr = self.img.read(self.band_enum[band].value).astype(float)
-        arr = self._fractal_3d(arr, power_target)
+        arr = self._fractal_3d(arr, num_aggre)
 
         # TODO remove later
         arr = self.__arr_float_to_uint8(arr)
 
-        self.__create_tif(1, [arr])
+        self.__create_tif(1, [arr], 2**num_aggre)
 
-    def _fractal_3d(self, arr_in, power_target):
-        y_max = arr_in.shape[0] - (2**power_target-1)
-        x_max = arr_in.shape[1] - (2**power_target-1)
-        arr_box = self.__boxed_array(arr_in, power_target)
-        # TODO should this be power_target or arr.size?
+    def _fractal_3d(self, arr_in, num_aggre):
+        y_max = arr_in.shape[0] - (2**num_aggre-1)
+        x_max = arr_in.shape[1] - (2**num_aggre-1)
+        arr_box = self.__boxed_array(arr_in, num_aggre)
+        # TODO should this be num_aggre or arr.size?
         # what is the correct way to organize these arrays?
-        denom_regress = np.empty(power_target)
-        num_regress = np.empty([power_target, x_max*y_max])
+        denom_regress = np.empty(num_aggre)
+        num_regress = np.empty([num_aggre, x_max*y_max])
         
-        for i in range(0, power_target):
+        for i in range(num_aggre):
             arr_min = np.array(arr_box)
             arr_max = np.array(arr_box)
             if (i > 0):
                 arr_min = self._partial_aggregation(arr_min, 0, i, 'min')
                 arr_max = self._partial_aggregation(arr_max, 0, i, 'max')
-            arr_sum = self._partial_aggregation(arr_max-arr_min+1, i, power_target, '++++')
+            arr_sum = self._partial_aggregation(arr_max-arr_min+1, i, num_aggre, '++++')
 
             arr_num = np.log(arr_sum)/np.log(2)
-            denom_regress[i] = power_target - i
+            denom_regress[i] = num_aggre - i
             num_regress[i,] = arr_num.flatten()
             # TODO should this be box_arr?
             arr_box = arr_box / 2
@@ -373,25 +392,7 @@ class SlidingWindow:
         z_max = np.max(z)
         n = ((z - z_min) / (z_max - z_min) * np.iinfo(np.uint16).max).astype(np.uint16)
         fn = os.path.splitext(self.file_name)[0] +'_mean_w'+ str(w) +'.tif'
-        self.__create_tif(1, [n], fn, 'uint16')
-        
-        # self.__print_display_tfw(fn, w, arr_dic, 0)
-
-    def __print_display_tfw(self, fn, w, arr_dic, column):
-        geo_t = arr_dic['geo_t']
-        display_diff = 20
-        topLeftPixelCenterX = geo_t[2] + ((2**(w+1))*geo_t[0])/2 # Top left corner of original image is now in center of window
-        topLeftPixelCenterY = geo_t[5] + ((2**(w+1))*geo_t[4])/2 # Note that this still works for w=1, because TFW requires center of first pixel
-
-        row = w
-        tfw = open(os.path.splitext(fn)[0] +'.tfw', 'wt')
-        tfw.write("%0.8f\n" % geo_t[0]) # pixel width
-        tfw.write("%0.8f\n" % geo_t[1]) # 0 for unrotated frame
-        tfw.write("%0.8f\n" % geo_t[3]) # 0 for unrotated frame
-        tfw.write("%0.8f\n" % geo_t[4]) # pixel height
-        tfw.write("%0.8f\n" % (topLeftPixelCenterX + (arr_dic['orig_width']+display_diff)*geo_t[0]*column))
-        tfw.write("%0.8f\n" % (topLeftPixelCenterY + (arr_dic['orig_height']+display_diff)*geo_t[4]*row))
-        tfw.close()
+        self.__create_tif(1, [n], 2**w, fn, 'uint16')
 
     # initialize z, xz, yz, xxz, yyz, xyz
     def __initialize_arrays(self, z):
