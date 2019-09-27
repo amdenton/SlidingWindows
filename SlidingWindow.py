@@ -413,10 +413,9 @@ class SlidingWindow:
         fn = os.path.splitext(self.file_name)[0] +'_mean_w'+ str(w) +'.tif'
         self.__create_tif(1, [n], 2**w, fn, 'uint16')
 
-    # initialize z, xz, yz, xxz, yyz, xyz
     def __initialize_arrays(self, z):
         xz, yz, xxz, yyz, xyz = tuple(np.zeros(z.shape) for _ in range(5))
-        arr_dic = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz, orig_height': z.shape[0], 'orig_width': z.shape[1]}
+        arr_dic = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz, 'orig_height': z.shape[0], 'orig_width': z.shape[1]}
         return arr_dic
 
     def __double_w(self, delta_power, arr_dic):
