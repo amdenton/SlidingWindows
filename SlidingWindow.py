@@ -33,6 +33,7 @@ class SlidingWindow:
         arr = self.__binary(arr, threshold)
         self.__create_tif(1, [arr])
 
+    # TODO specify threshold
     def __binary(self, arr, threshold):
         return np.where(arr < threshold, 0, 255).astype(np.uint8)
 
@@ -301,11 +302,13 @@ class SlidingWindow:
 
         self.__create_tif(1, [arr])
 
-    def _fractal_3d(self, arr_in, power_target):
-        y_max = arr_in.shape[0] - (2**power_target-1)
-        x_max = arr_in.shape[1] - (2**power_target-1)
-        arr_box = self.__boxed_array(arr_in, power_target)
-        # TODO should this be power_target or arr.size?
+    def _fractal_3d(self, arr_in, num_aggre):
+        if (num_aggre <= 0):
+            raise ValueError('number of aggregations must be greater than zero')
+        y_max = arr_in.shape[0] - (2**num_aggre-1)
+        x_max = arr_in.shape[1] - (2**num_aggre-1)
+        arr_box = self.__boxed_array(arr_in, num_aggre)
+        # TODO should this be num_aggre or arr.size?
         # what is the correct way to organize these arrays?
         denom_regress = np.empty(power_target)
         num_regress = np.empty([power_target, x_max*y_max])
@@ -313,10 +316,10 @@ class SlidingWindow:
         for i in range(0, power_target):
             arr_min = np.array(arr_box)
             arr_max = np.array(arr_box)
-            if (i > 0):
-                arr_min = self._partial_aggregation(arr_min, 0, i, 'min')
-                arr_max = self._partial_aggregation(arr_max, 0, i, 'max')
-            arr_sum = self._partial_aggregation(arr_max-arr_min+1, i, power_target, 'sum')
+            
+            arr_min = self._partial_aggregation(arr_min, 0, i, 'min')
+            arr_max = self._partial_aggregation(arr_max, 0, i, 'max')
+            arr_sum = self._partial_aggregation(arr_max-arr_min+1, i, num_aggre, '++++')
 
             arr_num = np.log(arr_sum)/np.log(2)
             denom_regress[i] = power_target - i
