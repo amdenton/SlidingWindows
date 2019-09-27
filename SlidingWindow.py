@@ -289,7 +289,6 @@ class SlidingWindow:
             arr_out = np.floor(n_boxes * buffer)
         return arr_out
 
-    # TODO does this need to be binary too?
     def fractal_3d(self, band, power_target):
         if (power_target <= 0):
             raise ValueError('power_target must be greater than zero')
@@ -302,30 +301,31 @@ class SlidingWindow:
 
         self.__create_tif(1, [arr])
 
+    # TODO does this need to be binary too?
+    # TODO should this have a power_start?
     def _fractal_3d(self, arr_in, num_aggre):
         if (num_aggre <= 0):
             raise ValueError('number of aggregations must be greater than zero')
         y_max = arr_in.shape[0] - (2**num_aggre-1)
         x_max = arr_in.shape[1] - (2**num_aggre-1)
         arr_box = self.__boxed_array(arr_in, num_aggre)
-        # TODO should this be num_aggre or arr.size?
-        # what is the correct way to organize these arrays?
-        denom_regress = np.empty(power_target)
-        num_regress = np.empty([power_target, x_max*y_max])
-        
-        for i in range(0, power_target):
-            arr_min = np.array(arr_box)
-            arr_max = np.array(arr_box)
-            
-            arr_min = self._partial_aggregation(arr_min, 0, i, 'min')
-            arr_max = self._partial_aggregation(arr_max, 0, i, 'max')
-            arr_sum = self._partial_aggregation(arr_max-arr_min+1, i, num_aggre, '++++')
+        arr_min = np.array(arr_box)
+        arr_max = np.array(arr_box)
+        # TODO is this the correct linear regression? one x value per aggregation step?
+        denom_regress = np.empty(num_aggre-1)
+        num_regress = np.empty([num_aggre-1, x_max*y_max])
 
+        # TODO is this supposed to start at 1?
+        for i in range(1, num_aggre):
+            arr_min = self._partial_aggregation(arr_min, i-1, i, 'min')
+            arr_max = self._partial_aggregation(arr_max, i-1, i, 'max')
+            arr_sum = self._partial_aggregation(arr_max-arr_min+1, i, num_aggre, 'sum')
             arr_num = np.log(arr_sum)/np.log(2)
-            denom_regress[i] = power_target - i
-            num_regress[i,] = arr_num.flatten()
-            # TODO should this be box_arr?
-            arr_box = arr_box / 2
+            denom_regress[i-1] = num_aggre - i
+            num_regress[i-1,] = arr_num.flatten()
+
+            arr_min /= 2
+            arr_max /= 2
 
         arr_coef = poly.polyfit(denom_regress, num_regress, 1)
         arr_out = np.reshape(arr_coef[1], (y_max, x_max))
