@@ -36,8 +36,22 @@ class SlidingWindow:
         arr = self.__binary(arr, threshold)
         self.__create_tif(1, [arr])
 
+    # TODO specify threshold
     def __binary(self, arr, threshold):
         return np.where(arr < threshold, 0, 255).astype(np.uint8)
+
+    def __is_binary(self, arr_in):
+        dtype = arr_in.dtype
+        max_val = 0
+        min_val = 0
+        if (np.issubdtype(dtype, np.floating)):
+            max_val = np.finfo(dtype).max
+            min_val = np.finfo(dtype).min
+        else:
+            max_val = np.iinfo(dtype).max
+            min_val = np.iinfo(dtype).min
+
+        return ((arr_in==min_val) | (arr_in==max_val)).all()
 
     # create tif with array of image bands
     def __create_tif(self, num_bands, arr_in, pixels_aggre=1, fn=None, dtype='uint8'):
@@ -261,20 +275,22 @@ class SlidingWindow:
 
         return arr_m
 
+    # TODO specify binary image
     def fractal(self, band, power_start, power_target):
         if (power_start < 0 or power_start >= power_target):
             raise ValueError('power_start must be nonzero and less than power_target')
 
         arr = self.img.read(self.band_enum[band].value).astype(float)
-        arr = self._fractal(arr, power_start, power_target)
+        arr = self._fractal(self.__binary(arr, 127), power_start, power_target)
 
         # TODO remove later
         arr = self.__arr_float_to_uint8(arr)
 
         self.__create_tif(1, [arr], (2**power_target)-(2**power_start))
 
-    # TODO do I need a binary image?
     def _fractal(self, arr_in, power_start, power_target):
+        if (not self.__is_binary(arr_in)):
+            raise ValueError('array must be binary')
         if (power_start < 0 or power_start >= power_target):
             raise ValueError('power_start must be nonzero and less than power_target')
 
@@ -324,28 +340,31 @@ class SlidingWindow:
 
         self.__create_tif(1, [arr], 2**num_aggre)
 
+    # TODO does this need to be binary too?
+    # TODO should this have a power_start?
     def _fractal_3d(self, arr_in, num_aggre):
+        if (num_aggre <= 0):
+            raise ValueError('number of aggregations must be greater than zero')
         y_max = arr_in.shape[0] - (2**num_aggre-1)
         x_max = arr_in.shape[1] - (2**num_aggre-1)
         arr_box = self.__boxed_array(arr_in, num_aggre)
-        # TODO should this be num_aggre or arr.size?
-        # what is the correct way to organize these arrays?
-        denom_regress = np.empty(num_aggre)
-        num_regress = np.empty([num_aggre, x_max*y_max])
-        
-        for i in range(num_aggre):
-            arr_min = np.array(arr_box)
-            arr_max = np.array(arr_box)
-            if (i > 0):
-                arr_min = self._partial_aggregation(arr_min, 0, i, 'min')
-                arr_max = self._partial_aggregation(arr_max, 0, i, 'max')
-            arr_sum = self._partial_aggregation(arr_max-arr_min+1, i, num_aggre, '++++')
+        arr_min = np.array(arr_box)
+        arr_max = np.array(arr_box)
+        # TODO is this the correct linear regression? one x value per aggregation step?
+        denom_regress = np.empty(num_aggre-1)
+        num_regress = np.empty([num_aggre-1, x_max*y_max])
 
+        # TODO is this supposed to start at 1?
+        for i in range(1, num_aggre):
+            arr_min = self._partial_aggregation(arr_min, i-1, i, 'min')
+            arr_max = self._partial_aggregation(arr_max, i-1, i, 'max')
+            arr_sum = self._partial_aggregation(arr_max-arr_min+1, i, num_aggre, '++++')
             arr_num = np.log(arr_sum)/np.log(2)
-            denom_regress[i] = num_aggre - i
-            num_regress[i,] = arr_num.flatten()
-            # TODO should this be box_arr?
-            arr_box = arr_box / 2
+            denom_regress[i-1] = num_aggre - i
+            num_regress[i-1,] = arr_num.flatten()
+
+            arr_min /= 2
+            arr_max /= 2
 
         arr_coef = poly.polyfit(denom_regress, num_regress, 1)
         arr_out = np.reshape(arr_coef[1], (y_max, x_max))
