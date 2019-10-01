@@ -13,7 +13,7 @@ class SlidingWindow:
         self.img = rasterio.open(file_path)
         self.band_enum = band_enum
 
-    __valid_ops = {'++++', '--++', '-+-+', '+--+', 'MAX', 'MIN'}
+    __valid_ops = {'++++', '++--', '-+-+', '-++-', 'MAX', 'MIN'}
     @property
     def valid_ops(self):
         return self.__valid_ops
@@ -115,12 +115,12 @@ class SlidingWindow:
                 for i in range (x_max):
                     if (operation.upper() == '++++'):
                         arr[j, i] = arr_out[j, i] + arr_out[j, i+delta] + arr_out[j+delta, i] + arr_out[j+delta, i+delta]
-                    if (operation.upper() == '--++'):
-                        arr[j, i] = -arr_out[j, i] - arr_out[j, i+delta] + arr_out[j+delta, i] + arr_out[j+delta, i+delta]
+                    if (operation.upper() == '++--'):
+                        arr[j, i] = arr_out[j, i] + arr_out[j, i+delta] - arr_out[j+delta, i] - arr_out[j+delta, i+delta]
                     if (operation.upper() == '-+-+'):
                         arr[j, i] = -arr_out[j, i] + arr_out[j, i+delta] - arr_out[j+delta, i] + arr_out[j+delta, i+delta]
-                    if (operation.upper() == '+--+'):
-                        arr[j, i] = arr_out[j, i] - arr_out[j, i+delta] - arr_out[j+delta, i] + arr_out[j+delta, i+delta]
+                    if (operation.upper() == '-++-'):
+                        arr[j, i] = -arr_out[j, i] + arr_out[j, i+delta] + arr_out[j+delta, i] - arr_out[j+delta, i+delta]
                     elif (operation.upper() == 'MAX'):
                         arr[j, i] = max(max(max(arr_out[j, i], arr_out[j, i+delta]), arr_out[j+delta, i]), arr_out[j+delta, i+delta])
                     elif (operation.upper() == 'MIN'):
@@ -171,12 +171,12 @@ class SlidingWindow:
             if operation.upper() == '++++':
                 arr_out = top_left + top_right + bottom_left + bottom_right
             # TODO should this be sum top?
-            if operation.upper() == '--++':
-                arr_out = -top_left - top_right + bottom_left + bottom_right
+            if operation.upper() == '++--':
+                arr_out = top_left + top_right - bottom_left - bottom_right
             if operation.upper() == '-+-+':
                 arr_out = -top_left + top_right - bottom_left + bottom_right
-            if operation.upper() == '+--+':
-                arr_out = top_left - top_right - bottom_left + bottom_right
+            if operation.upper() == '-++-':
+                arr_out = -top_left + top_right + bottom_left - bottom_right
             elif operation.upper() == 'MAX':
                 arr_out = np.maximum(np.maximum(np.maximum(top_left, top_right), bottom_left), bottom_right)
             elif operation.upper() == 'MIN':
@@ -416,16 +416,19 @@ class SlidingWindow:
         self.__create_tif(1, [n], 2**delta_power, fn, 'uint16')
 
     def __initialize_arrays(self, z):
-        y_max = z.shape[0]
         x_max = z.shape[1]
+        y_max = z.shape[0]
+        x_range = np.arange(x_max)
+        x_range = x_range - np.mean(x_range)
+        y_range = np.arange(y_max)
+        y_range = y_range - np.mean(y_range)
 
-        # TODO should these be zero, [1,n], or [0, n-1]?
-        x = np.tile(np.arange(x_max), (y_max, 1))
-        y = np.transpose(np.tile(np.arange(y_max), (x_max, 1)))
-        xz = x*z
+        x = np.tile(x_range, (y_max, 1))
+        y = np.transpose(np.tile(y_range, (x_max, 1)))
         yz = y*z
-        xxz = x*x*z
+        xz = x*z
         yyz = y*y*z
+        xxz = x*x*z
         xyz = x*y*z
 
         arr_dic = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz, 'orig_height': z.shape[0], 'orig_width': z.shape[1]}
@@ -441,28 +444,28 @@ class SlidingWindow:
         xyz_sum_all = self._partial_aggregation(arr_dic['xyz'], delta_power, delta_power+1, '++++')
 
         xz_sum_all = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, '++++')
-        xz_sum_bottom = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, '--++')
+        xz_sum_top = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, '++--')
         xz_sum_right = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, '-+-+')
 
         yz_sum_all = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, '++++')
-        yz_sum_bottom = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, '--++')
+        yz_sum_top = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, '++--')
         yz_sum_right = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, '-+-+')
 
         z_sum_all = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '++++')
-        z_sum_bottom = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '--++')
+        z_sum_top = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '++--')
         z_sum_right = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '-+-+')
-        z_sum_anti_diag = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '+--+')
+        z_sum_anti_diag = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '-++-')
 
         # TODO should this be ( xxz_sum_all + xz_sum_right*delta*.5 + z_sum_all*0.0625*(delta**2) )*0.25 ?
         xxz = ( xxz_sum_all + xz_sum_right*delta + z_sum_all*0.25*(delta**2) )*0.25
         # TODO should this be ( yyz_sum_all + yz_sum_top*delta*.5 + z_sum_all*0.0625*(delta**2) )*0.25 ?
-        yyz = ( yyz_sum_all + yz_sum_bottom*delta + z_sum_all*0.25*(delta**2) )*0.25
-        # TODO should this be ( xyz_sum_all + (xz_sum_top + yz_sum_right)*0.25*delta + z_sum_main_diag*0.0625*(delta**2) )*0.25 ?
-        xyz = ( xyz_sum_all + (xz_sum_bottom + yz_sum_right)*0.5*delta + z_sum_anti_diag*0.25*(delta**2) )*0.25
+        yyz = ( yyz_sum_all + yz_sum_top*delta + z_sum_all*0.25*(delta**2) )*0.25
+        # TODO should this be ( xyz_sum_all + (xz_sum_top + yz_sum_right)*0.25*delta + z_sum_anti_diag*0.0625*(delta**2) )*0.25 ?
+        xyz = ( xyz_sum_all + (xz_sum_top + yz_sum_right)*0.5*delta + z_sum_anti_diag*0.25*(delta**2) )*0.25
         # TODO Should this be ( xz_sum_all + z_sum_right*.25*delta )*0.25 ?
         xz = ( xz_sum_all + z_sum_right*0.5*delta )*0.25
         # TODO Should this be ( yz_sum_all + z_sum_top*.25*delta )*0.25 ?
-        yz = ( yz_sum_all + z_sum_bottom*0.5*delta )*0.25
+        yz = ( yz_sum_all + z_sum_top*0.5*delta )*0.25
         z = z_sum_all * 0.25
         
         for i in (['z', z], ['xz', xz], ['yz', yz], ['xxz', xxz], ['yyz', yyz], ['xyz', xyz]):
@@ -518,10 +521,14 @@ class SlidingWindow:
         x_max = arr_dic['orig_width'] - (pixels_aggre-1)
         #slope_image = Image.new('F',(width-w+1,height-w+1))
         slope_array = np.zeros([y_max, x_max])
-        xx_inv = 12. / ((pixels_aggre**2) - 1)
+        xx = ((pixels_aggre**2) - 1) / 12.0
+
+        slope = np.arctan(np.sqrt((xz**2) + (yz**2)) / xx)
+
         for j in range (y_max):
             for i in range (x_max):
-                value = math.atan(prefactor * xx_inv * math.sqrt(xz[j,i]**2 + yz[j,i]**2)/abs(self.img.profile['transform'][0]))
+                # TODO why do we need transform and prefactor
+                value = math.atan(prefactor / xx * math.sqrt(xz[j,i]**2 + yz[j,i]**2)/abs(self.img.profile['transform'][0]))
                 #slope_image.putpixel((i,j),value)
                 slope_array[j,i]=value
 
@@ -529,10 +536,9 @@ class SlidingWindow:
         #slope_image.save(fn_loc)
         slope_min = np.min(slope_array)
         slope_max = np.max(slope_array)
-        slope_array = ((slope_array - slope_min) / (slope_max - slope_min) * np.iinfo(np.uint16).max).astype
+        slope_array = ((slope_array - slope_min) / (slope_max - slope_min) * np.iinfo(np.uint16).max).astype(np.uint16)
         fn = os.path.splitext(self.file_name)[0] + '_slope_w' + str(pixels_aggre) +'.tif'
-        n = slope_array.astype(np.uint16)
-        self.__create_tif(1, [n], pixels_aggre, fn, 'uint16')
+        self.__create_tif(1, [slope_array], pixels_aggre, fn, 'uint16')
         #print_tfw(fn,fn_loc,w,GeoT)
         print_display_tfw(fn,fn_loc,w,GeoT,3)
 
