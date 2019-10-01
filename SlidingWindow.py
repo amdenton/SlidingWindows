@@ -170,6 +170,7 @@ class SlidingWindow:
 
             if operation.upper() == '++++':
                 arr_out = top_left + top_right + bottom_left + bottom_right
+            # TODO should this be sum top?
             if operation.upper() == '--++':
                 arr_out = -top_left - top_right + bottom_left + bottom_right
             if operation.upper() == '-+-+':
@@ -397,6 +398,7 @@ class SlidingWindow:
         arr_out = np.reshape(arr_coef[1], (y_max, x_max))
         return arr_out
 
+    # TODO should i assume that this is the first band?
     def dem_utils(self, num_aggre):
         arr = self.img.read(1).astype(float)
         arr_dic = self.__initialize_arrays(arr)
@@ -405,24 +407,32 @@ class SlidingWindow:
             self.__double_w(i, arr_dic)
             self.__window_mean(i, arr_dic)
 
-    def __window_mean(self, w, arr_dic):
+    def __window_mean(self, delta_power, arr_dic):
         z = arr_dic['z']
         z_min = np.min(z)
         z_max = np.max(z)
         n = ((z - z_min) / (z_max - z_min) * np.iinfo(np.uint16).max).astype(np.uint16)
-        fn = os.path.splitext(self.file_name)[0] +'_mean_w'+ str(w) +'.tif'
-        self.__create_tif(1, [n], 2**w, fn, 'uint16')
+        fn = os.path.splitext(self.file_name)[0] +'_mean_w'+ str(2**delta_power) +'.tif'
+        self.__create_tif(1, [n], 2**delta_power, fn, 'uint16')
 
     def __initialize_arrays(self, z):
-        xz, yz, xxz, yyz, xyz = tuple(np.zeros(z.shape) for _ in range(5))
+        y_max = z.shape[0]
+        x_max = z.shape[1]
+
+        # TODO should these be zero, [1,n], or [0, n-1]?
+        x = np.tile(np.arange(x_max), (y_max, 1))
+        y = np.transpose(np.tile(np.arange(y_max), (x_max, 1)))
+        xz = x*z
+        yz = y*z
+        xxz = x*x*z
+        yyz = y*y*z
+        xyz = x*y*z
+
         arr_dic = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz, 'orig_height': z.shape[0], 'orig_width': z.shape[1]}
         return arr_dic
 
     def __double_w(self, delta_power, arr_dic):
         delta = 2**delta_power
-        x_max = arr_dic['z'].shape[0] - delta
-        y_max = arr_dic['z'].shape[1] - delta
-        z, xz, yz, xxz, yyz, xyz = [np.zeros([y_max, x_max]) for _ in range(6)]
 
         xxz_sum_all = self._partial_aggregation(arr_dic['xxz'], delta_power, delta_power+1, '++++')
 
@@ -441,14 +451,229 @@ class SlidingWindow:
         z_sum_all = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '++++')
         z_sum_bottom = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '--++')
         z_sum_right = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '-+-+')
-        z_sum_main_diag = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '+--+')
+        z_sum_anti_diag = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '+--+')
 
+        # TODO should this be ( xxz_sum_all + xz_sum_right*delta*.5 + z_sum_all*0.0625*(delta**2) )*0.25 ?
         xxz = ( xxz_sum_all + xz_sum_right*delta + z_sum_all*0.25*(delta**2) )*0.25
+        # TODO should this be ( yyz_sum_all + yz_sum_top*delta*.5 + z_sum_all*0.0625*(delta**2) )*0.25 ?
         yyz = ( yyz_sum_all + yz_sum_bottom*delta + z_sum_all*0.25*(delta**2) )*0.25
-        xyz = ( xyz_sum_all + (xz_sum_bottom + yz_sum_right)*0.5*delta + z_sum_main_diag*0.25*(delta**2) )*0.25
+        # TODO should this be ( xyz_sum_all + (xz_sum_top + yz_sum_right)*0.25*delta + z_sum_main_diag*0.0625*(delta**2) )*0.25 ?
+        xyz = ( xyz_sum_all + (xz_sum_bottom + yz_sum_right)*0.5*delta + z_sum_anti_diag*0.25*(delta**2) )*0.25
+        # TODO Should this be ( xz_sum_all + z_sum_right*.25*delta )*0.25 ?
         xz = ( xz_sum_all + z_sum_right*0.5*delta )*0.25
+        # TODO Should this be ( yz_sum_all + z_sum_top*.25*delta )*0.25 ?
         yz = ( yz_sum_all + z_sum_bottom*0.5*delta )*0.25
         z = z_sum_all * 0.25
         
         for i in (['z', z], ['xz', xz], ['yz', yz], ['xxz', xxz], ['yyz', yyz], ['xyz', xyz]):
             arr_dic[i[0]] = i[1]
+
+    # TODO NOT FUNCTIONAL
+    def double_w_array(w_out,z,xz,yz,xxz,yyz,xyz):
+        delta = int(w_out/2)
+        z.flatten()
+        col_extent_old = width - delta + 1
+        col_extent = width - w_out + 1
+        row_extent = height - w_out + 1
+        # Get Starting block indices
+        selector = np.array((0,delta,(delta*col_extent_old),(delta*col_extent_old+delta)))
+        # Get offsetted indices across the height and width of input array
+        output_index_set = np.arange(row_extent)[:,None]*col_extent_old + np.arange(col_extent)
+        full_selector = selector.ravel()[:,None] + output_index_set.ravel()
+        big_array_z = np.take(z,full_selector)
+
+        z_loc = big_array_z.mean(axis=0)
+
+        big_array_xz = np.take(xz,full_selector) 
+        big_array_yz = np.take(yz,full_selector) 
+        big_array_xxz = np.take(xxz,full_selector) + 2 * delta * np.multiply(big_array_xz,xz_signs)
+
+        xxz_loc = big_array_xxz.mean(axis=0) + 0.25 * delta * delta * z_loc
+        big_array_yyz = np.take(yyz,full_selector) + 2 * delta * np.multiply(big_array_yz,yz_signs)
+        yyz_loc = big_array_yyz.mean(axis=0) + 0.25 * delta * delta * z_loc
+        big_array_xyz = np.take(xyz,full_selector) + delta * (np.multiply(big_array_xz,yz_signs) + np.multiply(big_array_yz,xz_signs)) + 0.25 * delta * delta * np.multiply(big_array_z,xyz_signs)
+        xyz_loc = big_array_xyz.mean(axis=0)
+        #big_array_xyz = np.take(xyz,full_selector) + \
+        #0.5 * delta * (np.multiply(big_array_xz,yz_signs) + np.multiply(big_array_yz,xz_signs)) + \
+        #0.25 * delta * delta * np.multiply(big_array_z,xyz_signs)
+        #xyz_loc = big_array_xyz.mean(axis=0)
+        
+        big_array_xz += 0.5 * delta * np.multiply(big_array_z,xz_signs)
+        xz_loc = big_array_xz.mean(axis=0)
+        big_array_yz += 0.5 * delta * np.multiply(big_array_z,yz_signs)
+        yz_loc = big_array_yz.mean(axis=0)
+
+        xx = (w*w - 1) / 12.
+    
+        return z_loc.reshape((row_extent,col_extent)), xz_loc.reshape((row_extent,col_extent)), yz_loc.reshape((row_extent,col_extent)), \
+        xxz_loc.reshape((row_extent,col_extent)), yyz_loc.reshape((row_extent,col_extent)), xyz_loc.reshape((row_extent,col_extent))
+
+    # TODO NOT FUNCTIONAL
+    def slope(self, arr_dic, delta_power, prefactor):
+        pixels_aggre = 2**delta_power
+        z = arr_dic['z']
+        yz = arr_dic['yz']
+        xz = arr_dic['xz']
+        y_max = arr_dic['orig_height'] - (pixels_aggre-1)
+        x_max = arr_dic['orig_width'] - (pixels_aggre-1)
+        #slope_image = Image.new('F',(width-w+1,height-w+1))
+        slope_array = np.zeros([y_max, x_max])
+        xx_inv = 12. / ((pixels_aggre**2) - 1)
+        for j in range (y_max):
+            for i in range (x_max):
+                value = math.atan(prefactor * xx_inv * math.sqrt(xz[j,i]**2 + yz[j,i]**2)/abs(self.img.profile['transform'][0]))
+                #slope_image.putpixel((i,j),value)
+                slope_array[j,i]=value
+
+        #im = Image.fromarray(slope_array)
+        #slope_image.save(fn_loc)
+        slope_min = np.min(slope_array)
+        slope_max = np.max(slope_array)
+        slope_array = ((slope_array - slope_min) / (slope_max - slope_min) * np.iinfo(np.uint16).max).astype
+        fn = os.path.splitext(self.file_name)[0] + '_slope_w' + str(pixels_aggre) +'.tif'
+        n = slope_array.astype(np.uint16)
+        self.__create_tif(1, [n], pixels_aggre, fn, 'uint16')
+        #print_tfw(fn,fn_loc,w,GeoT)
+        print_display_tfw(fn,fn_loc,w,GeoT,3)
+
+    # TODO NOT FUNCTIONAL
+    # Sign of pixel directions considered here and in directional curvaturen terms
+    def aspect(w,z,xz,yz,fn,GeoT):
+        #aspect_image = Image.new('F',(width-w+1,height-w+1))
+        aspect_array = np.zeros((height-w+1,width-w+1))
+        factor = maxuint16 / (2*math.pi)
+        for j in range (0, height-w+1):
+            for i in range (0, width-w+1):
+                xz_loc = xz[j,i]
+                yz_loc = yz[j,i]
+                if yz_loc == 0:
+                    if xz_loc < 0:
+                        value = 1.5*math.pi
+                    else:
+                        value = 0.5*math.pi
+                else:
+                    value = -math.atan(xz_loc/yz_loc)
+                    if yz_loc < 0:
+                        value += math.pi
+                    elif xz_loc > 0:
+                        value += 2*math.pi
+                #aspect_image.putpixel((i,j),value)
+                aspect_array[j,i]=value*factor
+        #im = Image.fromarray(aspect_array)
+        #im.save(fn_loc)
+        print("aspect_array")
+        print(aspect_array)
+        fn_loc = os.path.splitext(fn)[0] +'_aspect_w'+str(w)+'.tif'
+        n = aspect_array.astype(np.uint16)
+        tiff.imsave(fn_loc,n)
+        #print_tfw(fn,fn_loc,w,GeoT)
+        print_display_tfw(fn,fn_loc,w,GeoT,1)
+
+    # TODO NOT FUNCTIONAL
+    def norm_curv(w,z,xz,yz,xxz,yyz,fn,GeoT):
+        curv_array = np.empty((height-w+1,width-w+1))
+        
+        xx = (w*w - 1) / 12.
+        inv_x4mxx2 = 180. / (w*w*w*w - 5*w*w + 4)
+        curv_array = (0.5*(xxz + yyz) - np.multiply(xx,z)) * inv_x4mxx2
+        #curv_array = (xxz - np.multiply(xx,z)) * inv_x4mxx2
+        curv_min = np.min(curv_array)
+        curv_max = np.max(curv_array)
+        curv_array = (curv_array - curv_min) / (curv_max - curv_min) * maxuint16
+        
+        fn_loc = os.path.splitext(fn)[0] +'_curv_w'+str(w)+'.tif'
+        n = curv_array.astype(np.uint16)
+        tiff.imsave(fn_loc,n)
+        #print_tfw(fn,fn_loc,w,GeoT)
+        print_display_tfw(fn,fn_loc,w,GeoT,2)
+
+    # TODO NOT FUNCTIONAL
+    def all_curv(w,z,xz,yz,xxz,yyz,xyz,fn,GeoT):
+        curv_array = np.empty((height-w+1,width-w+1))
+        
+        xx = (w*w - 1) / 12.
+        inv_xx_sq = 1./(xx*xx)
+        inv_x4mxx2 = 180. / (w*w*w*w - 5*w*w + 4)
+        curv_array = (0.5*(xxz + yyz) - np.multiply(xx,z)) * inv_x4mxx2
+        #curv_array = (xxz - np.multiply(xx,z)) * inv_x4mxx2
+
+        pmp_array = np.divide((0.5 * (xxz - yyz) * inv_x4mxx2 * (xz * xz - yz * yz) + xyz * inv_xx_sq * xz * yz), (xz * xz + yz * yz)) 
+        #pmp_array = np.divide((0.5 * (xxz - yyz) * (xz * xz - yz * yz) + xyz * xz * yz), (inv_x4mxx2 *(xz * xz + yz * yz))) 
+        
+        curv_min = np.amin(curv_array)
+        curv_max = np.amax(curv_array)    
+        fn_loc = os.path.splitext(fn)[0] +'_curv_w'+str(w)+'.tif'
+        n = ((curv_array - curv_min) / (curv_max - curv_min) * maxuint16).astype(np.uint16)
+        tiff.imsave(fn_loc,n)
+        #print_tfw(fn,fn_loc,w,GeoT)
+        print_display_tfw(fn,fn_loc,w,GeoT,2)
+        
+        prof_array = curv_array + pmp_array
+        prof_min = np.amin(prof_array)
+        prof_max = np.amax(prof_array)    
+        fn_loc = os.path.splitext(fn)[0] +'_prof_w'+str(w)+'.tif'
+        n = ((prof_array - prof_min) / (prof_max - prof_min) * maxuint16).astype(np.uint16)
+        tiff.imsave(fn_loc,n)
+        #print_tfw(fn,fn_loc,w,GeoT)
+        print_display_tfw(fn,fn_loc,w,GeoT,2)
+
+        plan_array = curv_array - pmp_array
+        plan_min = np.amin(plan_array)
+        plan_max = np.amax(plan_array)    
+        fn_loc = os.path.splitext(fn)[0] +'_plan_w'+str(w)+'.tif'
+        n = ((plan_array - plan_min) / (plan_max - plan_min) * maxuint16).astype(np.uint16)
+        tiff.imsave(fn_loc,n)
+        #print_tfw(fn,fn_loc,w,GeoT)
+        print_display_tfw(fn,fn_loc,w,GeoT,2)
+
+    # TODO NOT FUNCTIONAL
+    # TODO same as planform?
+    def profile(self, delta_power, arr_dic):
+        pixels_aggre = 2**delta_power
+        z = arr_dic['z']
+        yyz = arr_dic['yyz']
+        xxz = arr_dic['xxz']
+        y_max = arr_dic['orig_height'] - (pixels_aggre-1)
+        x_max = arr_dic['orig_width'] - (pixels_aggre-1)
+        curv_array = np.empty((y_max, x_max))
+        curv_array = np.empty((y_max, x_max))
+        
+        xx = ((pixels_aggre**2) - 1) / 12.
+        inv_x4mxx2 = 180.0 / ((pixels_aggre**4) - 5*(pixels_aggre**2) + 4)
+        curv_array = (0.5*(xxz + yyz) - np.multiply(xx,z)) * inv_x4mxx2
+        #curv_array = (xxz - np.multiply(xx,z)) * inv_x4mxx2
+        curv_min = np.mina(curv_array)
+        curv_max = np.maxa(curv_array)
+        curv_array = (curv_array - curv_min) / (curv_max - curv_min) * np.iinfo(np.uint16).max
+        
+        fn = os.path.splitext(self.file_name)[0] + '_profile_w' + str(pixels_aggre) +'.tif'
+        n = curv_array.astype(np.uint16)
+        self.__create_tif(1, [n], pixels_aggre, fn, 'uint16')
+        #print_tfw(fn,fn_loc,w,GeoT)
+        print_display_tfw(fn,fn_loc,w,GeoT,3)
+
+    # TODO NOT FUNCTIONAL
+    # TODO same as profile?
+    def planform(self, delta_power, arr_dic):
+        pixels_aggre = 2**delta_power
+        z = arr_dic['z']
+        yyz = arr_dic['yyz']
+        xxz = arr_dic['xxz']
+        y_max = arr_dic['orig_height'] - (pixels_aggre-1)
+        x_max = arr_dic['orig_width'] - (pixels_aggre-1)
+        curv_array = np.empty((y_max, x_max))
+
+        
+        xx = ((pixels_aggre**2) - 1) / 12.
+        inv_x4mxx2 = 180.0 / ((pixels_aggre**4) - 5*(pixels_aggre**2) + 4)
+        curv_array = (0.5*(xxz + yyz) - np.multiply(xx,z)) * inv_x4mxx2
+        #curv_array = (xxz - np.multiply(xx,z)) * inv_x4mxx2
+        curv_min = np.min(curv_array)
+        curv_max = np.max(curv_array)
+        curv_array = (curv_array - curv_min) / (curv_max - curv_min) * np.iinfo(np.uint16).max
+        
+        fn = os.path.splitext(self.file_name)[0] + '_plan_w' + str(pixels_aggre) +'.tif'
+        n = curv_array.astype(np.uint16)
+        self.__create_tif(1, [n], pixels_aggre, fn, 'uint16')
+        #print_tfw(fn,fn_loc,w,GeoT)
+        print_display_tfw(fn,fn_loc,w,GeoT,4)
