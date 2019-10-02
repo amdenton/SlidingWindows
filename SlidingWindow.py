@@ -297,7 +297,7 @@ class SlidingWindow:
         # TODO remove later
         arr = self.__arr_dtype_conversion(arr, np.uint8)
 
-        self.__create_tif(1, [arr], (2**power_target)-(2**power_start))
+        self.__create_tif(1, [arr], 2**power_target)
 
     def _fractal(self, arr_in, power_start, power_target):
         if (not self.__is_binary(arr_in)):
@@ -420,15 +420,17 @@ class SlidingWindow:
     def __window_mean(self, delta_power, arr_in):
         delta = 2**delta_power
         arr = self.__arr_dtype_conversion(arr_in, np.uint16)
-        fn = os.path.splitext(self.file_name)[0] + '_mean_w' + str(delta) + '.tif'
-        self.__create_tif(1, [arr], delta, fn, 'uint16')
+        fn = os.path.splitext(self.file_name)[0] + '_mean_w' + str(delta*2) + '.tif'
+        self.__create_tif(1, [arr], delta*2, fn, 'uint16')
 
     def __initialize_arrays(self, z):
+        # TODO will there be a problem with x and y when they have odd sizes?
+        # TODO these might actually need to be zero?
         x_max = z.shape[1]
         y_max = z.shape[0]
         x_range = np.arange(x_max)
         x_range = x_range - np.mean(x_range)
-        y_range = np.arange(y_max)
+        y_range = np.arange(y_max)[::-1]
         y_range = y_range - np.mean(y_range)
 
         x = np.tile(x_range, (y_max, 1))
@@ -475,14 +477,22 @@ class SlidingWindow:
             arr_dic[i[0]] = i[1]
 
     # TODO NOT FUNCTIONAL
-    def double_w_array(w_out,z,xz,yz,xxz,yyz,xyz):
-        delta = int(w_out/2)
+    def double_w_array(self, arr_dic, delta_power):
+        delta = 2**delta_power
+        z = arr_dic['z']
+        xz = arr_dic['xz']
+        yz = arr_dic['yz']
+        xxz = arr_dic['xxz']
+        yyz = arr_dic['yyz']
+        xyz = arr_dic['xyz']
+        width = arr_dic['orig_width']
+        height = arr_dic['orig_height']
         z.flatten()
-        col_extent_old = width - delta + 1
-        col_extent = width - w_out + 1
-        row_extent = height - w_out + 1
+        col_extent_old = z.shape[1]
+        col_extent = z.shape[1] - delta
+        row_extent = z.shape[0] - delta
         # Get Starting block indices
-        selector = np.array((0,delta,(delta*col_extent_old),(delta*col_extent_old+delta)))
+        selector = np.array([0, delta, (delta*col_extent_old), (delta*col_extent_old+delta)])
         # Get offsetted indices across the height and width of input array
         output_index_set = np.arange(row_extent)[:,None]*col_extent_old + np.arange(col_extent)
         full_selector = selector.ravel()[:,None] + output_index_set.ravel()
@@ -509,22 +519,22 @@ class SlidingWindow:
         big_array_yz += 0.5 * delta * np.multiply(big_array_z,yz_signs)
         yz_loc = big_array_yz.mean(axis=0)
 
-        xx = (w*w - 1) / 12.
+        xx = (4*(delta**2) - 1) / 12.
     
         return z_loc.reshape((row_extent,col_extent)), xz_loc.reshape((row_extent,col_extent)), yz_loc.reshape((row_extent,col_extent)), \
         xxz_loc.reshape((row_extent,col_extent)), yyz_loc.reshape((row_extent,col_extent)), xyz_loc.reshape((row_extent,col_extent))
 
     # TODO NOT FUNCTIONAL
     def slope(self, arr_dic, delta_power, prefactor):
-        pixels_aggre = 2**delta_power
+        delta = 2**delta_power
         z = arr_dic['z']
         yz = arr_dic['yz']
         xz = arr_dic['xz']
-        y_max = arr_dic['orig_height'] - (pixels_aggre-1)
-        x_max = arr_dic['orig_width'] - (pixels_aggre-1)
+        y_max = arr_dic['orig_height'] - (delta-1)
+        x_max = arr_dic['orig_width'] - (delta-1)
         #slope_image = Image.new('F',(width-w+1,height-w+1))
         slope_array = np.zeros([y_max, x_max])
-        xx = ((pixels_aggre**2) - 1) / 12.0
+        xx = ((delta**2) - 1) / 12.0
 
         slope = np.arctan(np.sqrt((xz**2) + (yz**2)) / xx)
 
@@ -540,8 +550,8 @@ class SlidingWindow:
         slope_min = np.min(slope_array)
         slope_max = np.max(slope_array)
         slope_array = ((slope_array - slope_min) / (slope_max - slope_min) * np.iinfo(np.uint16).max).astype(np.uint16)
-        fn = os.path.splitext(self.file_name)[0] + '_slope_w' + str(pixels_aggre) +'.tif'
-        self.__create_tif(1, [slope_array], pixels_aggre, fn, 'uint16')
+        fn = os.path.splitext(self.file_name)[0] + '_slope_w' + str(delta*2) +'.tif'
+        self.__create_tif(1, [slope_array], delta*2, fn, 'uint16')
         #print_tfw(fn,fn_loc,w,GeoT)
         print_display_tfw(fn,fn_loc,w,GeoT,3)
 
@@ -638,51 +648,51 @@ class SlidingWindow:
     # TODO NOT FUNCTIONAL
     # TODO same as planform?
     def profile(self, delta_power, arr_dic):
-        pixels_aggre = 2**delta_power
+        delta = 2**delta_power
         z = arr_dic['z']
         yyz = arr_dic['yyz']
         xxz = arr_dic['xxz']
-        y_max = arr_dic['orig_height'] - (pixels_aggre-1)
-        x_max = arr_dic['orig_width'] - (pixels_aggre-1)
+        y_max = arr_dic['orig_height'] - (delta-1)
+        x_max = arr_dic['orig_width'] - (delta-1)
         curv_array = np.empty((y_max, x_max))
         curv_array = np.empty((y_max, x_max))
         
-        xx = ((pixels_aggre**2) - 1) / 12.
-        inv_x4mxx2 = 180.0 / ((pixels_aggre**4) - 5*(pixels_aggre**2) + 4)
+        xx = ((delta**2) - 1) / 12.
+        inv_x4mxx2 = 180.0 / ((delta**4) - 5*(delta**2) + 4)
         curv_array = (0.5*(xxz + yyz) - np.multiply(xx,z)) * inv_x4mxx2
         #curv_array = (xxz - np.multiply(xx,z)) * inv_x4mxx2
         curv_min = np.mina(curv_array)
         curv_max = np.maxa(curv_array)
         curv_array = (curv_array - curv_min) / (curv_max - curv_min) * np.iinfo(np.uint16).max
         
-        fn = os.path.splitext(self.file_name)[0] + '_profile_w' + str(pixels_aggre) +'.tif'
+        fn = os.path.splitext(self.file_name)[0] + '_profile_w' + str(delta*2) +'.tif'
         n = curv_array.astype(np.uint16)
-        self.__create_tif(1, [n], pixels_aggre, fn, 'uint16')
+        self.__create_tif(1, [n], delta*2, fn, 'uint16')
         #print_tfw(fn,fn_loc,w,GeoT)
         print_display_tfw(fn,fn_loc,w,GeoT,3)
 
     # TODO NOT FUNCTIONAL
     # TODO same as profile?
     def planform(self, delta_power, arr_dic):
-        pixels_aggre = 2**delta_power
+        delta = 2**delta_power
         z = arr_dic['z']
         yyz = arr_dic['yyz']
         xxz = arr_dic['xxz']
-        y_max = arr_dic['orig_height'] - (pixels_aggre-1)
-        x_max = arr_dic['orig_width'] - (pixels_aggre-1)
+        y_max = arr_dic['orig_height'] - (delta-1)
+        x_max = arr_dic['orig_width'] - (delta-1)
         curv_array = np.empty((y_max, x_max))
 
         
-        xx = ((pixels_aggre**2) - 1) / 12.
-        inv_x4mxx2 = 180.0 / ((pixels_aggre**4) - 5*(pixels_aggre**2) + 4)
+        xx = ((delta**2) - 1) / 12.
+        inv_x4mxx2 = 180.0 / ((delta**4) - 5*(delta**2) + 4)
         curv_array = (0.5*(xxz + yyz) - np.multiply(xx,z)) * inv_x4mxx2
         #curv_array = (xxz - np.multiply(xx,z)) * inv_x4mxx2
         curv_min = np.min(curv_array)
         curv_max = np.max(curv_array)
         curv_array = (curv_array - curv_min) / (curv_max - curv_min) * np.iinfo(np.uint16).max
         
-        fn = os.path.splitext(self.file_name)[0] + '_plan_w' + str(pixels_aggre) +'.tif'
+        fn = os.path.splitext(self.file_name)[0] + '_plan_w' + str(delta*2) +'.tif'
         n = curv_array.astype(np.uint16)
-        self.__create_tif(1, [n], pixels_aggre, fn, 'uint16')
+        self.__create_tif(1, [n], delta*2, fn, 'uint16')
         #print_tfw(fn,fn_loc,w,GeoT)
         print_display_tfw(fn,fn_loc,w,GeoT,4)
