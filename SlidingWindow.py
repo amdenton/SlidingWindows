@@ -44,6 +44,14 @@ class SlidingWindow:
         dtype = arr_in.dtype
         max_val = 0
         min_val = 0
+        (max_val, min_val) = self.__get_max_min(dtype)
+        return ((arr_in==min_val) | (arr_in==max_val)).all()
+
+    # get max and min of numpy data type
+    # returns tuple (max, min)
+    def __get_max_min(self, dtype):
+        max_val = 0
+        min_val = 0
         if (np.issubdtype(dtype, np.floating)):
             max_val = np.finfo(dtype).max
             min_val = np.finfo(dtype).min
@@ -51,7 +59,7 @@ class SlidingWindow:
             max_val = np.iinfo(dtype).max
             min_val = np.iinfo(dtype).min
 
-        return ((arr_in==min_val) | (arr_in==max_val)).all()
+        return (max_val, min_val)
 
     # create tif with array of image bands
     def __create_tif(self, num_bands, arr_in, pixels_aggre=1, fn=None, dtype='uint8'):
@@ -91,11 +99,13 @@ class SlidingWindow:
                 dst.write(arr_in[x], x+1)
 
     # TODO fix later, not the best way to do this
-    def __arr_float_to_uint8(self, arr_in):
-        max_val = np.amax(arr_in)
-        min_val = np.amin(arr_in)
-        arr_out = ((arr_in - min_val)/(max_val - min_val)) * 255
-        arr_out = arr_out.astype(np.uint8)
+    # arr_in: array to be converted
+    # dtype: numpy type to convert to
+    def __arr_dtype_conversion(self, arr_in, dtype):
+        arr_max = np.amax(arr_in)
+        arr_min = np.amin(arr_in)
+        dtype_max = self.__get_max_min(dtype)[0]
+        arr_out = ((arr_in - arr_min)/(arr_max - arr_min) * dtype_max).astype(dtype)
         return arr_out
 
     def _aggregation_brute(self, arr_in, operation, num_aggre):
@@ -141,7 +151,7 @@ class SlidingWindow:
             arr[x] = self._partial_aggregation(arr[x], 0, num_aggre, operation)
 
             # TODO remove later
-            arr[x] = self.__arr_float_to_uint8(arr[x])
+            arr[x] = self.__arr_dtype_conversion(arr[x], np.uint8)
         
         self.__create_tif(num_bands, arr, 2**num_aggre)
 
@@ -198,7 +208,7 @@ class SlidingWindow:
         arr_m = self._regression(arr_a, arr_b, num_aggre)
 
         # TODO remove later
-        arr_m = self.__arr_float_to_uint8(arr_m)
+        arr_m = self.__arr_dtype_conversion(arr_m, np.uint8)
 
         self.__create_tif(1, [arr_m], 2**num_aggre)
 
@@ -233,7 +243,7 @@ class SlidingWindow:
         arr_r = self._pearson(arr_a, arr_b, num_aggre)
 
         # TODO remove later
-        arr_r = self.__arr_float_to_uint8(arr_r)
+        arr_r = self.__arr_dtype_conversion(arr_r, np.uint8)
 
         self.__create_tif(1, [arr_r], 2**num_aggre)
 
@@ -285,7 +295,7 @@ class SlidingWindow:
         arr = self._fractal(self.__binary(arr, 127), power_start, power_target)
 
         # TODO remove later
-        arr = self.__arr_float_to_uint8(arr)
+        arr = self.__arr_dtype_conversion(arr, np.uint8)
 
         self.__create_tif(1, [arr], (2**power_target)-(2**power_start))
 
@@ -337,7 +347,7 @@ class SlidingWindow:
         arr = self._fractal_3d(arr, num_aggre)
 
         # TODO remove later
-        arr = self.__arr_float_to_uint8(arr)
+        arr = self.__arr_dtype_conversion(arr, np.uint8)
 
         self.__create_tif(1, [arr], 2**num_aggre)
 
@@ -405,15 +415,13 @@ class SlidingWindow:
 
         for i in range(num_aggre):
             self.__double_w(i, arr_dic)
-            self.__window_mean(i, arr_dic)
+            self.__window_mean(i, arr_dic['z'])
 
-    def __window_mean(self, delta_power, arr_dic):
-        z = arr_dic['z']
-        z_min = np.min(z)
-        z_max = np.max(z)
-        n = ((z - z_min) / (z_max - z_min) * np.iinfo(np.uint16).max).astype(np.uint16)
-        fn = os.path.splitext(self.file_name)[0] +'_mean_w'+ str(2**delta_power) +'.tif'
-        self.__create_tif(1, [n], 2**delta_power, fn, 'uint16')
+    def __window_mean(self, delta_power, arr_in):
+        delta = 2**delta_power
+        arr = self.__arr_dtype_conversion(arr_in, np.uint16)
+        fn = os.path.splitext(self.file_name)[0] + '_mean_w' + str(delta) + '.tif'
+        self.__create_tif(1, [arr], delta, fn, 'uint16')
 
     def __initialize_arrays(self, z):
         x_max = z.shape[1]
@@ -456,15 +464,10 @@ class SlidingWindow:
         z_sum_right = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '-+-+')
         z_sum_anti_diag = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '-++-')
 
-        # TODO should this be ( xxz_sum_all + xz_sum_right*delta*.5 + z_sum_all*0.0625*(delta**2) )*0.25 ?
         xxz = ( xxz_sum_all + xz_sum_right*delta + z_sum_all*0.25*(delta**2) )*0.25
-        # TODO should this be ( yyz_sum_all + yz_sum_top*delta*.5 + z_sum_all*0.0625*(delta**2) )*0.25 ?
         yyz = ( yyz_sum_all + yz_sum_top*delta + z_sum_all*0.25*(delta**2) )*0.25
-        # TODO should this be ( xyz_sum_all + (xz_sum_top + yz_sum_right)*0.25*delta + z_sum_anti_diag*0.0625*(delta**2) )*0.25 ?
         xyz = ( xyz_sum_all + (xz_sum_top + yz_sum_right)*0.5*delta + z_sum_anti_diag*0.25*(delta**2) )*0.25
-        # TODO Should this be ( xz_sum_all + z_sum_right*.25*delta )*0.25 ?
         xz = ( xz_sum_all + z_sum_right*0.5*delta )*0.25
-        # TODO Should this be ( yz_sum_all + z_sum_top*.25*delta )*0.25 ?
         yz = ( yz_sum_all + z_sum_top*0.5*delta )*0.25
         z = z_sum_all * 0.25
         
