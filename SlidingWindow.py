@@ -411,10 +411,10 @@ class SlidingWindow:
     # TODO should i assume that this is the first band?
     def dem_utils(self, num_aggre):
         arr = self.img.read(1).astype(float)
-        arr_dic = self.__initialize_arrays(arr)
+        arr_dic = self._initialize_arrays(arr)
 
         for i in range(num_aggre):
-            self.__double_w(i, arr_dic)
+            self._double_w(i, arr_dic)
             self.__window_mean(i, arr_dic['z'])
 
     def __window_mean(self, delta_power, arr_in):
@@ -423,7 +423,7 @@ class SlidingWindow:
         fn = os.path.splitext(self.file_name)[0] + '_mean_w' + str(delta*2) + '.tif'
         self.__create_tif(1, [arr], delta*2, fn, 'uint16')
 
-    def __initialize_arrays(self, z):
+    def _initialize_arrays(self, z):
         # TODO will there be a problem with x and y when they have odd sizes?
         # TODO these might actually need to be zero?
         x_max = z.shape[1]
@@ -441,10 +441,10 @@ class SlidingWindow:
         xxz = x*x*z
         xyz = x*y*z
 
-        arr_dic = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz, 'orig_height': z.shape[0], 'orig_width': z.shape[1]}
+        arr_dic = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz, 'orig_width': z.shape[1], 'orig_height': z.shape[0]}
         return arr_dic
 
-    def __double_w(self, delta_power, arr_dic):
+    def _double_w(self, delta_power, arr_dic):
         delta = 2**delta_power
 
         xxz_sum_all = self._partial_aggregation(arr_dic['xxz'], delta_power, delta_power+1, '++++')
@@ -476,53 +476,89 @@ class SlidingWindow:
         for i in (['z', z], ['xz', xz], ['yz', yz], ['xxz', xxz], ['yyz', yyz], ['xyz', xyz]):
             arr_dic[i[0]] = i[1]
 
-    # TODO NOT FUNCTIONAL
-    def double_w_array(self, arr_dic, delta_power):
+    def _double_w_old_1(self, delta_power, arr_dic):
+        delta = 2**delta_power
+        z, xz, yz, xxz, yyz, xyz = (arr_dic[x] for x in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz'))
+        x_max = arr_dic['orig_width'] - delta
+        y_max = arr_dic['orig_height'] - delta
+        z_loc, xz_loc, yz_loc, xxz_loc, yyz_loc, xyz_loc = (np.zeros([y_max, x_max]) for _ in range(6))
+
+        for y in range (y_max):
+            for x in range (x_max):
+                xz_loc[y, x] = (
+                    (xz[y, x] + xz[y, x+delta] + xz[y+delta, x] + xz[y+delta, x+delta]) + 
+                    (-z[y, x] + z[y, x+delta] - z[y+delta, x] + z[y+delta, x+delta])*0.5*delta
+                )*0.25
+
+                yz_loc[y, x] = (
+                    (yz[y, x] + yz[y, x+delta] + yz[y+delta, x] + yz[y+delta, x+delta]) + 
+                    (z[y, x] + z[y, x+delta] - z[y+delta, x] - z[y+delta, x+delta])*0.5*delta
+                )*0.25
+
+                xxz_loc[y, x] = (
+                    (xxz[y, x] + xxz[y, x+delta] + xxz[y+delta, x] + xxz[y+delta, x+delta]) + 
+                    (-xz[y, x] + xz[y, x+delta] - xz[y+delta, x] + xz[y+delta, x+delta])*delta + 
+                    (z[y, x] + z[y, x+delta] + z[y+delta, x] + z[y+delta, x+delta])*0.25*(delta**2)
+                ) * 0.25
+
+                yyz_loc[y, x] = (
+                    (yyz[y, x] + yyz[y, x+delta] + yyz[y+delta, x] + yyz[y+delta, x+delta]) + 
+                    (yz[y, x] + yz[y, x+delta] - yz[y+delta, x] - yz[y+delta, x+delta])*delta + 
+                    (z[y, x] + z[y, x+delta] + z[y+delta, x] + z[y+delta, x+delta])*0.25*(delta**2)
+                )*0.25
+
+                xyz_loc[y, x] = (
+                    (xyz[y, x] + xyz[y, x+delta] + xyz[y+delta, x] + xyz[y+delta, x+delta]) + (
+                        (xz[y, x] + xz[y, x+delta] - xz[y+delta, x] - xz[y+delta, x+delta]) +
+                        (-yz[y, x] + yz[y, x+delta] - yz[y+delta, x] + yz[y+delta, x+delta])
+                    )*0.5*delta + 
+                    (-z[y,x] + z[y, x+delta] + z[y+delta, x] - z[y+delta, x+delta])*0.25*(delta**2)
+                )*0.25
+
+                z_loc[y, x] = (z[y, x] + z[y, x+delta] + z[y+delta, x] + z[y+delta, x+delta])*0.25
+        
+        for i in (['z', z_loc], ['xz', xz_loc], ['yz', yz_loc], ['xxz', xxz_loc], ['yyz', yyz_loc], ['xyz', xyz_loc]):
+            arr_dic[i[0]] = i[1]
+
+    def _double_w_old_2(self, delta_power, arr_dic):
+        # arrays represent corners of aggregation square: [top_left, top_right, bottom_left, bottom_right]
+        sum_right = np.array([-1, 1, -1, 1])[:,None]
+        sum_top = np.array([1, 1, -1, -1])[:,None]
+        sum_anti_diag = np.array([-1, 1, 1, -1])[:,None]
+
         delta = 2**delta_power
         z = arr_dic['z']
-        xz = arr_dic['xz']
-        yz = arr_dic['yz']
-        xxz = arr_dic['xxz']
-        yyz = arr_dic['yyz']
-        xyz = arr_dic['xyz']
-        width = arr_dic['orig_width']
-        height = arr_dic['orig_height']
-        z.flatten()
-        col_extent_old = z.shape[1]
-        col_extent = z.shape[1] - delta
-        row_extent = z.shape[0] - delta
-        # Get Starting block indices
-        selector = np.array([0, delta, (delta*col_extent_old), (delta*col_extent_old+delta)])
-        # Get offsetted indices across the height and width of input array
-        output_index_set = np.arange(row_extent)[:,None]*col_extent_old + np.arange(col_extent)
-        full_selector = selector.ravel()[:,None] + output_index_set.ravel()
-        big_array_z = np.take(z,full_selector)
+        x_max_old = z.shape[1]
+        x_max = z.shape[1] - delta
+        y_max = z.shape[0] - delta
+        z = z.flatten()
+        # sum the 4 corners of a square of width delta
+        # separation of indices to sum
+        corner_indices = np.array([[0], [delta], [delta*x_max_old], [delta*x_max_old+delta]])
+        # create array of indices to sum: [[top_left], [top_right], [bottom_left], [bottom_right]]
+        top_left_indices = (np.arange(y_max)[:, np.newaxis]*x_max_old + np.arange(x_max)).flatten()
+        full_selector = corner_indices + top_left_indices
 
-        z_loc = big_array_z.mean(axis=0)
+        big_array_z = np.take(z, full_selector)
+        z = big_array_z.mean(axis=0)
 
-        big_array_xz = np.take(xz,full_selector) 
-        big_array_yz = np.take(yz,full_selector) 
-        big_array_xxz = np.take(xxz,full_selector) + 2 * delta * np.multiply(big_array_xz,xz_signs)
+        big_array_xz = np.take(arr_dic['xz'], full_selector)
+        xz = np.mean(big_array_xz  + (big_array_z*sum_right)*0.5*delta, axis=0)
 
-        xxz_loc = big_array_xxz.mean(axis=0) + 0.25 * delta * delta * z_loc
-        big_array_yyz = np.take(yyz,full_selector) + 2 * delta * np.multiply(big_array_yz,yz_signs)
-        yyz_loc = big_array_yyz.mean(axis=0) + 0.25 * delta * delta * z_loc
-        big_array_xyz = np.take(xyz,full_selector) + delta * (np.multiply(big_array_xz,yz_signs) + np.multiply(big_array_yz,xz_signs)) + 0.25 * delta * delta * np.multiply(big_array_z,xyz_signs)
-        xyz_loc = big_array_xyz.mean(axis=0)
-        #big_array_xyz = np.take(xyz,full_selector) + \
-        #0.5 * delta * (np.multiply(big_array_xz,yz_signs) + np.multiply(big_array_yz,xz_signs)) + \
-        #0.25 * delta * delta * np.multiply(big_array_z,xyz_signs)
-        #xyz_loc = big_array_xyz.mean(axis=0)
-        
-        big_array_xz += 0.5 * delta * np.multiply(big_array_z,xz_signs)
-        xz_loc = big_array_xz.mean(axis=0)
-        big_array_yz += 0.5 * delta * np.multiply(big_array_z,yz_signs)
-        yz_loc = big_array_yz.mean(axis=0)
+        big_array_yz = np.take(arr_dic['yz'], full_selector)
+        yz_loc = np.mean(big_array_yz + (big_array_z*sum_top)*0.5*delta, axis=0)
 
-        xx = (4*(delta**2) - 1) / 12.
+        big_array_xxz = np.take(arr_dic['xxz'], full_selector)
+        xxz_loc = np.mean(big_array_xxz + (big_array_xz*sum_right)*delta + 0.25*(delta*2)*z, axis=0)
+
+        big_array_yyz = np.take(arr_dic['yyz'], full_selector)
+        yyz_loc = np.mean(big_array_yyz + (big_array_yz*sum_top)*delta + 0.25*(delta**2)*z, axis=0)
+
+        big_array_xyz = np.take(arr_dic['xyz'], full_selector)
+        xyz_loc = np.mean(big_array_xyz + ((big_array_xz*sum_top) + (big_array_yz*sum_right))*.5*delta + 0.25*(delta**2)*(big_array_z*sum_anti_diag), axis=0)
     
-        return z_loc.reshape((row_extent,col_extent)), xz_loc.reshape((row_extent,col_extent)), yz_loc.reshape((row_extent,col_extent)), \
-        xxz_loc.reshape((row_extent,col_extent)), yyz_loc.reshape((row_extent,col_extent)), xyz_loc.reshape((row_extent,col_extent))
+        for i in (['z', z], ['xz', xz], ['yz', yz_loc], ['xxz', xxz_loc], ['yyz', yyz_loc], ['xyz', xyz_loc]):
+            arr_dic[i[0]] = i[1].reshape((y_max, x_max))
 
     # TODO NOT FUNCTIONAL
     def slope(self, arr_dic, delta_power, prefactor):
