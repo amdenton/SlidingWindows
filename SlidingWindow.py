@@ -485,37 +485,31 @@ class SlidingWindow:
 
         for y in range (y_max):
             for x in range (x_max):
-                xz_loc[y, x] = (
-                    (xz[y, x] + xz[y, x+delta] + xz[y+delta, x] + xz[y+delta, x+delta]) + 
-                    (-z[y, x] + z[y, x+delta] - z[y+delta, x] + z[y+delta, x+delta])*0.5*delta
-                )*0.25
+                z_sum_all = z[y, x] + z[y, x+delta] + z[y+delta, x] + z[y+delta, x+delta]
+                z_sum_top = z[y, x] + z[y, x+delta] - z[y+delta, x] - z[y+delta, x+delta]
+                z_sum_right = -z[y, x] + z[y, x+delta] - z[y+delta, x] + z[y+delta, x+delta]
+                z_sum_anti_diag = -z[y,x] + z[y, x+delta] + z[y+delta, x] - z[y+delta, x+delta]
 
-                yz_loc[y, x] = (
-                    (yz[y, x] + yz[y, x+delta] + yz[y+delta, x] + yz[y+delta, x+delta]) + 
-                    (z[y, x] + z[y, x+delta] - z[y+delta, x] - z[y+delta, x+delta])*0.5*delta
-                )*0.25
+                xz_sum_all = xz[y, x] + xz[y, x+delta] + xz[y+delta, x] + xz[y+delta, x+delta]
+                xz_sum_top = xz[y, x] + xz[y, x+delta] - xz[y+delta, x] - xz[y+delta, x+delta]
+                xz_sum_right = -xz[y, x] + xz[y, x+delta] - xz[y+delta, x] + xz[y+delta, x+delta]
 
-                xxz_loc[y, x] = (
-                    (xxz[y, x] + xxz[y, x+delta] + xxz[y+delta, x] + xxz[y+delta, x+delta]) + 
-                    (-xz[y, x] + xz[y, x+delta] - xz[y+delta, x] + xz[y+delta, x+delta])*delta + 
-                    (z[y, x] + z[y, x+delta] + z[y+delta, x] + z[y+delta, x+delta])*0.25*(delta**2)
-                )*0.25
+                yz_sum_all = yz[y, x] + yz[y, x+delta] + yz[y+delta, x] + yz[y+delta, x+delta]
+                yz_sum_top = yz[y, x] + yz[y, x+delta] - yz[y+delta, x] - yz[y+delta, x+delta]
+                yz_sum_right = -yz[y, x] + yz[y, x+delta] - yz[y+delta, x] + yz[y+delta, x+delta]
 
-                yyz_loc[y, x] = (
-                    (yyz[y, x] + yyz[y, x+delta] + yyz[y+delta, x] + yyz[y+delta, x+delta]) + 
-                    (yz[y, x] + yz[y, x+delta] - yz[y+delta, x] - yz[y+delta, x+delta])*delta + 
-                    (z[y, x] + z[y, x+delta] + z[y+delta, x] + z[y+delta, x+delta])*0.25*(delta**2)
-                )*0.25
+                xxz_sum_all = xxz[y, x] + xxz[y, x+delta] + xxz[y+delta, x] + xxz[y+delta, x+delta]
 
-                xyz_loc[y, x] = (
-                    (xyz[y, x] + xyz[y, x+delta] + xyz[y+delta, x] + xyz[y+delta, x+delta]) + (
-                        (xz[y, x] + xz[y, x+delta] - xz[y+delta, x] - xz[y+delta, x+delta]) +
-                        (-yz[y, x] + yz[y, x+delta] - yz[y+delta, x] + yz[y+delta, x+delta])
-                    )*0.5*delta + 
-                    (-z[y,x] + z[y, x+delta] + z[y+delta, x] - z[y+delta, x+delta])*0.25*(delta**2)
-                )*0.25
+                yyz_sum_all = yyz[y, x] + yyz[y, x+delta] + yyz[y+delta, x] + yyz[y+delta, x+delta]
 
-                z_loc[y, x] = (z[y, x] + z[y, x+delta] + z[y+delta, x] + z[y+delta, x+delta])*0.25
+                xyz_sum_all = xyz[y, x] + xyz[y, x+delta] + xyz[y+delta, x] + xyz[y+delta, x+delta]
+
+                xz_loc[y, x] = 0.25*(xz_sum_all + 0.5*delta*z_sum_right)
+                yz_loc[y, x] = 0.25*(yz_sum_all + 0.5*delta*z_sum_top)
+                xxz_loc[y, x] = 0.25*(xxz_sum_all + delta*xz_sum_right + 0.25*(delta**2)*z_sum_all)
+                yyz_loc[y, x] = 0.25*(yyz_sum_all + delta*yz_sum_top + 0.25*(delta**2)*z_sum_all)
+                xyz_loc[y, x] = 0.25*(xyz_sum_all + 0.5*delta*(xz_sum_top + yz_sum_right) + 0.25*(delta**2)*z_sum_anti_diag)
+                z_loc[y, x] = 0.25*(z[y, x] + z[y, x+delta] + z[y+delta, x] + z[y+delta, x+delta])
         
         for i in (['z', z_loc], ['xz', xz_loc], ['yz', yz_loc], ['xxz', xxz_loc], ['yyz', yyz_loc], ['xyz', xyz_loc]):
             arr_dic[i[0]] = i[1]
