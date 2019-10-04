@@ -549,7 +549,7 @@ class SlidingWindow:
         yz_loc = np.mean(big_array_yz + (big_array_z*sum_top)*0.5*delta, axis=0)
 
         big_array_xxz = np.take(arr_dic['xxz'], full_selector)
-        xxz_loc = np.mean(big_array_xxz + (big_array_xz*sum_right)*delta + 0.25*(delta*2)*z, axis=0)
+        xxz_loc = np.mean(big_array_xxz + (big_array_xz*sum_right)*delta + 0.25*(delta**2)*z, axis=0)
 
         big_array_yyz = np.take(arr_dic['yyz'], full_selector)
         yyz_loc = np.mean(big_array_yyz + (big_array_yz*sum_top)*delta + 0.25*(delta**2)*z, axis=0)
