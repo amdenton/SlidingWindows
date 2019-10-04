@@ -447,11 +447,10 @@ class SlidingWindow:
     def _double_w(self, delta_power, arr_dic):
         delta = 2**delta_power
 
-        xxz_sum_all = self._partial_aggregation(arr_dic['xxz'], delta_power, delta_power+1, '++++')
-
-        yyz_sum_all = self._partial_aggregation(arr_dic['yyz'], delta_power, delta_power+1, '++++')
-
-        xyz_sum_all = self._partial_aggregation(arr_dic['xyz'], delta_power, delta_power+1, '++++')
+        z_sum_all = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '++++')
+        z_sum_top = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '++--')
+        z_sum_right = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '-+-+')
+        z_sum_anti_diag = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '-++-')
 
         xz_sum_all = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, '++++')
         xz_sum_top = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, '++--')
@@ -461,22 +460,23 @@ class SlidingWindow:
         yz_sum_top = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, '++--')
         yz_sum_right = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, '-+-+')
 
-        z_sum_all = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '++++')
-        z_sum_top = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '++--')
-        z_sum_right = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '-+-+')
-        z_sum_anti_diag = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '-++-')
+        xxz_sum_all = self._partial_aggregation(arr_dic['xxz'], delta_power, delta_power+1, '++++')
 
-        xxz = ( xxz_sum_all + xz_sum_right*delta + z_sum_all*0.25*(delta**2) )*0.25
-        yyz = ( yyz_sum_all + yz_sum_top*delta + z_sum_all*0.25*(delta**2) )*0.25
-        xyz = ( xyz_sum_all + (xz_sum_top + yz_sum_right)*0.5*delta + z_sum_anti_diag*0.25*(delta**2) )*0.25
-        xz = ( xz_sum_all + z_sum_right*0.5*delta )*0.25
-        yz = ( yz_sum_all + z_sum_top*0.5*delta )*0.25
-        z = z_sum_all * 0.25
+        yyz_sum_all = self._partial_aggregation(arr_dic['yyz'], delta_power, delta_power+1, '++++')
+
+        xyz_sum_all = self._partial_aggregation(arr_dic['xyz'], delta_power, delta_power+1, '++++')
+
+        xxz = 0.25*(xxz_sum_all + delta*xz_sum_right + 0.25*(delta**2)*z_sum_all)
+        yyz = 0.25*(yyz_sum_all + yz_sum_top*delta + 0.25*(delta**2)*z_sum_all)
+        xyz = 0.25*(xyz_sum_all + 0.5*delta*(xz_sum_top + yz_sum_right) + 0.25*(delta**2)*z_sum_anti_diag)
+        xz = 0.25*(xz_sum_all + 0.5*delta*z_sum_right)
+        yz = 0.25*(yz_sum_all + 0.5*delta*z_sum_top)
+        z = 0.25*z_sum_all
         
         for i in (['z', z], ['xz', xz], ['yz', yz], ['xxz', xxz], ['yyz', yyz], ['xyz', xyz]):
             arr_dic[i[0]] = i[1]
 
-    def _double_w_old_1(self, delta_power, arr_dic):
+    def _double_w_brute(self, delta_power, arr_dic):
         delta = 2**delta_power
         z, xz, yz, xxz, yyz, xyz = (arr_dic[x] for x in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz'))
         x_max = arr_dic['orig_width'] - delta
@@ -499,7 +499,7 @@ class SlidingWindow:
                     (xxz[y, x] + xxz[y, x+delta] + xxz[y+delta, x] + xxz[y+delta, x+delta]) + 
                     (-xz[y, x] + xz[y, x+delta] - xz[y+delta, x] + xz[y+delta, x+delta])*delta + 
                     (z[y, x] + z[y, x+delta] + z[y+delta, x] + z[y+delta, x+delta])*0.25*(delta**2)
-                ) * 0.25
+                )*0.25
 
                 yyz_loc[y, x] = (
                     (yyz[y, x] + yyz[y, x+delta] + yyz[y+delta, x] + yyz[y+delta, x+delta]) + 
@@ -520,18 +520,17 @@ class SlidingWindow:
         for i in (['z', z_loc], ['xz', xz_loc], ['yz', yz_loc], ['xxz', xxz_loc], ['yyz', yyz_loc], ['xyz', xyz_loc]):
             arr_dic[i[0]] = i[1]
 
-    def _double_w_old_2(self, delta_power, arr_dic):
+    def _double_w_old(self, delta_power, arr_dic):
         # arrays represent corners of aggregation square: [top_left, top_right, bottom_left, bottom_right]
         sum_right = np.array([-1, 1, -1, 1])[:,None]
         sum_top = np.array([1, 1, -1, -1])[:,None]
         sum_anti_diag = np.array([-1, 1, 1, -1])[:,None]
 
         delta = 2**delta_power
-        z = arr_dic['z']
-        x_max_old = z.shape[1]
-        x_max = z.shape[1] - delta
-        y_max = z.shape[0] - delta
-        z = z.flatten()
+        z_in = arr_dic['z']
+        x_max_old = z_in.shape[1]
+        x_max = z_in.shape[1] - delta
+        y_max = z_in.shape[0] - delta
         # sum the 4 corners of a square of width delta
         # separation of indices to sum
         corner_indices = np.array([[0], [delta], [delta*x_max_old], [delta*x_max_old+delta]])
@@ -539,25 +538,39 @@ class SlidingWindow:
         top_left_indices = (np.arange(y_max)[:, np.newaxis]*x_max_old + np.arange(x_max)).flatten()
         full_selector = corner_indices + top_left_indices
 
-        big_array_z = np.take(z, full_selector)
-        z = big_array_z.mean(axis=0)
+        z_corners = np.take(z_in, full_selector)
+        z_sum_all = z_corners.mean(axis=0)
+        z_sum_top = (z_corners*sum_top).mean(axis=0)
+        z_sum_right = (z_corners*sum_right).mean(axis=0)
+        z_sum_anti_diag = (z_corners*sum_anti_diag).mean(axis=0)
 
-        big_array_xz = np.take(arr_dic['xz'], full_selector)
-        xz = np.mean(big_array_xz  + (big_array_z*sum_right)*0.5*delta, axis=0)
+        xz_corners = np.take(arr_dic['xz'], full_selector)
+        xz_sum_all = xz_corners.mean(axis=0)
+        xz_sum_top = (xz_corners*sum_top).mean(axis=0)
+        xz_sum_right = (xz_corners*sum_right).mean(axis=0)
 
-        big_array_yz = np.take(arr_dic['yz'], full_selector)
-        yz_loc = np.mean(big_array_yz + (big_array_z*sum_top)*0.5*delta, axis=0)
+        yz_corners = np.take(arr_dic['yz'], full_selector)
+        yz_sum_all = yz_corners.mean(axis=0)
+        yz_sum_top = (yz_corners*sum_top).mean(axis=0)
+        yz_sum_right = (yz_corners*sum_right).mean(axis=0)
 
-        big_array_xxz = np.take(arr_dic['xxz'], full_selector)
-        xxz_loc = np.mean(big_array_xxz + (big_array_xz*sum_right)*delta + 0.25*(delta**2)*z, axis=0)
+        xxz_corners = np.take(arr_dic['xxz'], full_selector)
+        xxz_sum_all = xxz_corners.mean(axis=0)
 
-        big_array_yyz = np.take(arr_dic['yyz'], full_selector)
-        yyz_loc = np.mean(big_array_yyz + (big_array_yz*sum_top)*delta + 0.25*(delta**2)*z, axis=0)
+        yyz_corners = np.take(arr_dic['yyz'], full_selector)
+        yyz_sum_all = yyz_corners.mean(axis=0)
 
-        big_array_xyz = np.take(arr_dic['xyz'], full_selector)
-        xyz_loc = np.mean(big_array_xyz + ((big_array_xz*sum_top) + (big_array_yz*sum_right))*.5*delta + 0.25*(delta**2)*(big_array_z*sum_anti_diag), axis=0)
+        xyz_corners = np.take(arr_dic['xyz'], full_selector)
+        xyz_sum_all = xyz_corners.mean(axis=0)
+
+        z = z_sum_all
+        xz = xz_sum_all  + 0.5*delta*z_sum_right
+        yz = yz_sum_all + 0.5*delta*z_sum_top
+        xxz = xxz_sum_all + xz_sum_right*delta + 0.25*(delta**2)*z
+        yyz = yyz_sum_all + yz_sum_top*delta + 0.25*(delta**2)*z
+        xyz = xyz_sum_all + .5*delta*(xz_sum_top + yz_sum_right) + 0.25*(delta**2)*z_sum_anti_diag
     
-        for i in (['z', z], ['xz', xz], ['yz', yz_loc], ['xxz', xxz_loc], ['yyz', yyz_loc], ['xyz', xyz_loc]):
+        for i in (['z', z], ['xz', xz], ['yz', yz], ['xxz', xxz], ['yyz', yyz], ['xyz', xyz]):
             arr_dic[i[0]] = i[1].reshape((y_max, x_max))
 
     # TODO NOT FUNCTIONAL
