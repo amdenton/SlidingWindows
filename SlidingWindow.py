@@ -479,8 +479,8 @@ class SlidingWindow:
     def _double_w_brute(self, delta_power, arr_dic):
         delta = 2**delta_power
         z, xz, yz, xxz, yyz, xyz = (arr_dic[x] for x in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz'))
-        x_max = arr_dic['orig_width'] - delta
-        y_max = arr_dic['orig_height'] - delta
+        x_max = z.shape[1] - delta
+        y_max = z.shape[0] - delta
         z_loc, xz_loc, yz_loc, xxz_loc, yyz_loc, xyz_loc = (np.zeros([y_max, x_max]) for _ in range(6))
 
         for y in range (y_max):
