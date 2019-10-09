@@ -567,7 +567,7 @@ class SlidingWindow:
         for i in (['z', z], ['xz', xz], ['yz', yz], ['xxz', xxz], ['yyz', yyz], ['xyz', xyz]):
             arr_dic[i[0]] = i[1].reshape((y_max, x_max))
 
-    def slope(self, arr_dic, delta_power, prefactor):
+    def slope(self, arr_dic, delta_power):
         delta = 2**delta_power
         transform = self.img.profile['transform']
         pixel_width = math.sqrt(transform[0]**2 + transform[3]**2)
@@ -581,42 +581,20 @@ class SlidingWindow:
         len_adj = math.sqrt( ((pixel_width*xz)**2) + ((pixel_height*yz)**2) )
         slope = np.arctan(len_opp/len_adj)
 
-        slope_min = np.min(slope)
-        slope_max = np.max(slope)
-        slope = ((slope - slope_min) / (slope_max - slope_min) * np.iinfo(np.uint16).max).astype(np.uint16)
+        slope = self.__arr_dtype_conversion(slope, np.uint16)
         fn = os.path.splitext(self.file_name)[0] + '_slope_w' + str(delta*2) +'.tif'
         self.__create_tif(1, [slope], delta*2, fn, 'uint16')
 
-    # TODO NOT FUNCTIONAL
-    # Sign of pixel directions considered here and in directional curvaturen terms
-    def aspect(w,z,xz,yz,fn,GeoT):
-        #aspect_image = Image.new('F',(width-w+1,height-w+1))
-        aspect_array = np.zeros((height-w+1,width-w+1))
-        factor = maxuint16 / (2*math.pi)
-        for j in range (0, height-w+1):
-            for i in range (0, width-w+1):
-                xz_loc = xz[j,i]
-                yz_loc = yz[j,i]
-                if yz_loc == 0:
-                    if xz_loc < 0:
-                        value = 1.5*math.pi
-                    else:
-                        value = 0.5*math.pi
-                else:
-                    value = -math.atan(xz_loc/yz_loc)
-                    if yz_loc < 0:
-                        value += math.pi
-                    elif xz_loc > 0:
-                        value += 2*math.pi
-                #aspect_image.putpixel((i,j),value)
-                aspect_array[j,i]=value*factor
-        #im = Image.fromarray(aspect_array)
-        #im.save(fn_loc)
-        print("aspect_array")
-        print(aspect_array)
-        fn_loc = os.path.splitext(fn)[0] +'_aspect_w'+str(w)+'.tif'
-        n = aspect_array.astype(np.uint16)
-        tiff.imsave(fn_loc,n)
+    # angle clockwise from north of the downward slope
+    def aspect(self, arr_dic, delta_power):
+        delta = 2**delta_power
+        xz = arr_dic['xz']
+        yz = arr_dic['yz']
+
+        aspect = (-np.arctan(xz/np.maximum(yz,1)) - np.sign(yz)*math.pi/2 + math.pi/2) % (2*math.pi)
+        fn = os.path.splitext(self.file_name)[0] + '_aspect_w' + str(delta*2) +'.tif'
+        aspect = self.__arr_dtype_conversion(aspect, np.uint16)
+        self.__create_tif(1, [aspect], delta*2, fn, 'uint16')
 
     # TODO NOT FUNCTIONAL
     def norm_curv(w,z,xz,yz,xxz,yyz,fn,GeoT):
