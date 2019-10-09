@@ -574,24 +574,18 @@ class SlidingWindow:
         pixel_height = math.sqrt(transform[1]**2 + transform[4]**2)
         xz = arr_dic['xz']
         yz = arr_dic['yz']
-        x_max = xz.shape[1]
-        y_max = xz.shape[0]
-        slope_array = np.zeros([y_max, x_max])
 
-        for j in range (y_max):
-            for i in range (x_max):
-                slope_x = 12*xz[j, i]/(4*delta**2 - 1) 
-                slope_y = 12*yz[j, i]/(4*delta**2 - 1)
-                len_opp = abs(slope_x)*xz[j,i] + abs(slope_y)*yz[j,i]
-                len_adj = math.sqrt( ((pixel_width*xz[j,i])**2) + ((pixel_height*yz[j,i])**2) )
-                value = math.atan(len_opp/len_adj)
-                slope_array[j, i] = value
+        slope_x = 12*xz/(4*delta**2 - 1)
+        slope_y = 12*yz/(4*delta**2 - 1)
+        len_opp = abs(slope_x)*xz + abs(slope_y)*yz
+        len_adj = math.sqrt( ((pixel_width*xz)**2) + ((pixel_height*yz)**2) )
+        slope = np.arctan(len_opp/len_adj)
 
-        slope_min = np.min(slope_array)
-        slope_max = np.max(slope_array)
-        slope_array = ((slope_array - slope_min) / (slope_max - slope_min) * np.iinfo(np.uint16).max).astype(np.uint16)
+        slope_min = np.min(slope)
+        slope_max = np.max(slope)
+        slope = ((slope - slope_min) / (slope_max - slope_min) * np.iinfo(np.uint16).max).astype(np.uint16)
         fn = os.path.splitext(self.file_name)[0] + '_slope_w' + str(delta*2) +'.tif'
-        self.__create_tif(1, [slope_array], delta*2, fn, 'uint16')
+        self.__create_tif(1, [slope], delta*2, fn, 'uint16')
 
     # TODO NOT FUNCTIONAL
     # Sign of pixel directions considered here and in directional curvaturen terms
