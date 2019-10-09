@@ -567,36 +567,31 @@ class SlidingWindow:
         for i in (['z', z], ['xz', xz], ['yz', yz], ['xxz', xxz], ['yyz', yyz], ['xyz', xyz]):
             arr_dic[i[0]] = i[1].reshape((y_max, x_max))
 
-    # TODO NOT FUNCTIONAL
     def slope(self, arr_dic, delta_power, prefactor):
         delta = 2**delta_power
-        z = arr_dic['z']
-        yz = arr_dic['yz']
+        transform = self.img.profile['transform']
+        pixel_width = math.sqrt(transform[0]**2 + transform[3]**2)
+        pixel_height = math.sqrt(transform[1]**2 + transform[4]**2)
         xz = arr_dic['xz']
-        y_max = arr_dic['orig_height'] - (delta-1)
-        x_max = arr_dic['orig_width'] - (delta-1)
-        #slope_image = Image.new('F',(width-w+1,height-w+1))
+        yz = arr_dic['yz']
+        x_max = xz.shape[1]
+        y_max = xz.shape[0]
         slope_array = np.zeros([y_max, x_max])
-        xx = ((delta**2) - 1) / 12.0
-
-        slope = np.arctan(np.sqrt((xz**2) + (yz**2)) / xx)
 
         for j in range (y_max):
             for i in range (x_max):
-                # TODO why do we need transform and prefactor
-                value = math.atan(prefactor / xx * math.sqrt(xz[j,i]**2 + yz[j,i]**2)/abs(self.img.profile['transform'][0]))
-                #slope_image.putpixel((i,j),value)
-                slope_array[j,i]=value
+                slope_x = 12*xz[j, i]/(4*delta**2 - 1) 
+                slope_y = 12*yz[j, i]/(4*delta**2 - 1)
+                len_opp = abs(slope_x)*xz[j,i] + abs(slope_y)*yz[j,i]
+                len_adj = math.sqrt( ((pixel_width*xz[j,i])**2) + ((pixel_height*yz[j,i])**2) )
+                value = math.atan(len_opp/len_adj)
+                slope_array[j, i] = value
 
-        #im = Image.fromarray(slope_array)
-        #slope_image.save(fn_loc)
         slope_min = np.min(slope_array)
         slope_max = np.max(slope_array)
         slope_array = ((slope_array - slope_min) / (slope_max - slope_min) * np.iinfo(np.uint16).max).astype(np.uint16)
         fn = os.path.splitext(self.file_name)[0] + '_slope_w' + str(delta*2) +'.tif'
         self.__create_tif(1, [slope_array], delta*2, fn, 'uint16')
-        #print_tfw(fn,fn_loc,w,GeoT)
-        print_display_tfw(fn,fn_loc,w,GeoT,3)
 
     # TODO NOT FUNCTIONAL
     # Sign of pixel directions considered here and in directional curvaturen terms
@@ -628,8 +623,6 @@ class SlidingWindow:
         fn_loc = os.path.splitext(fn)[0] +'_aspect_w'+str(w)+'.tif'
         n = aspect_array.astype(np.uint16)
         tiff.imsave(fn_loc,n)
-        #print_tfw(fn,fn_loc,w,GeoT)
-        print_display_tfw(fn,fn_loc,w,GeoT,1)
 
     # TODO NOT FUNCTIONAL
     def norm_curv(w,z,xz,yz,xxz,yyz,fn,GeoT):
@@ -646,8 +639,6 @@ class SlidingWindow:
         fn_loc = os.path.splitext(fn)[0] +'_curv_w'+str(w)+'.tif'
         n = curv_array.astype(np.uint16)
         tiff.imsave(fn_loc,n)
-        #print_tfw(fn,fn_loc,w,GeoT)
-        print_display_tfw(fn,fn_loc,w,GeoT,2)
 
     # TODO NOT FUNCTIONAL
     def all_curv(w,z,xz,yz,xxz,yyz,xyz,fn,GeoT):
@@ -667,8 +658,6 @@ class SlidingWindow:
         fn_loc = os.path.splitext(fn)[0] +'_curv_w'+str(w)+'.tif'
         n = ((curv_array - curv_min) / (curv_max - curv_min) * maxuint16).astype(np.uint16)
         tiff.imsave(fn_loc,n)
-        #print_tfw(fn,fn_loc,w,GeoT)
-        print_display_tfw(fn,fn_loc,w,GeoT,2)
         
         prof_array = curv_array + pmp_array
         prof_min = np.amin(prof_array)
@@ -676,8 +665,6 @@ class SlidingWindow:
         fn_loc = os.path.splitext(fn)[0] +'_prof_w'+str(w)+'.tif'
         n = ((prof_array - prof_min) / (prof_max - prof_min) * maxuint16).astype(np.uint16)
         tiff.imsave(fn_loc,n)
-        #print_tfw(fn,fn_loc,w,GeoT)
-        print_display_tfw(fn,fn_loc,w,GeoT,2)
 
         plan_array = curv_array - pmp_array
         plan_min = np.amin(plan_array)
@@ -685,8 +672,6 @@ class SlidingWindow:
         fn_loc = os.path.splitext(fn)[0] +'_plan_w'+str(w)+'.tif'
         n = ((plan_array - plan_min) / (plan_max - plan_min) * maxuint16).astype(np.uint16)
         tiff.imsave(fn_loc,n)
-        #print_tfw(fn,fn_loc,w,GeoT)
-        print_display_tfw(fn,fn_loc,w,GeoT,2)
 
     # TODO NOT FUNCTIONAL
     # TODO same as planform?
@@ -711,8 +696,6 @@ class SlidingWindow:
         fn = os.path.splitext(self.file_name)[0] + '_profile_w' + str(delta*2) +'.tif'
         n = curv_array.astype(np.uint16)
         self.__create_tif(1, [n], delta*2, fn, 'uint16')
-        #print_tfw(fn,fn_loc,w,GeoT)
-        print_display_tfw(fn,fn_loc,w,GeoT,3)
 
     # TODO NOT FUNCTIONAL
     # TODO same as profile?
@@ -737,5 +720,3 @@ class SlidingWindow:
         fn = os.path.splitext(self.file_name)[0] + '_plan_w' + str(delta*2) +'.tif'
         n = curv_array.astype(np.uint16)
         self.__create_tif(1, [n], delta*2, fn, 'uint16')
-        #print_tfw(fn,fn_loc,w,GeoT)
-        print_display_tfw(fn,fn_loc,w,GeoT,4)
