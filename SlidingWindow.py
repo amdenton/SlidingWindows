@@ -645,50 +645,30 @@ class SlidingWindow:
         n = ((plan_array - plan_min) / (plan_max - plan_min) * maxuint16).astype(np.uint16)
         tiff.imsave(fn_loc,n)
 
-    # TODO NOT FUNCTIONAL
-    # TODO same as planform?
     def profile(self, delta_power, arr_dic):
         delta = 2**delta_power
-        z = arr_dic['z']
-        yyz = arr_dic['yyz']
-        xxz = arr_dic['xxz']
-        y_max = arr_dic['orig_height'] - (delta-1)
-        x_max = arr_dic['orig_width'] - (delta-1)
-        curv_array = np.empty((y_max, x_max))
-        curv_array = np.empty((y_max, x_max))
-        
-        xx = ((delta**2) - 1) / 12.
-        inv_x4mxx2 = 180.0 / ((delta**4) - 5*(delta**2) + 4)
-        curv_array = (0.5*(xxz + yyz) - np.multiply(xx,z)) * inv_x4mxx2
-        #curv_array = (xxz - np.multiply(xx,z)) * inv_x4mxx2
-        curv_min = np.mina(curv_array)
-        curv_max = np.maxa(curv_array)
-        curv_array = (curv_array - curv_min) / (curv_max - curv_min) * np.iinfo(np.uint16).max
-        
-        fn = os.path.splitext(self.file_name)[0] + '_profile_w' + str(delta*2) +'.tif'
-        n = curv_array.astype(np.uint16)
-        self.__create_tif(1, [n], delta*2, fn, 'uint16')
+        z, xz, yz, yyz, xxz, xyz = tuple (arr_dic[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
 
-    # TODO NOT FUNCTIONAL
-    # TODO same as profile?
+        a00 = (2160*xxz - 720*(delta**2)*z - 180*z) / (32*(delta**4) - 40*(delta**2) + 8)
+        a10 = (288*xyz) / (32*(delta**4) - 16*(delta**2) + 2)
+        a11 = (2160*yyz - 720*(delta**2)*z - 180*z) / (32*(delta**4) - 40*(delta**2) + 8)
+        
+        profile = (a00*(xz**2) + 2*a10*xz*yz + a11*(yz*2)) / ((xz**2) + (yz**2))
+
+        fn = os.path.splitext(self.file_name)[0] + '_profile_w' + str(delta*2) +'.tif'
+        profile = self.__arr_dtype_conversion(profile, np.uint16)
+        self.__create_tif(1, [profile], delta*2, fn, 'uint16')
+
     def planform(self, delta_power, arr_dic):
         delta = 2**delta_power
-        z = arr_dic['z']
-        yyz = arr_dic['yyz']
-        xxz = arr_dic['xxz']
-        y_max = arr_dic['orig_height'] - (delta-1)
-        x_max = arr_dic['orig_width'] - (delta-1)
-        curv_array = np.empty((y_max, x_max))
+        z, xz, yz, yyz, xxz, xyz = tuple (arr_dic[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
 
+        a00 = (2160*xxz - 720*(delta**2)*z - 180*z) / (32*(delta**4) - 40*(delta**2) + 8)
+        a10 = (288*xyz) / (32*(delta**4) - 16*(delta**2) + 2)
+        a11 = (2160*yyz - 720*(delta**2)*z - 180*z) / (32*(delta**4) - 40*(delta**2) + 8)
         
-        xx = ((delta**2) - 1) / 12.
-        inv_x4mxx2 = 180.0 / ((delta**4) - 5*(delta**2) + 4)
-        curv_array = (0.5*(xxz + yyz) - np.multiply(xx,z)) * inv_x4mxx2
-        #curv_array = (xxz - np.multiply(xx,z)) * inv_x4mxx2
-        curv_min = np.min(curv_array)
-        curv_max = np.max(curv_array)
-        curv_array = (curv_array - curv_min) / (curv_max - curv_min) * np.iinfo(np.uint16).max
+        planform = (a00*(yz**2) - 2*a10*xz*yz + a11*(xz*2)) / ((xz**2) + (yz**2))
         
-        fn = os.path.splitext(self.file_name)[0] + '_plan_w' + str(delta*2) +'.tif'
-        n = curv_array.astype(np.uint16)
-        self.__create_tif(1, [n], delta*2, fn, 'uint16')
+        fn = os.path.splitext(self.file_name)[0] + '_planform_w' + str(delta*2) +'.tif'
+        planform = self.__arr_dtype_conversion(planform, np.uint16)
+        self.__create_tif(1, [planform], delta*2, fn, 'uint16')
