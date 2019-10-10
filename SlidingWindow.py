@@ -8,6 +8,43 @@ import affine
 
 class SlidingWindow:
 
+    # TODO create more tests
+    # test geoTransform update in __create_tif()
+    # test averages (e.g. xz, yz) in DEM_UTILS   TODO also figure out how to initialize arrays
+
+    # TODO do I have all required functionality?
+    # image creation with geoTransform update
+    # array conversion TODO needs updating
+    # ndvi
+    # binary
+    # aggregation
+    # regression
+    # Pearson
+    # fractal
+    # fractal 3D TODO ensure this method is written properly (check __boxed_array() for sure)
+    # DEM window mean
+    # DEM array intialization
+    # DEM double_w TODO this has 3 methods, do we need all 3?
+    # DEM slope
+    # DEM aspect
+    # DEM standard curve
+    # DEM profile curve
+    # DEM planform curve
+
+    # TODO what is the best way to handles aggregations?
+    # 1. generate all images at each step
+    # 2. specify what images to generate at each step
+    # 3. store the results of all aggregations and let user choose images to generate at which step
+
+    # TODO how should RBG and DEM be differentiated?
+
+    # TODO Is the current model for the application desirable?
+    # currently: intit with image -> execute operation -> image automatically created
+    # cannot currently stack bands, TODO do we want to?
+
+    # TODO research how to create python package
+    # TODO add more documentation
+
     def __init__(self, file_path, band_enum):
         self.file_name = os.path.split(file_path)[-1]
         self.img = rasterio.open(file_path)
@@ -28,18 +65,22 @@ class SlidingWindow:
         ndvi = ((ir.astype(float) - red.astype(float)) / (ir + red)).astype(np.uint8)
 
         self.__create_tif(1, [ndvi])
-        
-    # turn image into black and white
-    # values greater than or equal to threshold are white
+
     def binary(self, band, threshold):
         arr = self.img.read(self.band_enum[band].value)
         arr = self.__binary(arr, threshold)
         self.__create_tif(1, [arr])
 
-    # TODO specify threshold
+    # create black and white image
+    # values greater than or equal to threshold percentage will be white
+    # threshold: percent in decimal of maximum
+    # TODO can I assume minimum is always 0, how would I handle it otherwise?
     def __binary(self, arr, threshold):
-        return np.where(arr < threshold, 0, 255).astype(np.uint8)
+        maximum = self.__get_max_min(arr.dtype)[0]
+        return np.where(arr < threshold*maximum, 0, maximum).astype(np.uint8)
 
+    # check if an image is black and white or not
+    # i.e. only contains values of dtype.min and dtype.max
     def __is_binary(self, arr_in):
         dtype = arr_in.dtype
         max_val = 0
@@ -180,7 +221,6 @@ class SlidingWindow:
 
             if operation.upper() == '++++':
                 arr_out = top_left + top_right + bottom_left + bottom_right
-            # TODO should this be sum top?
             if operation.upper() == '++--':
                 arr_out = top_left + top_right - bottom_left - bottom_right
             if operation.upper() == '-+-+':
@@ -292,7 +332,7 @@ class SlidingWindow:
             raise ValueError('power_start must be nonzero and less than power_target')
 
         arr = self.img.read(self.band_enum[band].value).astype(float)
-        arr = self._fractal(self.__binary(arr, 127), power_start, power_target)
+        arr = self._fractal(self.__binary(arr, .5), power_start, power_target)
 
         # TODO remove later
         arr = self.__arr_dtype_conversion(arr, np.uint8)
@@ -387,7 +427,8 @@ class SlidingWindow:
 
         y_max = arr_in.shape[0] - (2**power_target - 1)
         x_max = arr_in.shape[1] - (2**power_target - 1)
-        arr = self.__binary(arr_in, np.mean(arr_in))
+        # TODO does this need to be np.mean(arr_in)?
+        arr = self.__binary(arr_in, np.mean(arr_in)/self.__get_max_min(arr_in.dtype)[0])
         denom_regress = np.empty(power_target-power_start)
         num_regress = np.zeros([power_target-power_start, x_max*y_max])
         
