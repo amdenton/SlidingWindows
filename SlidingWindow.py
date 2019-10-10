@@ -596,55 +596,6 @@ class SlidingWindow:
         aspect = self.__arr_dtype_conversion(aspect, np.uint16)
         self.__create_tif(1, [aspect], delta*2, fn, 'uint16')
 
-    # TODO NOT FUNCTIONAL
-    def norm_curv(w,z,xz,yz,xxz,yyz,fn,GeoT):
-        curv_array = np.empty((height-w+1,width-w+1))
-        
-        xx = (w*w - 1) / 12.
-        inv_x4mxx2 = 180. / (w*w*w*w - 5*w*w + 4)
-        curv_array = (0.5*(xxz + yyz) - np.multiply(xx,z)) * inv_x4mxx2
-        #curv_array = (xxz - np.multiply(xx,z)) * inv_x4mxx2
-        curv_min = np.min(curv_array)
-        curv_max = np.max(curv_array)
-        curv_array = (curv_array - curv_min) / (curv_max - curv_min) * maxuint16
-        
-        fn_loc = os.path.splitext(fn)[0] +'_curv_w'+str(w)+'.tif'
-        n = curv_array.astype(np.uint16)
-        tiff.imsave(fn_loc,n)
-
-    # TODO NOT FUNCTIONAL
-    def all_curv(w,z,xz,yz,xxz,yyz,xyz,fn,GeoT):
-        curv_array = np.empty((height-w+1,width-w+1))
-        
-        xx = (w*w - 1) / 12.
-        inv_xx_sq = 1./(xx*xx)
-        inv_x4mxx2 = 180. / (w*w*w*w - 5*w*w + 4)
-        curv_array = (0.5*(xxz + yyz) - np.multiply(xx,z)) * inv_x4mxx2
-        #curv_array = (xxz - np.multiply(xx,z)) * inv_x4mxx2
-
-        pmp_array = np.divide((0.5 * (xxz - yyz) * inv_x4mxx2 * (xz * xz - yz * yz) + xyz * inv_xx_sq * xz * yz), (xz * xz + yz * yz)) 
-        #pmp_array = np.divide((0.5 * (xxz - yyz) * (xz * xz - yz * yz) + xyz * xz * yz), (inv_x4mxx2 *(xz * xz + yz * yz))) 
-        
-        curv_min = np.amin(curv_array)
-        curv_max = np.amax(curv_array)    
-        fn_loc = os.path.splitext(fn)[0] +'_curv_w'+str(w)+'.tif'
-        n = ((curv_array - curv_min) / (curv_max - curv_min) * maxuint16).astype(np.uint16)
-        tiff.imsave(fn_loc,n)
-        
-        prof_array = curv_array + pmp_array
-        prof_min = np.amin(prof_array)
-        prof_max = np.amax(prof_array)    
-        fn_loc = os.path.splitext(fn)[0] +'_prof_w'+str(w)+'.tif'
-        n = ((prof_array - prof_min) / (prof_max - prof_min) * maxuint16).astype(np.uint16)
-        tiff.imsave(fn_loc,n)
-
-        plan_array = curv_array - pmp_array
-        plan_min = np.amin(plan_array)
-        plan_max = np.amax(plan_array)    
-        fn_loc = os.path.splitext(fn)[0] +'_plan_w'+str(w)+'.tif'
-        n = ((plan_array - plan_min) / (plan_max - plan_min) * maxuint16).astype(np.uint16)
-        tiff.imsave(fn_loc,n)
-
     def profile(self, delta_power, arr_dic):
         delta = 2**delta_power
         z, xz, yz, yyz, xxz, xyz = tuple (arr_dic[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
@@ -672,3 +623,15 @@ class SlidingWindow:
         fn = os.path.splitext(self.file_name)[0] + '_planform_w' + str(delta*2) +'.tif'
         planform = self.__arr_dtype_conversion(planform, np.uint16)
         self.__create_tif(1, [planform], delta*2, fn, 'uint16')
+
+    def standard(self, delta_power, arr_dic):
+        delta = 2**delta_power
+        z, yyz, xxz = tuple (arr_dic[i] for i in ('z', 'yyz', 'xxz'))
+
+        a00 = (2160*xxz - 720*(delta**2)*z - 180*z) / (32*(delta**4) - 40*(delta**2) + 8)
+        a11 = (2160*yyz - 720*(delta**2)*z - 180*z) / (32*(delta**4) - 40*(delta**2) + 8)
+        standard = (a00 + a11) / 2
+
+        fn = os.path.splitext(self.file_name)[0] + '_standard_w' + str(delta*2) +'.tif'
+        standard = self.__arr_dtype_conversion(standard, np.uint16)
+        self.__create_tif(1, [standard], delta*2, fn, 'uint16')
