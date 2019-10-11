@@ -1,6 +1,5 @@
 import unittest
 from SlidingWindow import SlidingWindow
-import BandEnum
 import numpy as np
 import rasterio
 
@@ -10,7 +9,7 @@ class TestSlidingWindow(unittest.TestCase):
     test_path_dem = 'dem/gunsite_dem-2-1.tif'
 
     def no_test_aggregation(self):
-        slide_window = SlidingWindow(self.test_path, BandEnum.rgbIr)
+        slide_window = SlidingWindow(self.test_path)
         img = rasterio.open(self.test_path)
         arr = img.read(1).astype(float)[0:512, 0:512]
 
@@ -69,7 +68,7 @@ class TestSlidingWindow(unittest.TestCase):
         self.assertTrue(np.array_equal(partial_minimum, brute_minimum))
 
     def no_test_regression(self):
-        slide_window = SlidingWindow(self.test_path, BandEnum.rgbIr)
+        slide_window = SlidingWindow(self.test_path)
         img = rasterio.open(self.test_path)
         arr1 = img.read(1).astype(float)[0:128, 0:128]
         arr2 = img.read(2).astype(float)[0:128, 0:128]
@@ -82,7 +81,7 @@ class TestSlidingWindow(unittest.TestCase):
         self.assertTrue(np.array_equal(arr_good, arr_brute))
 
     def test_dem(self):
-        slide_window = SlidingWindow(self.test_path_dem, BandEnum.rgbIr)
+        slide_window = SlidingWindow(self.test_path_dem)
         img = rasterio.open(self.test_path_dem)
         arr = img.read(1).astype(float)[0:1024, 0:1024]
 
