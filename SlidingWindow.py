@@ -44,6 +44,7 @@ class SlidingWindow:
 
     # TODO research how to create python package
     # TODO add more documentation
+    # TODO should all these methods use floating point?
 
     def __init__(self, file_path):
         self.file_name = os.path.split(file_path)[-1]
@@ -55,6 +56,7 @@ class SlidingWindow:
     def valid_ops(self):
         return self.__valid_ops
 
+    # create NDVI image
     def ndvi(self, red_band, ir_band):
         bands = np.array(range(self.img.count))+1
         if (red_band not in bands or ir_band not in bands):
@@ -63,13 +65,20 @@ class SlidingWindow:
         red = self.img.read(red_band)
         ir = self.img.read(ir_band)
         ndvi = self.__ndvi(red, ir)
+        # TODO change later
+        ndvi = self.__arr_dtype_conversion(ndvi, np.uint8)
         self.__create_tif(ndvi)
 
     # i.e. Normalized Difference Vegetation Index
     # for viewing live green vegetation
+    # requires red and infrared bands
+    # returns floating point array
     def __ndvi(self, red_arr, ir_arr):
-        return ( (ir_arr - red_arr) / (ir_arr + red_arr) ).astype(np.uint8)
+        red_arr = red_arr.astype(float)
+        ir_arr = ir_arr.astype(float)
+        return ( (ir_arr - red_arr) / (ir_arr + red_arr) )
 
+    # create binary image
     def binary(self, band, threshold):
         bands = np.array(range(self.img.count))+1
         if (band not in bands):
@@ -82,17 +91,21 @@ class SlidingWindow:
     # create black and white image
     # values greater than or equal to threshold percentage will be white
     # threshold: percent in decimal of maximum
+    # returns array of same data type
     # TODO can I assume minimum is always 0, how would I handle it otherwise?
     def __binary(self, arr, threshold):
+        if (threshold < 0 or threshold > 1):
+            raise ValueError('threshold must be between 0 and 1')
+        dtype = arr.dtype
         maximum = self.__get_max_min(arr.dtype)[0]
-        return np.where(arr < (threshold*maximum), 0, maximum).astype(np.uint8)
+        return np.where(arr < (threshold*maximum), 0, maximum).astype(dtype)
 
     # check if an image is black and white or not
     # i.e. only contains values of dtype.min and dtype.max
+    # TODO should min value be arr_in.dtype.min or 0?
     def __is_binary(self, arr_in):
-        dtype = arr_in.dtype
-        max_val, min_val = self.__get_max_min(dtype)
-        return ((arr_in==min_val) | (arr_in==max_val)).all()
+        max_val = self.__get_max_min(arr_in.dtype)[0]
+        return ((arr_in==0) | (arr_in==max_val)).all()
 
     # get max and min of numpy data type
     # returns tuple (max, min)
@@ -110,13 +123,18 @@ class SlidingWindow:
 
     # create tif with array of numpy arrays representing image bands
     # adjust geoTransform according to how many pixels were aggregated
-    def __create_tif(self, arr_in, pixels_aggre=1, fn=None, dtype='uint8'):
+    def __create_tif(self, arr_in, pixels_aggre=1, fn=None):
         if (type(arr_in) == np.ndarray):
             arr_in = [arr_in]
+        dtype = arr_in[0].dtype
+        for x in range(1, len(arr_in)):
+            if (arr_in[x].dtype is not dtype):
+                raise TypeError('arrays must have the same dtype')
+
 
         profile = self.img.profile
 
-        # update transform with aggregated pixels
+        # update geo transform with aggregated pixels
         transform = profile['transform']
         temp = np.empty(6)
         # TODO test this stuff, ok?
@@ -154,32 +172,38 @@ class SlidingWindow:
         arr_max = np.amax(arr_in)
         arr_min = np.amin(arr_in)
         dtype_max = self.__get_max_min(dtype)[0]
-        arr_out = ((arr_in - arr_min)/(arr_max - arr_min) * dtype_max).astype(dtype)
+        arr_out = ((arr_in - arr_min)/(arr_max - arr_min)).astype(dtype) * dtype_max
         return arr_out
 
+    # non-vectorized aggregation method
+    # very slow
+    # returns floating point array
     def _aggregation_brute(self, arr_in, operation, num_aggre):
         if (operation.upper() not in self.__valid_ops):
             raise ValueError('operation must be one of %r.' % self.__valid_ops)
 
+        arr_in = arr_in.astype(float)
         x_max = arr_in.shape[1]
         y_max = arr_in.shape[0]
         arr_out = np.array(arr_in)
 
+        # iterate through window sizes
         for i in range(num_aggre):
             delta = 2**i
             y_max -= delta
             x_max -= delta
             arr = np.empty([y_max, x_max])
 
+            # iterate through pixels
             for j in range (y_max):
                 for i in range (x_max):
-                    if (operation.upper() == '++++'):
+                    if (operation == '++++'):
                         arr[j, i] = arr_out[j, i] + arr_out[j, i+delta] + arr_out[j+delta, i] + arr_out[j+delta, i+delta]
-                    if (operation.upper() == '++--'):
+                    if (operation == '++--'):
                         arr[j, i] = arr_out[j, i] + arr_out[j, i+delta] - arr_out[j+delta, i] - arr_out[j+delta, i+delta]
-                    if (operation.upper() == '-+-+'):
+                    if (operation == '-+-+'):
                         arr[j, i] = -arr_out[j, i] + arr_out[j, i+delta] - arr_out[j+delta, i] + arr_out[j+delta, i+delta]
-                    if (operation.upper() == '-++-'):
+                    if (operation == '-++-'):
                         arr[j, i] = -arr_out[j, i] + arr_out[j, i+delta] + arr_out[j+delta, i] - arr_out[j+delta, i+delta]
                     elif (operation.upper() == 'MAX'):
                         arr[j, i] = max(max(max(arr_out[j, i], arr_out[j, i+delta]), arr_out[j+delta, i]), arr_out[j+delta, i+delta])
@@ -188,14 +212,11 @@ class SlidingWindow:
             arr_out = arr
         return arr_out
 
-    def aggregation(self, operation, num_aggre):
-        if (operation.upper() not in self.__valid_ops):
-            raise ValueError('operation must be one of %r.' % self.__valid_ops)
-        
+    # create image with each band aggregated num_aggre times
+    def aggregation(self, operation, num_aggre):        
         arr = []
-        num_bands = self.img.count
-        for x in range(num_bands):
-            arr.append(self.img.read(x+1).astype(float))
+        for x in range(self.img.count):
+            arr.append(self.img.read(x+1))
             arr[x] = self._partial_aggregation(arr[x], 0, num_aggre, operation)
 
             # TODO remove later
@@ -204,18 +225,20 @@ class SlidingWindow:
         self.__create_tif(arr, pixels_aggre=2**num_aggre)
 
     # do power_target-power_start aggregations on window
-    # starting with delta=2**power_start
+    # starting with delta=2**power_start aggregation offset
+    # returns floating point array
     def _partial_aggregation(self, arr_in, power_start, power_target, operation):
         if (operation.upper() not in self.__valid_ops):
             raise ValueError('operation must be one of %r.' % self.__valid_ops)
         if (power_start < 0 or power_start >= power_target):
             raise ValueError('power_start must be nonzero and less than power_target')
 
+        arr_in = arr_in.astype(float)
         y_max = arr_in.shape[0]
         x_max = arr_in.shape[1]
         arr_out = arr_in.flatten()
         
-        # calculate sliding window for each value of delta
+        # iterate through sliding window sizes
         for i in range(power_start, power_target):
             delta = 2**i
             size = arr_out.size
@@ -239,7 +262,7 @@ class SlidingWindow:
             elif operation.upper() == 'MIN':
                 arr_out = np.minimum(np.minimum(np.minimum(top_left, top_right), bottom_left), bottom_right)
 
-        # remove last removal_num rows and columns
+        # remove last removal_num rows and columns, they are not aggregate pixels
         removal_num = (2**power_target) - (2**power_start)
         y_max -= removal_num
         # pad to make array square
@@ -249,13 +272,14 @@ class SlidingWindow:
         
         return arr_out
 
+    # create image with pixel values cooresponding to their aggregated regression slope
     def regression(self, band1, band2, num_aggre):
         bands = np.array(range(self.img.count))+1
         if (band1 not in bands or band2 not in bands):
             raise ValueError('bands must be in range of %r.' % bands)
 
-        arr_a = self.img.read(band1).astype(float)
-        arr_b = self.img.read(band2).astype(float)
+        arr_a = self.img.read(band1)
+        arr_b = self.img.read(band2)
         arr_m = self._regression(arr_a, arr_b, num_aggre)
 
         # TODO remove later
@@ -264,7 +288,10 @@ class SlidingWindow:
         self.__create_tif(arr_m, pixels_aggre=2**num_aggre)
 
     # Do num_aggre aggregations and return the regression slope between two bands
+    # returns floating point array
     def _regression(self, arr_a, arr_b, num_aggre):
+        arr_a = arr_a.astype(float)
+        arr_b = arr_b.astype(float)
         arr_aa = arr_a**2
         arr_ab = arr_a*arr_b
 
@@ -278,8 +305,9 @@ class SlidingWindow:
 
         # regression coefficient, i.e. slope of best fit line
         numerator = count * arr_ab - arr_a * arr_b
-        denominator = count * arr_aa - arr_a * arr_a
+        denominator = count * arr_aa - arr_a**2
         # avoid division by zero
+        # TODO is this required? Zero only occurs when there is no variance in the a band
         denominator = np.maximum(denominator, 1)
         arr_m = numerator/denominator
 
@@ -287,14 +315,14 @@ class SlidingWindow:
 
     # TODO potentially add R squared method?
 
-    # Do num_aggre aggregations and return the pearson coorelation between two bands
+    # create image with pixel values cooresponding to their aggregated pearson correlation
     def pearson(self, band1, band2, num_aggre):
         bands = np.array(range(self.img.count))+1
         if (band1 not in bands or band2 not in bands):
             raise ValueError('bands must be in range of %r.' % bands)
 
-        arr_a = self.img.read(band1).astype(float)
-        arr_b = self.img.read(band2).astype(float)
+        arr_a = self.img.read(band1)
+        arr_b = self.img.read(band2)
         arr_r = self._pearson(arr_a, arr_b, num_aggre)
 
         # TODO remove later
@@ -303,7 +331,10 @@ class SlidingWindow:
         self.__create_tif(arr_r, pixels_aggre=2**num_aggre)
 
     # Do num_aggre aggregations and return the regression slope between two bands
+    # returns floating point array
     def _pearson(self, arr_a, arr_b, num_aggre):
+        arr_a = arr_a.astype(float)
+        arr_b = arr_b.astype(float)
         arr_aa = arr_a**2
         arr_bb = arr_b**2
         arr_ab = arr_a*arr_b
@@ -314,19 +345,25 @@ class SlidingWindow:
         arr_bb = self._partial_aggregation(arr_bb, 0, num_aggre, '++++')
         arr_ab = self._partial_aggregation(arr_ab, 0, num_aggre, '++++')
 
-        # total pixels aggregated per pixel
+        # total input pixels aggregated per output pixel
         count = (2**num_aggre)**2
 
         # pearson correlation
         numerator = count*arr_ab - arr_a*arr_b
         denominator = np.sqrt(count * arr_aa - arr_a**2) * np.sqrt(count * arr_bb - arr_b**2)
         # avoid division by zero
+        # TODO is this required? Zero only occurs when there is no variance in the a or b bands
         denominator = np.maximum(denominator, 1)
         arr_r = numerator / denominator
         
         return arr_r
 
+    # Do num_aggre aggregations and return the regression slope between two bands
+    # non-vectorized using numpy's polyfit method
+    # returns floating point array
     def _regression_brute(self, arr_a, arr_b, num_aggre):
+        arr_a = arr_a.astype(float)
+        arr_b = arr_b.astype(float)
         w_out = 2**num_aggre
         y_max =  arr_a.shape[0] - (w_out-1)
         x_max = arr_a.shape[1] - (w_out-1)
@@ -341,22 +378,21 @@ class SlidingWindow:
 
         return arr_m
 
-    # TODO specify binary image
-    def fractal(self, band, power_start, power_target):
+    
+    def fractal(self, band, threshold, power_start, power_target):
         bands = np.array(range(self.img.count))+1
         if (band not in bands):
             raise ValueError('band must be in range of %r.' % bands)
-        if (power_start < 0 or power_start >= power_target):
-            raise ValueError('power_start must be nonzero and less than power_target')
 
-        arr = self.img.read(band).astype(float)
-        arr = self._fractal(self.__binary(arr, .5), power_start, power_target)
+        arr = self.img.read(band)
+        arr = self._fractal(self.__binary(arr, threshold), power_start, power_target)
 
         # TODO remove later
-        arr = self.__arr_dtype_conversion(arr, np.uint8)
+        arr = self.__arr_dtype_conversion(arr, np.uint16)
 
         self.__create_tif(arr, pixels_aggre=2**power_target)
 
+    # TODO should this be floating point?
     def _fractal(self, arr_in, power_start, power_target):
         if (not self.__is_binary(arr_in)):
             raise ValueError('array must be binary')
@@ -483,7 +519,7 @@ class SlidingWindow:
         delta = 2**delta_power
         arr = self.__arr_dtype_conversion(arr_in, np.uint16)
         fn = os.path.splitext(self.file_name)[0] + '_mean_w' + str(delta*2) + '.tif'
-        self.__create_tif(arr, pixels_aggre=delta*2, fn=fn, dtype='uint16')
+        self.__create_tif(arr, pixels_aggre=delta*2, fn=fn)
 
     def _initialize_arrays(self, z):
         # TODO will there be a problem with x and y when they have odd sizes?
@@ -645,7 +681,7 @@ class SlidingWindow:
 
         slope = self.__arr_dtype_conversion(slope, np.uint16)
         fn = os.path.splitext(self.file_name)[0] + '_slope_w' + str(delta*2) +'.tif'
-        self.__create_tif(slope, pixels_aggre=delta*2, fn=fn, dtype='uint16')
+        self.__create_tif(slope, pixels_aggre=delta*2, fn=fn)
 
     # angle clockwise from north of the downward slope
     def aspect(self, arr_dic, delta_power):
@@ -656,7 +692,7 @@ class SlidingWindow:
         aspect = (-np.arctan(xz/np.maximum(yz,1)) - np.sign(yz)*math.pi/2 + math.pi/2) % (2*math.pi)
         fn = os.path.splitext(self.file_name)[0] + '_aspect_w' + str(delta*2) +'.tif'
         aspect = self.__arr_dtype_conversion(aspect, np.uint16)
-        self.__create_tif(aspect, pixels_aggre=delta*2, fn=fn, dtype='uint16')
+        self.__create_tif(aspect, pixels_aggre=delta*2, fn=fn)
 
     def profile(self, delta_power, arr_dic):
         delta = 2**delta_power
@@ -670,7 +706,7 @@ class SlidingWindow:
 
         fn = os.path.splitext(self.file_name)[0] + '_profile_w' + str(delta*2) +'.tif'
         profile = self.__arr_dtype_conversion(profile, np.uint16)
-        self.__create_tif(profile, pixels_aggre=delta*2, fn=fn, dtype='uint16')
+        self.__create_tif(profile, pixels_aggre=delta*2, fn=fn)
 
     def planform(self, delta_power, arr_dic):
         delta = 2**delta_power
@@ -684,7 +720,7 @@ class SlidingWindow:
         
         fn = os.path.splitext(self.file_name)[0] + '_planform_w' + str(delta*2) +'.tif'
         planform = self.__arr_dtype_conversion(planform, np.uint16)
-        self.__create_tif(planform, pixels_aggre=delta*2, fn=fn, dtype='uint16')
+        self.__create_tif(planform, pixels_aggre=delta*2, fn=fn)
 
     def standard(self, delta_power, arr_dic):
         delta = 2**delta_power
@@ -696,4 +732,4 @@ class SlidingWindow:
 
         fn = os.path.splitext(self.file_name)[0] + '_standard_w' + str(delta*2) +'.tif'
         standard = self.__arr_dtype_conversion(standard, np.uint16)
-        self.__create_tif(standard, pixels_aggre=delta*2, fn=fn, dtype='uint16')
+        self.__create_tif(standard, pixels_aggre=delta*2, fn=fn)
