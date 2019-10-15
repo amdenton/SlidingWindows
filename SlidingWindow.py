@@ -104,7 +104,7 @@ class SlidingWindow:
     # i.e. only contains values of dtype.min and dtype.max
     # TODO should min value be arr_in.dtype.min or 0?
     def __is_binary(self, arr_in):
-        max_val = self.__get_max_min(arr_in.dtype)[0]
+        max_val = np.amax(arr_in)
         return ((arr_in==0) | (arr_in==max_val)).all()
 
     # get max and min of numpy data type
@@ -172,7 +172,7 @@ class SlidingWindow:
         arr_max = np.amax(arr_in)
         arr_min = np.amin(arr_in)
         dtype_max = self.__get_max_min(dtype)[0]
-        arr_out = ((arr_in - arr_min)/(arr_max - arr_min)).astype(dtype) * dtype_max
+        arr_out = ((arr_in - arr_min)/(arr_max - arr_min)*dtype_max).astype(dtype) 
         return arr_out
 
     # non-vectorized aggregation method
@@ -378,7 +378,7 @@ class SlidingWindow:
 
         return arr_m
 
-    
+    # create image with pixel values cooresponding to their aggregated fractal dimension
     def fractal(self, band, threshold, power_start, power_target):
         bands = np.array(range(self.img.count))+1
         if (band not in bands):
@@ -392,16 +392,16 @@ class SlidingWindow:
 
         self.__create_tif(arr, pixels_aggre=2**power_target)
 
-    # TODO should this be floating point?
+    # Compute fractal dimension on 2**power_target wide pixel areas
     def _fractal(self, arr_in, power_start, power_target):
         if (not self.__is_binary(arr_in)):
             raise ValueError('array must be binary')
         if (power_start < 0 or power_start >= power_target):
             raise ValueError('power_start must be nonzero and less than power_target')
 
-        y_max = arr_in.shape[0]-(2**power_target-1)
-        x_max = arr_in.shape[1]-(2**power_target-1)
-        arr = np.array(arr_in)
+        arr = arr_in.astype(float)
+        x_max = arr.shape[1]-(2**power_target-1)
+        y_max = arr.shape[0]-(2**power_target-1)
         denom_regress = np.empty(power_target-power_start)
         num_regress = np.empty([power_target-power_start, x_max*y_max])
         
@@ -418,14 +418,14 @@ class SlidingWindow:
             if i < power_target-1:
                 arr = self._partial_aggregation(arr, i, i+1, 'max')
 
-        arr_coef = poly.polyfit(denom_regress, num_regress, 1)
-        arr_out = np.reshape(arr_coef[1], (y_max, x_max))
+        arr_slope = poly.polyfit(denom_regress, num_regress, 1)[1]
+        arr_out = np.reshape(arr_slope, (y_max, x_max))
         return arr_out
 
     # This is for the 3D fractal dimension that is between 2 and 3, but it isn't tested yet
     def __boxed_array(self, arr_in, power_target):
-        arr_min = np.min(arr_in)
-        arr_max = np.max(arr_in)
+        arr_min = np.amin(arr_in)
+        arr_max = np.amax(arr_in)
         arr_out = np.zeros(arr_in.size)
         if (arr_max > arr_min):
             n_boxes = 2**power_target-1
