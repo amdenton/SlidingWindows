@@ -56,6 +56,19 @@ class SlidingWindow:
     def valid_ops(self):
         return self.__valid_ops
 
+    # dictionary of all arrays required for DEM utils
+    z, xz, yz, xxz, yyz, xyz = (np.zeros(0) for _ in range(6))
+    __dem_arr_dic = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz}
+    @property
+    def dem_arr_dic(self):
+        return self.__dem_arr_dic
+
+    # number of dem pixels aggregated
+    __dem_pixels_aggre = 1
+    @property
+    def dem_pixels_aggre(self):
+        return self.__dem_pixels_aggre
+
     # create NDVI image
     def ndvi(self, red_band, ir_band):
         bands = np.array(range(self.img.count))+1
@@ -412,7 +425,7 @@ class SlidingWindow:
             arr_sum = self._partial_aggregation(arr, i, power_target, '++++')
             arr_sum = np.maximum(arr_sum, 1)
 
-            arr_sum = np.log(arr_sum)/np.log(2)
+            arr_sum = np.log2(arr_sum)
             denom_regress[i-power_start] = power_target-i
             num_regress[i-power_start,] = arr_sum.flatten()
             if i < power_target-1:
@@ -437,10 +450,8 @@ class SlidingWindow:
         bands = np.array(range(self.img.count))+1
         if (band not in bands):
             raise ValueError('band must be in range of %r.' % bands)
-        if (num_aggre <= 0):
-            raise ValueError('number of aggregations must be greater than zero')
 
-        arr = self.img.read(band).astype(float)
+        arr = self.img.read(band)
         arr = self._fractal_3d(arr, num_aggre)
 
         # TODO remove later
@@ -448,240 +459,149 @@ class SlidingWindow:
 
         self.__create_tif(arr, pixels_aggre=2**num_aggre)
 
-    # TODO does this need to be binary too?
+    # TODO does this need to be binary too? probably not?
     # TODO should this have a power_start?
     def _fractal_3d(self, arr_in, num_aggre):
-        if (num_aggre <= 0):
-            raise ValueError('number of aggregations must be greater than zero')
+        if (num_aggre <= 1):
+            raise ValueError('number of aggregations must be greater than one')
         y_max = arr_in.shape[0] - (2**num_aggre-1)
         x_max = arr_in.shape[1] - (2**num_aggre-1)
-        arr_box = self.__boxed_array(arr_in, num_aggre)
+        arr_box = self.__boxed_array(arr_in, num_aggre).astype(float)
         arr_min = np.array(arr_box)
         arr_max = np.array(arr_box)
-        # TODO is this the correct linear regression? one x value per aggregation step?
         denom_regress = np.empty(num_aggre-1)
         num_regress = np.empty([num_aggre-1, x_max*y_max])
-
+        
         # TODO is this supposed to start at 1?
         for i in range(1, num_aggre):
             arr_min = self._partial_aggregation(arr_min, i-1, i, 'min')
             arr_max = self._partial_aggregation(arr_max, i-1, i, 'max')
             arr_sum = self._partial_aggregation(arr_max-arr_min+1, i, num_aggre, '++++')
-            arr_num = np.log(arr_sum)/np.log(2)
+            arr_num = np.log2(arr_sum)
             denom_regress[i-1] = num_aggre - i
             num_regress[i-1,] = arr_num.flatten()
 
+            # TODO why do we divide by two?
             arr_min /= 2
             arr_max /= 2
 
-        arr_coef = poly.polyfit(denom_regress, num_regress, 1)
-        arr_out = np.reshape(arr_coef[1], (y_max, x_max))
+        arr_slope = poly.polyfit(denom_regress, num_regress, 1)[1]
+        arr_out = np.reshape(arr_slope, (y_max, x_max))
         return arr_out
 
-    def _fractal_brute(self, arr_in, power_start, power_target):
-        if (power_start < 0 or power_start >= power_target):
-            raise ValueError('power_start must be nonzero and less than power_target')
+    # TODO should I assume dem band is the only band?
+    def dem_initialize_arrays(self, z):
+        z = self.img.read(1)
+        xz, yz, xxz, yyz, xyz = (np.zeros(z.shape) for _ in range(5))
+        self.__dem_arr_dic.update({'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz})
 
-        y_max = arr_in.shape[0] - (2**power_target - 1)
-        x_max = arr_in.shape[1] - (2**power_target - 1)
-        # TODO does this need to be np.mean(arr_in)?
-        arr = self.__binary(arr_in, np.mean(arr_in)/self.__get_max_min(arr_in.dtype)[0])
-        denom_regress = np.empty(power_target-power_start)
-        num_regress = np.zeros([power_target-power_start, x_max*y_max])
+    def dem_aggregation_step(self, num_steps):
+        z, xz, yz, xxz, yyz, xyz, delta = (self.__dem_arr_dic[x] for x in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz'))
+        delta_power = math.log2(self.__dem_pixels_aggre)
+
+        for _ in range(num_steps):
+            z_sum_all = self._partial_aggregation(z, delta_power, delta_power+1, '++++')
+            z_sum_top = self._partial_aggregation(z, delta_power, delta_power+1, '++--')
+            z_sum_right = self._partial_aggregation(z, delta_power, delta_power+1, '-+-+')
+            z_sum_anti_diag = self._partial_aggregation(z, delta_power, delta_power+1, '-++-')
+
+            xz_sum_all = self._partial_aggregation(xz, delta_power, delta_power+1, '++++')
+            xz_sum_top = self._partial_aggregation(xz, delta_power, delta_power+1, '++--')
+            xz_sum_right = self._partial_aggregation(xz, delta_power, delta_power+1, '-+-+')
+
+            yz_sum_all = self._partial_aggregation(yz, delta_power, delta_power+1, '++++')
+            yz_sum_top = self._partial_aggregation(yz, delta_power, delta_power+1, '++--')
+            yz_sum_right = self._partial_aggregation(yz, delta_power, delta_power+1, '-+-+')
+
+            xxz_sum_all = self._partial_aggregation(xxz, delta_power, delta_power+1, '++++')
+
+            yyz_sum_all = self._partial_aggregation(yyz, delta_power, delta_power+1, '++++')
+
+            xyz_sum_all = self._partial_aggregation(xyz, delta_power, delta_power+1, '++++')
+
+            xxz = 0.25*(xxz_sum_all + delta*xz_sum_right + 0.25*(delta**2)*z_sum_all)
+            yyz = 0.25*(yyz_sum_all + yz_sum_top*delta + 0.25*(delta**2)*z_sum_all)
+            xyz = 0.25*(xyz_sum_all + 0.5*delta*(xz_sum_top + yz_sum_right) + 0.25*(delta**2)*z_sum_anti_diag)
+            xz = 0.25*(xz_sum_all + 0.5*delta*z_sum_right)
+            yz = 0.25*(yz_sum_all + 0.5*delta*z_sum_top)
+            z = 0.25*z_sum_all
+
+            delta_power += 1
         
-        if power_start > 0:
-            arr = self._partial_aggregation(arr, 0, power_start, 'max')
+        self.__dem_arr_dic.update({'z': z, 'xz': xz, 'yz': yz, 'xxz': xxz, 'yyz': yyz, 'xyz': xyz})
+        self.__dem_pixels_aggre = 2**delta_power
+
+    def _dem_aggregation_step_brute(self, num_steps):
+        z, xz, yz, xxz, yyz, xyz = (self.__dem_arr_dic[x] for x in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz'))
         
-        for i in range(power_start, power_target):
-            arr_sum = self._partial_aggregation(arr, i, power_target, '++++')
-            arr_sum = np.maximum(arr_sum, 1)
-            num_array = np.log(arr_sum)/np.log(2)
-            denom = power_target-i
-            denom_regress[i-power_start] = denom
-            num_regress[i-power_start,] = num_array.flatten()
-            if i < power_target-1:
-                arr = self._partial_aggregation(arr, i, i+1, 'max')
+        for _ in range(num_steps):
+            x_max = z.shape[1] - delta
+            y_max = z.shape[0] - delta
+            for y in range (y_max):
+                for x in range (x_max):
+                    z_sum_all = z[y, x] + z[y, x+delta] + z[y+delta, x] + z[y+delta, x+delta]
+                    z_sum_top = z[y, x] + z[y, x+delta] - z[y+delta, x] - z[y+delta, x+delta]
+                    z_sum_right = -z[y, x] + z[y, x+delta] - z[y+delta, x] + z[y+delta, x+delta]
+                    z_sum_anti_diag = -z[y,x] + z[y, x+delta] + z[y+delta, x] - z[y+delta, x+delta]
+
+                    xz_sum_all = xz[y, x] + xz[y, x+delta] + xz[y+delta, x] + xz[y+delta, x+delta]
+                    xz_sum_top = xz[y, x] + xz[y, x+delta] - xz[y+delta, x] - xz[y+delta, x+delta]
+                    xz_sum_right = -xz[y, x] + xz[y, x+delta] - xz[y+delta, x] + xz[y+delta, x+delta]
+
+                    yz_sum_all = yz[y, x] + yz[y, x+delta] + yz[y+delta, x] + yz[y+delta, x+delta]
+                    yz_sum_top = yz[y, x] + yz[y, x+delta] - yz[y+delta, x] - yz[y+delta, x+delta]
+                    yz_sum_right = -yz[y, x] + yz[y, x+delta] - yz[y+delta, x] + yz[y+delta, x+delta]
+
+                    xxz_sum_all = xxz[y, x] + xxz[y, x+delta] + xxz[y+delta, x] + xxz[y+delta, x+delta]
+
+                    yyz_sum_all = yyz[y, x] + yyz[y, x+delta] + yyz[y+delta, x] + yyz[y+delta, x+delta]
+
+                    xyz_sum_all = xyz[y, x] + xyz[y, x+delta] + xyz[y+delta, x] + xyz[y+delta, x+delta]
+
+                    xz[y, x] = 0.25*(xz_sum_all + 0.5*delta*z_sum_right)
+                    yz[y, x] = 0.25*(yz_sum_all + 0.5*delta*z_sum_top)
+                    xxz[y, x] = 0.25*(xxz_sum_all + delta*xz_sum_right + 0.25*(delta**2)*z_sum_all)
+                    yyz[y, x] = 0.25*(yyz_sum_all + delta*yz_sum_top + 0.25*(delta**2)*z_sum_all)
+                    xyz[y, x] = 0.25*(xyz_sum_all + 0.5*delta*(xz_sum_top + yz_sum_right) + 0.25*(delta**2)*z_sum_anti_diag)
+                    z[y, x] = 0.25*z_sum_all
+            delta *= 2
         
-        arr_coef = poly.polyfit(denom_regress, num_regress, 1)
-        arr_out = np.reshape(arr_coef[1], (y_max, x_max))
-        return arr_out
+        self.__dem_arr_dic.update({'z': z, 'xz': xz, 'yz': yz, 'xxz': xxz, 'yyz': yyz, 'xyz': xyz})
+        self.__dem_pixels_aggre = delta
 
-    # TODO should i assume that this is the first band?
-    def dem_utils(self, num_aggre):
-        arr = self.img.read(1).astype(float)
-        arr_dic = self._initialize_arrays(arr)
-
-        for i in range(num_aggre):
-            self._double_w(i, arr_dic)
-            self.__window_mean(i, arr_dic['z'])
-
-    def __window_mean(self, delta_power, arr_in):
-        delta = 2**delta_power
-        arr = self.__arr_dtype_conversion(arr_in, np.uint16)
-        fn = os.path.splitext(self.file_name)[0] + '_mean_w' + str(delta*2) + '.tif'
-        self.__create_tif(arr, pixels_aggre=delta*2, fn=fn)
-
-    def _initialize_arrays(self, z):
-        # TODO will there be a problem with x and y when they have odd sizes?
-        # TODO these might actually need to be zero?
-        x_max = z.shape[1]
-        y_max = z.shape[0]
-        x_range = np.arange(x_max)
-        x_range = x_range - np.mean(x_range)
-        y_range = np.arange(y_max)[::-1]
-        y_range = y_range - np.mean(y_range)
-
-        x = np.tile(x_range, (y_max, 1))
-        y = np.transpose(np.tile(y_range, (x_max, 1)))
-        yz = y*z
-        xz = x*z
-        yyz = y*y*z
-        xxz = x*x*z
-        xyz = x*y*z
-
-        arr_dic = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz, 'orig_width': z.shape[1], 'orig_height': z.shape[0]}
-        return arr_dic
-
-    def _double_w(self, delta_power, arr_dic):
-        delta = 2**delta_power
-
-        z_sum_all = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '++++')
-        z_sum_top = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '++--')
-        z_sum_right = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '-+-+')
-        z_sum_anti_diag = self._partial_aggregation(arr_dic['z'], delta_power, delta_power+1, '-++-')
-
-        xz_sum_all = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, '++++')
-        xz_sum_top = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, '++--')
-        xz_sum_right = self._partial_aggregation(arr_dic['xz'], delta_power, delta_power+1, '-+-+')
-
-        yz_sum_all = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, '++++')
-        yz_sum_top = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, '++--')
-        yz_sum_right = self._partial_aggregation(arr_dic['yz'], delta_power, delta_power+1, '-+-+')
-
-        xxz_sum_all = self._partial_aggregation(arr_dic['xxz'], delta_power, delta_power+1, '++++')
-
-        yyz_sum_all = self._partial_aggregation(arr_dic['yyz'], delta_power, delta_power+1, '++++')
-
-        xyz_sum_all = self._partial_aggregation(arr_dic['xyz'], delta_power, delta_power+1, '++++')
-
-        xxz = 0.25*(xxz_sum_all + delta*xz_sum_right + 0.25*(delta**2)*z_sum_all)
-        yyz = 0.25*(yyz_sum_all + yz_sum_top*delta + 0.25*(delta**2)*z_sum_all)
-        xyz = 0.25*(xyz_sum_all + 0.5*delta*(xz_sum_top + yz_sum_right) + 0.25*(delta**2)*z_sum_anti_diag)
-        xz = 0.25*(xz_sum_all + 0.5*delta*z_sum_right)
-        yz = 0.25*(yz_sum_all + 0.5*delta*z_sum_top)
-        z = 0.25*z_sum_all
+    def dem_mean(self, arr_name='z'):
+        if (arr_name not in self.__dem_arr_dic):
+            raise ValueError('%s must be a member of %r' % (arr_name, self.__dem_arr_dic))
         
-        for i in (['z', z], ['xz', xz], ['yz', yz], ['xxz', xxz], ['yyz', yyz], ['xyz', xyz]):
-            arr_dic[i[0]] = i[1]
+        arr = self.__dem_arr_dic[arr_name]
+        arr = self.__arr_dtype_conversion(arr, np.uint16)
+        pixels_aggre = self.__dem_pixels_aggre
+        fn = os.path.splitext(self.file_name)[0] + '_' + arr_name + '_mean_w' + str(pixels_aggre) + '.tif'
+        self.__create_tif(arr, pixels_aggre=pixels_aggre, fn=fn)
 
-    def _double_w_brute(self, delta_power, arr_dic):
-        delta = 2**delta_power
-        z, xz, yz, xxz, yyz, xyz = (arr_dic[x] for x in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz'))
-        x_max = z.shape[1] - delta
-        y_max = z.shape[0] - delta
-        z_loc, xz_loc, yz_loc, xxz_loc, yyz_loc, xyz_loc = (np.zeros([y_max, x_max]) for _ in range(6))
+    def dem_slope(self, delta_power):
+        slope = self.__slope(delta_power)
 
-        for y in range (y_max):
-            for x in range (x_max):
-                z_sum_all = z[y, x] + z[y, x+delta] + z[y+delta, x] + z[y+delta, x+delta]
-                z_sum_top = z[y, x] + z[y, x+delta] - z[y+delta, x] - z[y+delta, x+delta]
-                z_sum_right = -z[y, x] + z[y, x+delta] - z[y+delta, x] + z[y+delta, x+delta]
-                z_sum_anti_diag = -z[y,x] + z[y, x+delta] + z[y+delta, x] - z[y+delta, x+delta]
+        slope = self.__arr_dtype_conversion(slope, np.uint16)
+        pixels_aggre = self.__dem_pixels_aggre
+        fn = os.path.splitext(self.file_name)[0] + '_slope_w' + str(pixels_aggre) +'.tif'
+        self.__create_tif(slope, pixels_aggre=pixels_aggre, fn=fn)
 
-                xz_sum_all = xz[y, x] + xz[y, x+delta] + xz[y+delta, x] + xz[y+delta, x+delta]
-                xz_sum_top = xz[y, x] + xz[y, x+delta] - xz[y+delta, x] - xz[y+delta, x+delta]
-                xz_sum_right = -xz[y, x] + xz[y, x+delta] - xz[y+delta, x] + xz[y+delta, x+delta]
-
-                yz_sum_all = yz[y, x] + yz[y, x+delta] + yz[y+delta, x] + yz[y+delta, x+delta]
-                yz_sum_top = yz[y, x] + yz[y, x+delta] - yz[y+delta, x] - yz[y+delta, x+delta]
-                yz_sum_right = -yz[y, x] + yz[y, x+delta] - yz[y+delta, x] + yz[y+delta, x+delta]
-
-                xxz_sum_all = xxz[y, x] + xxz[y, x+delta] + xxz[y+delta, x] + xxz[y+delta, x+delta]
-
-                yyz_sum_all = yyz[y, x] + yyz[y, x+delta] + yyz[y+delta, x] + yyz[y+delta, x+delta]
-
-                xyz_sum_all = xyz[y, x] + xyz[y, x+delta] + xyz[y+delta, x] + xyz[y+delta, x+delta]
-
-                xz_loc[y, x] = 0.25*(xz_sum_all + 0.5*delta*z_sum_right)
-                yz_loc[y, x] = 0.25*(yz_sum_all + 0.5*delta*z_sum_top)
-                xxz_loc[y, x] = 0.25*(xxz_sum_all + delta*xz_sum_right + 0.25*(delta**2)*z_sum_all)
-                yyz_loc[y, x] = 0.25*(yyz_sum_all + delta*yz_sum_top + 0.25*(delta**2)*z_sum_all)
-                xyz_loc[y, x] = 0.25*(xyz_sum_all + 0.5*delta*(xz_sum_top + yz_sum_right) + 0.25*(delta**2)*z_sum_anti_diag)
-                z_loc[y, x] = 0.25*(z[y, x] + z[y, x+delta] + z[y+delta, x] + z[y+delta, x+delta])
-        
-        for i in (['z', z_loc], ['xz', xz_loc], ['yz', yz_loc], ['xxz', xxz_loc], ['yyz', yyz_loc], ['xyz', xyz_loc]):
-            arr_dic[i[0]] = i[1]
-
-    def _double_w_old(self, delta_power, arr_dic):
-        # arrays represent corners of aggregation square: [top_left, top_right, bottom_left, bottom_right]
-        sum_right = np.array([-1, 1, -1, 1])[:,None]
-        sum_top = np.array([1, 1, -1, -1])[:,None]
-        sum_anti_diag = np.array([-1, 1, 1, -1])[:,None]
-
-        delta = 2**delta_power
-        z_in = arr_dic['z']
-        x_max_old = z_in.shape[1]
-        x_max = z_in.shape[1] - delta
-        y_max = z_in.shape[0] - delta
-        # sum the 4 corners of a square of width delta
-        # separation of indices to sum
-        corner_indices = np.array([[0], [delta], [delta*x_max_old], [delta*x_max_old+delta]])
-        # create array of indices to sum: [[top_left], [top_right], [bottom_left], [bottom_right]]
-        top_left_indices = (np.arange(y_max)[:, np.newaxis]*x_max_old + np.arange(x_max)).flatten()
-        full_selector = corner_indices + top_left_indices
-
-        z_corners = np.take(z_in, full_selector)
-        z_sum_all = z_corners.mean(axis=0)
-        z_sum_top = (z_corners*sum_top).mean(axis=0)
-        z_sum_right = (z_corners*sum_right).mean(axis=0)
-        z_sum_anti_diag = (z_corners*sum_anti_diag).mean(axis=0)
-
-        xz_corners = np.take(arr_dic['xz'], full_selector)
-        xz_sum_all = xz_corners.mean(axis=0)
-        xz_sum_top = (xz_corners*sum_top).mean(axis=0)
-        xz_sum_right = (xz_corners*sum_right).mean(axis=0)
-
-        yz_corners = np.take(arr_dic['yz'], full_selector)
-        yz_sum_all = yz_corners.mean(axis=0)
-        yz_sum_top = (yz_corners*sum_top).mean(axis=0)
-        yz_sum_right = (yz_corners*sum_right).mean(axis=0)
-
-        xxz_corners = np.take(arr_dic['xxz'], full_selector)
-        xxz_sum_all = xxz_corners.mean(axis=0)
-
-        yyz_corners = np.take(arr_dic['yyz'], full_selector)
-        yyz_sum_all = yyz_corners.mean(axis=0)
-
-        xyz_corners = np.take(arr_dic['xyz'], full_selector)
-        xyz_sum_all = xyz_corners.mean(axis=0)
-
-        z = z_sum_all
-        xz = xz_sum_all  + 0.5*delta*z_sum_right
-        yz = yz_sum_all + 0.5*delta*z_sum_top
-        xxz = xxz_sum_all + xz_sum_right*delta + 0.25*(delta**2)*z
-        yyz = yyz_sum_all + yz_sum_top*delta + 0.25*(delta**2)*z
-        xyz = xyz_sum_all + .5*delta*(xz_sum_top + yz_sum_right) + 0.25*(delta**2)*z_sum_anti_diag
-    
-        for i in (['z', z], ['xz', xz], ['yz', yz], ['xxz', xxz], ['yyz', yyz], ['xyz', xyz]):
-            arr_dic[i[0]] = i[1].reshape((y_max, x_max))
-
-    def slope(self, arr_dic, delta_power):
-        delta = 2**delta_power
+    def __slope(self, delta_power):
+        pixels_aggre = self.__dem_pixels_aggre
         transform = self.img.profile['transform']
         pixel_width = math.sqrt(transform[0]**2 + transform[3]**2)
         pixel_height = math.sqrt(transform[1]**2 + transform[4]**2)
-        xz = arr_dic['xz']
-        yz = arr_dic['yz']
+        xz = self.__dem_arr_dic['xz']
+        yz = self.__dem_arr_dic['yz']
 
-        slope_x = 12*xz/(4*delta**2 - 1)
-        slope_y = 12*yz/(4*delta**2 - 1)
+        slope_x = xz*(12/(pixels_aggre**2 - 1))
+        slope_y = yz*(12/(pixels_aggre**2 - 1))
         len_opp = abs(slope_x)*xz + abs(slope_y)*yz
         len_adj = math.sqrt( ((pixel_width*xz)**2) + ((pixel_height*yz)**2) )
         slope = np.arctan(len_opp/len_adj)
 
-        slope = self.__arr_dtype_conversion(slope, np.uint16)
-        fn = os.path.splitext(self.file_name)[0] + '_slope_w' + str(delta*2) +'.tif'
-        self.__create_tif(slope, pixels_aggre=delta*2, fn=fn)
+        return slope
 
     # angle clockwise from north of the downward slope
     def aspect(self, arr_dic, delta_power):

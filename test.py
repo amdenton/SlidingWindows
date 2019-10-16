@@ -82,47 +82,17 @@ class TestSlidingWindow(unittest.TestCase):
 
     def test_dem(self):
         slide_window = SlidingWindow(self.test_path_dem)
-        img = rasterio.open(self.test_path_dem)
-        arr = img.read(1).astype(float)[0:1024, 0:1024]
 
-        arr_dic = slide_window._initialize_arrays(arr)
-        slide_window._double_w(1, arr_dic)
-        slide_window._double_w(2, arr_dic)
-        slide_window._double_w(3, arr_dic)
-        slide_window._double_w(4, arr_dic)
-        slide_window._double_w(5, arr_dic)
-        slide_window._double_w(6, arr_dic)
-        arr_dic_1 = {}
-        for i in (['z', arr_dic['z']], ['xz', arr_dic['xz']], ['yz', arr_dic['yz']], ['xxz', arr_dic['xxz']], ['yyz', arr_dic['yyz']], ['xyz', arr_dic['xyz']]):
-            arr_dic_1[i[0]] = np.round(i[1], 0)
+        slide_window.dem_initialize_arrays(1)
+        slide_window.dem_aggregation_step(6)
+        arr_dic = slide_window.dem_arr_dic
 
-        arr_dic = slide_window._initialize_arrays(arr)
-        slide_window._double_w_brute(1, arr_dic)
-        slide_window._double_w_brute(2, arr_dic)
-        slide_window._double_w_brute(3, arr_dic)
-        slide_window._double_w_brute(4, arr_dic)
-        slide_window._double_w_brute(5, arr_dic)
-        slide_window._double_w_brute(6, arr_dic)
-        arr_dic_2 = {}
-        for i in (['z', arr_dic['z']], ['xz', arr_dic['xz']], ['yz', arr_dic['yz']], ['xxz', arr_dic['xxz']], ['yyz', arr_dic['yyz']], ['xyz', arr_dic['xyz']]):
-            arr_dic_2[i[0]] = np.round(i[1], 0)
+        slide_window.dem_initialize_arrays(1)
+        slide_window._dem_aggregation_step_brute(6)
+        arr_dic_brute = slide_window.dem_arr_dic
 
-        arr_dic = slide_window._initialize_arrays(arr)
-        slide_window._double_w_old(1, arr_dic)
-        slide_window._double_w_old(2, arr_dic)
-        slide_window._double_w_old(3, arr_dic)
-        slide_window._double_w_old(4, arr_dic)
-        slide_window._double_w_old(5, arr_dic)
-        slide_window._double_w_old(6, arr_dic)
-        arr_dic_3 = {}
-        for i in (['z', arr_dic['z']], ['xz', arr_dic['xz']], ['yz', arr_dic['yz']], ['xxz', arr_dic['xxz']], ['yyz', arr_dic['yyz']], ['xyz', arr_dic['xyz']]):
-            arr_dic_3[i[0]] = np.round(i[1], 0)
-
-        for key in arr_dic_1:
-            self.assertTrue(np.array_equal(arr_dic_1[key], arr_dic_2[key]))
-
-        for key in arr_dic_1:
-            self.assertTrue(np.array_equal(arr_dic_1[key], arr_dic_3[key]))
+        for key in arr_dic:
+            self.assertTrue(np.array_equal(arr_dic[key], arr_dic_brute[key]))
 
 if __name__ == '__main__':
     unittest.main()
