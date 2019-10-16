@@ -496,8 +496,9 @@ class SlidingWindow:
         self.__dem_arr_dic.update({'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz})
 
     def dem_aggregation_step(self, num_steps):
-        z, xz, yz, xxz, yyz, xyz, delta = (self.__dem_arr_dic[x] for x in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz'))
-        delta_power = math.log2(self.__dem_pixels_aggre)
+        z, xz, yz, xxz, yyz, xyz = tuple (self.__dem_arr_dic[x] for x in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz'))
+        pixels_aggre = self.__dem_pixels_aggre
+        delta_power = int(math.log2(pixels_aggre))
 
         for _ in range(num_steps):
             z_sum_all = self._partial_aggregation(z, delta_power, delta_power+1, '++++')
@@ -519,20 +520,22 @@ class SlidingWindow:
 
             xyz_sum_all = self._partial_aggregation(xyz, delta_power, delta_power+1, '++++')
 
-            xxz = 0.25*(xxz_sum_all + delta*xz_sum_right + 0.25*(delta**2)*z_sum_all)
-            yyz = 0.25*(yyz_sum_all + yz_sum_top*delta + 0.25*(delta**2)*z_sum_all)
-            xyz = 0.25*(xyz_sum_all + 0.5*delta*(xz_sum_top + yz_sum_right) + 0.25*(delta**2)*z_sum_anti_diag)
-            xz = 0.25*(xz_sum_all + 0.5*delta*z_sum_right)
-            yz = 0.25*(yz_sum_all + 0.5*delta*z_sum_top)
+            xxz = 0.25*(xxz_sum_all + pixels_aggre*xz_sum_right + 0.25*(pixels_aggre**2)*z_sum_all)
+            yyz = 0.25*(yyz_sum_all + yz_sum_top*pixels_aggre + 0.25*(pixels_aggre**2)*z_sum_all)
+            xyz = 0.25*(xyz_sum_all + 0.5*pixels_aggre*(xz_sum_top + yz_sum_right) + 0.25*(pixels_aggre**2)*z_sum_anti_diag)
+            xz = 0.25*(xz_sum_all + 0.5*pixels_aggre*z_sum_right)
+            yz = 0.25*(yz_sum_all + 0.5*pixels_aggre*z_sum_top)
             z = 0.25*z_sum_all
 
+            pixels_aggre *= 2
             delta_power += 1
         
         self.__dem_arr_dic.update({'z': z, 'xz': xz, 'yz': yz, 'xxz': xxz, 'yyz': yyz, 'xyz': xyz})
-        self.__dem_pixels_aggre = 2**delta_power
+        self.__dem_pixels_aggre = pixels_aggre
 
     def _dem_aggregation_step_brute(self, num_steps):
-        z, xz, yz, xxz, yyz, xyz = (self.__dem_arr_dic[x] for x in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz'))
+        z, xz, yz, xxz, yyz, xyz = tuple (self.__dem_arr_dic[x] for x in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz'))
+        delta = self.__dem_pixels_aggre
         
         for _ in range(num_steps):
             x_max = z.shape[1] - delta
@@ -569,6 +572,7 @@ class SlidingWindow:
         self.__dem_arr_dic.update({'z': z, 'xz': xz, 'yz': yz, 'xxz': xxz, 'yyz': yyz, 'xyz': xyz})
         self.__dem_pixels_aggre = delta
 
+    # generate image of aggregated mean values of designated array
     def dem_mean(self, arr_name='z'):
         if (arr_name not in self.__dem_arr_dic):
             raise ValueError('%s must be a member of %r' % (arr_name, self.__dem_arr_dic))
@@ -579,15 +583,16 @@ class SlidingWindow:
         fn = os.path.splitext(self.file_name)[0] + '_' + arr_name + '_mean_w' + str(pixels_aggre) + '.tif'
         self.__create_tif(arr, pixels_aggre=pixels_aggre, fn=fn)
 
-    def dem_slope(self, delta_power):
-        slope = self.__slope(delta_power)
-
+    # generate image of aggregated slope values
+    def dem_slope(self):
+        slope = self.__slope()
         slope = self.__arr_dtype_conversion(slope, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.file_name)[0] + '_slope_w' + str(pixels_aggre) +'.tif'
         self.__create_tif(slope, pixels_aggre=pixels_aggre, fn=fn)
 
-    def __slope(self, delta_power):
+    # return array of aggregated slope values
+    def __slope(self):
         pixels_aggre = self.__dem_pixels_aggre
         transform = self.img.profile['transform']
         pixel_width = math.sqrt(transform[0]**2 + transform[3]**2)
@@ -597,59 +602,78 @@ class SlidingWindow:
 
         slope_x = xz*(12/(pixels_aggre**2 - 1))
         slope_y = yz*(12/(pixels_aggre**2 - 1))
-        len_opp = abs(slope_x)*xz + abs(slope_y)*yz
+        len_opp = np.absolute(slope_x)*xz + np.absolute(slope_y)*yz
         len_adj = math.sqrt( ((pixel_width*xz)**2) + ((pixel_height*yz)**2) )
         slope = np.arctan(len_opp/len_adj)
 
         return slope
 
-    # angle clockwise from north of the downward slope
-    def aspect(self, arr_dic, delta_power):
-        delta = 2**delta_power
-        xz = arr_dic['xz']
-        yz = arr_dic['yz']
-
-        aspect = (-np.arctan(xz/np.maximum(yz,1)) - np.sign(yz)*math.pi/2 + math.pi/2) % (2*math.pi)
-        fn = os.path.splitext(self.file_name)[0] + '_aspect_w' + str(delta*2) +'.tif'
+    # generate image of aggregated angle of steepest descent, calculated as clockwise angle from north 
+    def dem_aspect(self):
+        aspect = self.__aspect()
         aspect = self.__arr_dtype_conversion(aspect, np.uint16)
-        self.__create_tif(aspect, pixels_aggre=delta*2, fn=fn)
+        pixels_aggre = self.__dem_pixels_aggre
+        fn = os.path.splitext(self.file_name)[0] + '_aspect_w' + str(pixels_aggre) +'.tif'
+        self.__create_tif(aspect, pixels_aggre=pixels_aggre, fn=fn)
 
-    def profile(self, delta_power, arr_dic):
-        delta = 2**delta_power
-        z, xz, yz, yyz, xxz, xyz = tuple (arr_dic[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
+    # return array of aggregated angle of steepest descent, calculated as clockwise angle from north
+    def __aspect(self):
+        xz = self.__dem_arr_dic['xz']
+        yz = self.__dem_arr_dic['yz']
+        # TODO fix this, np.maximum is a bad solution for divide by zero
+        return (-np.arctan(xz/np.maximum(yz,1)) - np.sign(yz)*math.pi/2 + math.pi/2) % (2*math.pi)
 
-        a00 = (2160*xxz - 720*(delta**2)*z - 180*z) / (32*(delta**4) - 40*(delta**2) + 8)
-        a10 = (288*xyz) / (32*(delta**4) - 16*(delta**2) + 2)
-        a11 = (2160*yyz - 720*(delta**2)*z - 180*z) / (32*(delta**4) - 40*(delta**2) + 8)
+    def dem_profile(self):
+        profile = self.__profile()
+        profile = self.__arr_dtype_conversion(profile, np.uint16)
+        pixels_aggre = self.__dem_pixels_aggre
+        fn = os.path.splitext(self.file_name)[0] + '_profile_w' + str(pixels_aggre) +'.tif'
+        self.__create_tif(profile, pixels_aggre=pixels_aggre, fn=fn)
+
+    def __profile(self):
+        pixels_aggre = self.__dem_pixels_aggre
+        z, xz, yz, yyz, xxz, xyz = tuple (self.__dem_arr_dic[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
+
+        a00 = (180*xxz - (pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
+        a10 = 72*xyz / ((pixels_aggre**4) - 2*(pixels_aggre**2) + 4)
+        a11 = (180*yyz - (pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*pixels_aggre**2 + 4)
         
         profile = (a00*(xz**2) + 2*a10*xz*yz + a11*(yz*2)) / ((xz**2) + (yz**2))
 
-        fn = os.path.splitext(self.file_name)[0] + '_profile_w' + str(delta*2) +'.tif'
-        profile = self.__arr_dtype_conversion(profile, np.uint16)
-        self.__create_tif(profile, pixels_aggre=delta*2, fn=fn)
+        return profile
 
-    def planform(self, delta_power, arr_dic):
-        delta = 2**delta_power
-        z, xz, yz, yyz, xxz, xyz = tuple (arr_dic[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
+    def dem_planform(self):
+        planform = self.__planform()
+        planform = self.__arr_dtype_conversion(planform, np.uint16)
+        pixels_aggre = self.__dem_pixels_aggre
+        fn = os.path.splitext(self.file_name)[0] + '_planform_w' + str(pixels_aggre) +'.tif'
+        self.__create_tif(planform, pixels_aggre=pixels_aggre, fn=fn)
 
-        a00 = (2160*xxz - 720*(delta**2)*z - 180*z) / (32*(delta**4) - 40*(delta**2) + 8)
-        a10 = (288*xyz) / (32*(delta**4) - 16*(delta**2) + 2)
-        a11 = (2160*yyz - 720*(delta**2)*z - 180*z) / (32*(delta**4) - 40*(delta**2) + 8)
+    def __planform(self):
+        pixels_aggre = self.__dem_pixels_aggre
+        z, xz, yz, yyz, xxz, xyz = tuple (self.__dem_arr_dic[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
+
+        a00 = (180*xxz - (pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
+        a10 = 72*xyz / ((pixels_aggre**4) - 2*(pixels_aggre**2) + 4)
+        a11 = (180*yyz - (pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*pixels_aggre**2 + 4)
         
         planform = (a00*(yz**2) - 2*a10*xz*yz + a11*(xz*2)) / ((xz**2) + (yz**2))
         
-        fn = os.path.splitext(self.file_name)[0] + '_planform_w' + str(delta*2) +'.tif'
-        planform = self.__arr_dtype_conversion(planform, np.uint16)
-        self.__create_tif(planform, pixels_aggre=delta*2, fn=fn)
+        return planform
 
-    def standard(self, delta_power, arr_dic):
-        delta = 2**delta_power
-        z, yyz, xxz = tuple (arr_dic[i] for i in ('z', 'yyz', 'xxz'))
+    def dem_standard(self):
+        standard = self.__standard()
+        standard = self.__arr_dtype_conversion(standard, np.uint16)
+        pixels_aggre = self.__dem_pixels_aggre
+        fn = os.path.splitext(self.file_name)[0] + '_standard_w' + str(pixels_aggre) +'.tif'
+        self.__create_tif(standard, pixels_aggre=pixels_aggre, fn=fn)
+    
+    def __standard(self):
+        pixels_aggre = self.__dem_pixels_aggre
+        z, yyz, xxz = tuple (self.__dem_arr_dic[i] for i in ('z', 'yyz', 'xxz'))
 
-        a00 = (2160*xxz - 720*(delta**2)*z - 180*z) / (32*(delta**4) - 40*(delta**2) + 8)
-        a11 = (2160*yyz - 720*(delta**2)*z - 180*z) / (32*(delta**4) - 40*(delta**2) + 8)
+        a00 = (180*xxz - (pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
+        a11 = (180*yyz - (pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*pixels_aggre**2 + 4)
         standard = (a00 + a11) / 2
 
-        fn = os.path.splitext(self.file_name)[0] + '_standard_w' + str(delta*2) +'.tif'
-        standard = self.__arr_dtype_conversion(standard, np.uint16)
-        self.__create_tif(standard, pixels_aggre=delta*2, fn=fn)
+        return standard
