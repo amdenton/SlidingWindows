@@ -58,10 +58,10 @@ class SlidingWindow:
 
     # dictionary of all arrays required for DEM utils
     z, xz, yz, xxz, yyz, xyz = (np.zeros(0) for _ in range(6))
-    __dem_arr_dic = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz}
+    __dem_arr_dict = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz}
     @property
-    def dem_arr_dic(self):
-        return self.__dem_arr_dic
+    def dem_arr_dict(self):
+        return self.__dem_arr_dict
 
     # number of dem pixels aggregated
     __dem_pixels_aggre = 1
@@ -136,7 +136,7 @@ class SlidingWindow:
 
     # create tif with array of numpy arrays representing image bands
     # adjust geoTransform according to how many pixels were aggregated
-    def __create_tif(self, arr_in, pixels_aggre=1, fn=None):
+    def __create_tif(self, arr_in, pixels_aggre=1, update_transform=True, fn=None):
         if (type(arr_in) == np.ndarray):
             arr_in = [arr_in]
         dtype = arr_in[0].dtype
@@ -146,24 +146,25 @@ class SlidingWindow:
 
 
         profile = self.img.profile
+        transform = profile['transform']
 
         # update geo transform with aggregated pixels
-        transform = profile['transform']
-        temp = np.empty(6)
-        # TODO test this stuff, ok?
-        pixel_width = math.sqrt(transform[0]**2 + transform[3]**2)
-        pixel_height = math.sqrt(transform[1]**2 + transform[4]**2)
-        temp[2] = transform[2] + (pixels_aggre-1) * pixel_width / 2
-        temp[5] = transform[5] - (pixels_aggre-1) * pixel_height / 2
-        temp[0] = transform[0] * pixels_aggre
-        temp[1] = transform[1] * pixels_aggre
-        temp[3] = transform[3] * pixels_aggre
-        temp[4] = transform[4] * pixels_aggre
-        new_transform = affine.Affine(temp[0], temp[1], temp[2], temp[3] , temp[4], temp[5])
+        if (update_transform):
+            temp = np.empty(6)
+            # TODO test this stuff, ok?
+            pixel_width = math.sqrt(transform[0]**2 + transform[3]**2)
+            pixel_height = math.sqrt(transform[1]**2 + transform[4]**2)
+            temp[2] = transform[2] + (pixels_aggre-1) * pixel_width / 2
+            temp[5] = transform[5] - (pixels_aggre-1) * pixel_height / 2
+            temp[0] = transform[0] * pixels_aggre
+            temp[1] = transform[1] * pixels_aggre
+            temp[3] = transform[3] * pixels_aggre
+            temp[4] = transform[4] * pixels_aggre
+            transform = affine.Affine(temp[0], temp[1], temp[2], temp[3] , temp[4], temp[5])
 
         profile.update(
             nodata=0,
-            transform=new_transform,
+            transform=transform,
             dtype=dtype,
             count=len(arr_in),
             height=len(arr_in[0]),
@@ -175,6 +176,8 @@ class SlidingWindow:
             fn = os.path.splitext(self.file_name)[0] + '_' + caller_name + '.tif'
             
         with rasterio.open(fn, 'w', **profile) as dst:
+            if (not update_transform):
+                dst.update_tags(ns='DEM_UTILITIES', pixels_aggregated=str(self.__dem_pixels_aggre))
             for x in range(len(arr_in)): 
                 dst.write(arr_in[x], x+1)
 
@@ -492,11 +495,28 @@ class SlidingWindow:
     # TODO should I assume dem band is the only band?
     def dem_initialize_arrays(self, z):
         z = self.img.read(1)
-        xz, yz, xxz, yyz, xyz = (np.zeros(z.shape) for _ in range(5))
-        self.__dem_arr_dic.update({'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz})
+        xz, yz, xxz, yyz, xyz = (np.zeros(z.shape).astype(z.dtype) for _ in range(5))
+        self.__dem_arr_dict.update({'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz})
+    
+    def dem_export_arrays(self):
+        pixels_aggre = self.__dem_pixels_aggre
+        export = []
+        for key in self.__dem_arr_dict:
+            export.append(self.__dem_arr_dict[key])
+        fn = os.path.splitext(self.file_name)[0] + '_export_w' + str(pixels_aggre) +'.tif'
+        self.__create_tif(export, pixels_aggre=pixels_aggre, update_transform=False, fn=fn)
+
+    def dem_import_arrays(self):
+        if (self.img.count != len(self.__dem_arr_dict)):
+            raise ValueError('Cannot import file, %d bands are required for DEM utilities' % len(self.__dem_arr_dict))
+        i = 1
+        for key in self.__dem_arr_dict:
+            self.__dem_arr_dict[key] = self.img.read(i)
+            i += 1
+        self.__dem_pixels_aggre = int(self.img.tags(ns='DEM_UTILITIES')['pixels_aggregated'])
 
     def dem_aggregation_step(self, num_steps):
-        z, xz, yz, xxz, yyz, xyz = tuple (self.__dem_arr_dic[x] for x in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz'))
+        z, xz, yz, xxz, yyz, xyz = tuple (self.__dem_arr_dict[x] for x in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz'))
         pixels_aggre = self.__dem_pixels_aggre
         delta_power = int(math.log2(pixels_aggre))
 
@@ -530,11 +550,11 @@ class SlidingWindow:
             pixels_aggre *= 2
             delta_power += 1
         
-        self.__dem_arr_dic.update({'z': z, 'xz': xz, 'yz': yz, 'xxz': xxz, 'yyz': yyz, 'xyz': xyz})
+        self.__dem_arr_dict.update({'z': z, 'xz': xz, 'yz': yz, 'xxz': xxz, 'yyz': yyz, 'xyz': xyz})
         self.__dem_pixels_aggre = pixels_aggre
 
     def _dem_aggregation_step_brute(self, num_steps):
-        z, xz, yz, xxz, yyz, xyz = tuple (self.__dem_arr_dic[x] for x in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz'))
+        z, xz, yz, xxz, yyz, xyz = tuple (self.__dem_arr_dict[x] for x in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz'))
         delta = self.__dem_pixels_aggre
         
         for _ in range(num_steps):
@@ -569,15 +589,15 @@ class SlidingWindow:
                     z[y, x] = 0.25*z_sum_all
             delta *= 2
         
-        self.__dem_arr_dic.update({'z': z, 'xz': xz, 'yz': yz, 'xxz': xxz, 'yyz': yyz, 'xyz': xyz})
+        self.__dem_arr_dict.update({'z': z, 'xz': xz, 'yz': yz, 'xxz': xxz, 'yyz': yyz, 'xyz': xyz})
         self.__dem_pixels_aggre = delta
 
     # generate image of aggregated mean values of designated array
     def dem_mean(self, arr_name='z'):
-        if (arr_name not in self.__dem_arr_dic):
-            raise ValueError('%s must be a member of %r' % (arr_name, self.__dem_arr_dic))
+        if (arr_name not in self.__dem_arr_dict):
+            raise ValueError('%s must be a member of %r' % (arr_name, self.__dem_arr_dict))
         
-        arr = self.__dem_arr_dic[arr_name]
+        arr = self.__dem_arr_dict[arr_name]
         arr = self.__arr_dtype_conversion(arr, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.file_name)[0] + '_' + arr_name + '_mean_w' + str(pixels_aggre) + '.tif'
@@ -597,13 +617,13 @@ class SlidingWindow:
         transform = self.img.profile['transform']
         pixel_width = math.sqrt(transform[0]**2 + transform[3]**2)
         pixel_height = math.sqrt(transform[1]**2 + transform[4]**2)
-        xz = self.__dem_arr_dic['xz']
-        yz = self.__dem_arr_dic['yz']
+        xz = self.__dem_arr_dict['xz']
+        yz = self.__dem_arr_dict['yz']
 
         slope_x = xz*(12/(pixels_aggre**2 - 1))
         slope_y = yz*(12/(pixels_aggre**2 - 1))
         len_opp = np.absolute(slope_x)*xz + np.absolute(slope_y)*yz
-        len_adj = math.sqrt( ((pixel_width*xz)**2) + ((pixel_height*yz)**2) )
+        len_adj = np.sqrt( ((pixel_width*xz)**2) + ((pixel_height*yz)**2) )
         slope = np.arctan(len_opp/len_adj)
 
         return slope
@@ -618,10 +638,10 @@ class SlidingWindow:
 
     # return array of aggregated angle of steepest descent, calculated as clockwise angle from north
     def __aspect(self):
-        xz = self.__dem_arr_dic['xz']
-        yz = self.__dem_arr_dic['yz']
+        xz = self.__dem_arr_dict['xz']
+        yz = self.__dem_arr_dict['yz']
         # TODO fix this, np.maximum is a bad solution for divide by zero
-        return (-np.arctan(xz/np.maximum(yz,1)) - np.sign(yz)*math.pi/2 + math.pi/2) % (2*math.pi)
+        return (-np.arctan(xz/yz,1) - np.sign(yz)*math.pi/2 + math.pi/2) % (2*math.pi)
 
     def dem_profile(self):
         profile = self.__profile()
@@ -632,7 +652,7 @@ class SlidingWindow:
 
     def __profile(self):
         pixels_aggre = self.__dem_pixels_aggre
-        z, xz, yz, yyz, xxz, xyz = tuple (self.__dem_arr_dic[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
+        z, xz, yz, yyz, xxz, xyz = tuple (self.__dem_arr_dict[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
 
         a00 = (180*xxz - (pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
         a10 = 72*xyz / ((pixels_aggre**4) - 2*(pixels_aggre**2) + 4)
@@ -651,7 +671,7 @@ class SlidingWindow:
 
     def __planform(self):
         pixels_aggre = self.__dem_pixels_aggre
-        z, xz, yz, yyz, xxz, xyz = tuple (self.__dem_arr_dic[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
+        z, xz, yz, yyz, xxz, xyz = tuple (self.__dem_arr_dict[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
 
         a00 = (180*xxz - (pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
         a10 = 72*xyz / ((pixels_aggre**4) - 2*(pixels_aggre**2) + 4)
@@ -670,7 +690,7 @@ class SlidingWindow:
     
     def __standard(self):
         pixels_aggre = self.__dem_pixels_aggre
-        z, yyz, xxz = tuple (self.__dem_arr_dic[i] for i in ('z', 'yyz', 'xxz'))
+        z, yyz, xxz = tuple (self.__dem_arr_dict[i] for i in ('z', 'yyz', 'xxz'))
 
         a00 = (180*xxz - (pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
         a11 = (180*yyz - (pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*pixels_aggre**2 + 4)
