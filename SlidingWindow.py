@@ -147,9 +147,12 @@ class SlidingWindow:
 
         profile = self.img.profile
         transform = profile['transform']
+        big_tiff = 'YES'
 
         # update geo transform with aggregated pixels
         if (update_transform):
+            big_tiff = 'NO'
+
             temp = np.empty(6)
             # TODO test this stuff, ok?
             pixel_width = math.sqrt(transform[0]**2 + transform[3]**2)
@@ -175,7 +178,7 @@ class SlidingWindow:
             caller_name = inspect.stack()[1].function
             fn = os.path.splitext(self.file_name)[0] + '_' + caller_name + '.tif'
             
-        with rasterio.open(fn, 'w', **profile) as dst:
+        with rasterio.open(fn, 'w', **profile, BIGTIFF=big_tiff) as dst:
             if (not update_transform):
                 dst.update_tags(ns='DEM_UTILITIES', pixels_aggregated=str(self.__dem_pixels_aggre))
             for x in range(len(arr_in)): 
@@ -640,8 +643,7 @@ class SlidingWindow:
     def __aspect(self):
         xz = self.__dem_arr_dict['xz']
         yz = self.__dem_arr_dict['yz']
-        # TODO fix this, np.maximum is a bad solution for divide by zero
-        return (-np.arctan(xz/yz,1) - np.sign(yz)*math.pi/2 + math.pi/2) % (2*math.pi)
+        return (-np.arctan(xz/yz) - np.sign(yz)*math.pi/2 + math.pi/2) % (2*math.pi)
 
     def dem_profile(self):
         profile = self.__profile()
