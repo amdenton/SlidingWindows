@@ -136,7 +136,7 @@ class SlidingWindow:
 
     # create tif with array of numpy arrays representing image bands
     # adjust geoTransform according to how many pixels were aggregated
-    def __create_tif(self, arr_in, pixels_aggre=1, update_transform=True, fn=None):
+    def __create_tif(self, arr_in, pixels_aggre=1, is_export=False, fn=None):
         if (type(arr_in) == np.ndarray):
             arr_in = [arr_in]
         dtype = arr_in[0].dtype
@@ -150,7 +150,7 @@ class SlidingWindow:
         big_tiff = 'YES'
 
         # update geo transform with aggregated pixels
-        if (update_transform):
+        if (not is_export):
             big_tiff = 'NO'
 
             temp = np.empty(6)
@@ -179,7 +179,7 @@ class SlidingWindow:
             fn = os.path.splitext(self.file_name)[0] + '_' + caller_name + '.tif'
             
         with rasterio.open(fn, 'w', **profile, BIGTIFF=big_tiff) as dst:
-            if (not update_transform):
+            if (is_export):
                 dst.update_tags(ns='DEM_UTILITIES', pixels_aggregated=str(self.__dem_pixels_aggre))
             for x in range(len(arr_in)): 
                 dst.write(arr_in[x], x+1)
@@ -496,7 +496,7 @@ class SlidingWindow:
         return arr_out
 
     # TODO should I assume dem band is the only band?
-    def dem_initialize_arrays(self, z):
+    def dem_initialize_arrays(self):
         z = self.img.read(1)
         xz, yz, xxz, yyz, xyz = (np.zeros(z.shape).astype(z.dtype) for _ in range(5))
         self.__dem_arr_dict.update({'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz})
@@ -507,7 +507,7 @@ class SlidingWindow:
         for key in self.__dem_arr_dict:
             export.append(self.__dem_arr_dict[key])
         fn = os.path.splitext(self.file_name)[0] + '_export_w' + str(pixels_aggre) +'.tif'
-        self.__create_tif(export, pixels_aggre=pixels_aggre, update_transform=False, fn=fn)
+        self.__create_tif(export, pixels_aggre=pixels_aggre, is_export=True, fn=fn)
 
     def dem_import_arrays(self):
         if (self.img.count != len(self.__dem_arr_dict)):
@@ -646,7 +646,8 @@ class SlidingWindow:
     def __aspect(self):
         xz = self.__dem_arr_dict['xz']
         yz = self.__dem_arr_dict['yz']
-        return (-np.arctan(xz/yz) - np.sign(yz)*math.pi/2 + math.pi/2) % (2*math.pi)
+        aspect = (-np.arctan(xz/yz) - np.sign(yz)*math.pi/2 + math.pi/2) % (2*math.pi)
+        return aspect
 
     def dem_profile(self):
         profile = self.__profile()

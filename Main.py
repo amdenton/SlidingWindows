@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import math
 
 slide_window = SlidingWindow('test.tif')
-slide_window_2 = SlidingWindow('gunsite_dem-2-1_export_w64.tif')
+slide_window_2 = SlidingWindow('gunsite_dem-2-1_export_w8.tif')
 
 #img = rasterio.open('gunsite_dem-2-1.tif').read(1)
 #plt.imshow(img)
@@ -30,7 +30,7 @@ slide_window_2 = SlidingWindow('gunsite_dem-2-1_export_w64.tif')
 #plt.show()
 
 #slide_window_2.dem_import_arrays()
-#slide_window_2.dem_initialize_arrays(1)
+#slide_window_2.dem_initialize_arrays()
 #for _ in range(6):
 #    slide_window_2.dem_aggregation_step(1)
 #    slide_window_2.dem_export_arrays()
