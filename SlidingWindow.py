@@ -519,6 +519,9 @@ class SlidingWindow:
         self.__dem_pixels_aggre = int(self.img.tags(ns='DEM_UTILITIES')['pixels_aggregated'])
 
     def dem_aggregation_step(self, num_steps):
+        if (self.__dem_arr_dict['z'].size == 0):
+            raise ValueError('Arrays must be initialized before performing aggregation steps')
+
         z, xz, yz, xxz, yyz, xyz = tuple (self.__dem_arr_dict[x] for x in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz'))
         pixels_aggre = self.__dem_pixels_aggre
         delta_power = int(math.log2(pixels_aggre))
@@ -656,9 +659,9 @@ class SlidingWindow:
         pixels_aggre = self.__dem_pixels_aggre
         z, xz, yz, yyz, xxz, xyz = tuple (self.__dem_arr_dict[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
 
-        a00 = (180*xxz - (pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
-        a10 = 72*xyz / ((pixels_aggre**4) - 2*(pixels_aggre**2) + 4)
-        a11 = (180*yyz - (pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*pixels_aggre**2 + 4)
+        a00 = (180*xxz - 15*(pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
+        a10 = 72*xyz / ((pixels_aggre**4) - 2*(pixels_aggre**2) + 1)
+        a11 = (180*yyz - 15*(pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
         
         profile = (a00*(xz**2) + 2*a10*xz*yz + a11*(yz*2)) / ((xz**2) + (yz**2))
 
@@ -675,9 +678,9 @@ class SlidingWindow:
         pixels_aggre = self.__dem_pixels_aggre
         z, xz, yz, yyz, xxz, xyz = tuple (self.__dem_arr_dict[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
 
-        a00 = (180*xxz - (pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
-        a10 = 72*xyz / ((pixels_aggre**4) - 2*(pixels_aggre**2) + 4)
-        a11 = (180*yyz - (pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*pixels_aggre**2 + 4)
+        a00 = (180*xxz - 15*(pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
+        a10 = 72*xyz / ((pixels_aggre**4) - 2*(pixels_aggre**2) + 1)
+        a11 = (180*yyz - 15*(pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
         
         planform = (a00*(yz**2) - 2*a10*xz*yz + a11*(xz*2)) / ((xz**2) + (yz**2))
         
@@ -694,8 +697,8 @@ class SlidingWindow:
         pixels_aggre = self.__dem_pixels_aggre
         z, yyz, xxz = tuple (self.__dem_arr_dict[i] for i in ('z', 'yyz', 'xxz'))
 
-        a00 = (180*xxz - (pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
-        a11 = (180*yyz - (pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*pixels_aggre**2 + 4)
+        a00 = (180*xxz - 15*(pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
+        a11 = (180*yyz - 15*(pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
         standard = (a00 + a11) / 2
 
         return standard
