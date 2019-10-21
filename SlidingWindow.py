@@ -560,6 +560,9 @@ class SlidingWindow:
         self.__dem_pixels_aggre = pixels_aggre
 
     def _dem_aggregation_step_brute(self, num_steps):
+        if (self.__dem_arr_dict['z'].size == 0):
+            raise ValueError('Arrays must be initialized before performing aggregation steps')
+
         z, xz, yz, xxz, yyz, xyz = tuple (self.__dem_arr_dict[x] for x in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz'))
         delta = self.__dem_pixels_aggre
         
@@ -600,6 +603,8 @@ class SlidingWindow:
 
     # generate image of aggregated mean values of designated array
     def dem_mean(self, arr_name='z'):
+        if (self.__dem_arr_dict['z'].size == 0):
+            raise ValueError('Arrays must be initialized before exporting mean')
         if (arr_name not in self.__dem_arr_dict):
             raise ValueError('%s must be a member of %r' % (arr_name, self.__dem_arr_dict))
         
@@ -619,6 +624,9 @@ class SlidingWindow:
 
     # return array of aggregated slope values
     def __slope(self):
+        if (self.__dem_arr_dict['z'].size == 0):
+            raise ValueError('Arrays must be initialized before calculating slope')
+
         pixels_aggre = self.__dem_pixels_aggre
         transform = self.img.profile['transform']
         pixel_width = math.sqrt(transform[0]**2 + transform[3]**2)
@@ -644,11 +652,15 @@ class SlidingWindow:
 
     # return array of aggregated angle of steepest descent, calculated as clockwise angle from north
     def __aspect(self):
+        if (self.__dem_arr_dict['z'].size == 0):
+            raise ValueError('Arrays must be initialized before calculating aspect')
+
         xz = self.__dem_arr_dict['xz']
         yz = self.__dem_arr_dict['yz']
         aspect = (-np.arctan(xz/yz) - np.sign(yz)*math.pi/2 + math.pi/2) % (2*math.pi)
         return aspect
 
+    # generate image of aggregated profile curvature, second derivative parallel to steepest descent
     def dem_profile(self):
         profile = self.__profile()
         profile = self.__arr_dtype_conversion(profile, np.uint16)
@@ -656,7 +668,11 @@ class SlidingWindow:
         fn = os.path.splitext(self.file_name)[0] + '_profile_w' + str(pixels_aggre) +'.tif'
         self.__create_tif(profile, pixels_aggre=pixels_aggre, fn=fn)
 
+    # return array of aggregated profile curvature, second derivative parallel to steepest descent
     def __profile(self):
+        if (self.__dem_arr_dict['z'].size == 0):
+            raise ValueError('Arrays must be initialized before calculating profile')
+
         pixels_aggre = self.__dem_pixels_aggre
         z, xz, yz, yyz, xxz, xyz = tuple (self.__dem_arr_dict[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
 
@@ -665,9 +681,9 @@ class SlidingWindow:
         a11 = (180*yyz - 15*(pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
         
         profile = (a00*(xz**2) + 2*a10*xz*yz + a11*(yz*2)) / ((xz**2) + (yz**2))
-
         return profile
 
+    # generate image of aggregated planform curvature, second derivative perpendicular to steepest descent
     def dem_planform(self):
         planform = self.__planform()
         planform = self.__arr_dtype_conversion(planform, np.uint16)
@@ -675,7 +691,11 @@ class SlidingWindow:
         fn = os.path.splitext(self.file_name)[0] + '_planform_w' + str(pixels_aggre) +'.tif'
         self.__create_tif(planform, pixels_aggre=pixels_aggre, fn=fn)
 
+    # return array of aggregated planform curvature, second derivative perpendicular to steepest descent
     def __planform(self):
+        if (self.__dem_arr_dict['z'].size == 0):
+            raise ValueError('Arrays must be initialized before calculating planform')
+
         pixels_aggre = self.__dem_pixels_aggre
         z, xz, yz, yyz, xxz, xyz = tuple (self.__dem_arr_dict[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
 
@@ -683,10 +703,10 @@ class SlidingWindow:
         a10 = 72*xyz / ((pixels_aggre**4) - 2*(pixels_aggre**2) + 1)
         a11 = (180*yyz - 15*(pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
         
-        planform = (a00*(yz**2) - 2*a10*xz*yz + a11*(xz*2)) / ((xz**2) + (yz**2))
-        
+        planform = (a00*(yz**2) - 2*a10*xz*yz + a11*(xz*2)) / ((xz**2) + (yz**2))   
         return planform
 
+    # generate image of aggregated standard curvature
     def dem_standard(self):
         standard = self.__standard()
         standard = self.__arr_dtype_conversion(standard, np.uint16)
@@ -694,12 +714,15 @@ class SlidingWindow:
         fn = os.path.splitext(self.file_name)[0] + '_standard_w' + str(pixels_aggre) +'.tif'
         self.__create_tif(standard, pixels_aggre=pixels_aggre, fn=fn)
     
+    # return array of aggregated standard curvature
     def __standard(self):
+        if (self.__dem_arr_dict['z'].size == 0):
+            raise ValueError('Arrays must be initialized before calculating standard curvature')
+        
         pixels_aggre = self.__dem_pixels_aggre
         z, yyz, xxz = tuple (self.__dem_arr_dict[i] for i in ('z', 'yyz', 'xxz'))
 
         a00 = (180*xxz - 15*(pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
         a11 = (180*yyz - 15*(pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
         standard = (a00 + a11) / 2
-
         return standard

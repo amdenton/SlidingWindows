@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import math
 
 slide_window = SlidingWindow('test.tif')
-slide_window_2 = SlidingWindow('gunsite_dem-2-1_export_w8.tif')
+slide_window_2 = SlidingWindow('gunsite_dem-2-1_export_w64.tif')
 
 #img = rasterio.open('gunsite_dem-2-1.tif').read(1)
 #plt.imshow(img)
@@ -24,7 +24,7 @@ slide_window_2 = SlidingWindow('gunsite_dem-2-1_export_w8.tif')
 #plt.show()
 #img = rasterio.open('gunsite_dem-2-1_export_w64_planform_w64.tif').read(1)
 #plt.imshow(img)
-#lt.show()
+#plt.show()
 #img = rasterio.open('gunsite_dem-2-1_export_w64_aspect_w64.tif').read(1)
 #plt.imshow(img)
 #plt.show()
