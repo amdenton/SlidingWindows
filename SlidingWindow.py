@@ -51,7 +51,7 @@ class SlidingWindow:
         self.img = rasterio.open(file_path)
 
     # operations for image aggregation
-    __valid_ops = {'++++', '++--', '-+-+', '-++-', 'MAX', 'MIN'}
+    __valid_ops = {'++++', '--++', '-+-+', '+--+', 'MAX', 'MIN'}
     @property
     def valid_ops(self):
         return self.__valid_ops
@@ -218,12 +218,12 @@ class SlidingWindow:
                 for i in range (x_max):
                     if (operation == '++++'):
                         arr[j, i] = arr_out[j, i] + arr_out[j, i+delta] + arr_out[j+delta, i] + arr_out[j+delta, i+delta]
-                    if (operation == '++--'):
-                        arr[j, i] = arr_out[j, i] + arr_out[j, i+delta] - arr_out[j+delta, i] - arr_out[j+delta, i+delta]
+                    if (operation == '--++'):
+                        arr[j, i] = -arr_out[j, i] - arr_out[j, i+delta] + arr_out[j+delta, i] + arr_out[j+delta, i+delta]
                     if (operation == '-+-+'):
                         arr[j, i] = -arr_out[j, i] + arr_out[j, i+delta] - arr_out[j+delta, i] + arr_out[j+delta, i+delta]
-                    if (operation == '-++-'):
-                        arr[j, i] = -arr_out[j, i] + arr_out[j, i+delta] + arr_out[j+delta, i] - arr_out[j+delta, i+delta]
+                    if (operation == '+--+'):
+                        arr[j, i] = arr_out[j, i] - arr_out[j, i+delta] - arr_out[j+delta, i] + arr_out[j+delta, i+delta]
                     elif (operation.upper() == 'MAX'):
                         arr[j, i] = max(max(max(arr_out[j, i], arr_out[j, i+delta]), arr_out[j+delta, i]), arr_out[j+delta, i+delta])
                     elif (operation.upper() == 'MIN'):
@@ -270,12 +270,12 @@ class SlidingWindow:
 
             if operation.upper() == '++++':
                 arr_out = top_left + top_right + bottom_left + bottom_right
-            if operation.upper() == '++--':
-                arr_out = top_left + top_right - bottom_left - bottom_right
+            if operation.upper() == '--++':
+                arr_out = -top_left - top_right + bottom_left + bottom_right
             if operation.upper() == '-+-+':
                 arr_out = -top_left + top_right - bottom_left + bottom_right
-            if operation.upper() == '-++-':
-                arr_out = -top_left + top_right + bottom_left - bottom_right
+            if operation.upper() == '+--+':
+                arr_out = top_left - top_right - bottom_left + bottom_right
             elif operation.upper() == 'MAX':
                 arr_out = np.maximum(np.maximum(np.maximum(top_left, top_right), bottom_left), bottom_right)
             elif operation.upper() == 'MIN':
@@ -527,17 +527,19 @@ class SlidingWindow:
         delta_power = int(math.log2(pixels_aggre))
 
         for _ in range(num_steps):
+            pixels_aggre *= 2
+
             z_sum_all = self._partial_aggregation(z, delta_power, delta_power+1, '++++')
-            z_sum_top = self._partial_aggregation(z, delta_power, delta_power+1, '++--')
+            z_sum_bottom = self._partial_aggregation(z, delta_power, delta_power+1, '--++')
             z_sum_right = self._partial_aggregation(z, delta_power, delta_power+1, '-+-+')
-            z_sum_anti_diag = self._partial_aggregation(z, delta_power, delta_power+1, '-++-')
+            z_sum_main_diag = self._partial_aggregation(z, delta_power, delta_power+1, '+--+')
 
             xz_sum_all = self._partial_aggregation(xz, delta_power, delta_power+1, '++++')
-            xz_sum_top = self._partial_aggregation(xz, delta_power, delta_power+1, '++--')
+            xz_sum_bottom = self._partial_aggregation(xz, delta_power, delta_power+1, '--++')
             xz_sum_right = self._partial_aggregation(xz, delta_power, delta_power+1, '-+-+')
 
             yz_sum_all = self._partial_aggregation(yz, delta_power, delta_power+1, '++++')
-            yz_sum_top = self._partial_aggregation(yz, delta_power, delta_power+1, '++--')
+            yz_sum_bottom = self._partial_aggregation(yz, delta_power, delta_power+1, '--++')
             yz_sum_right = self._partial_aggregation(yz, delta_power, delta_power+1, '-+-+')
 
             xxz_sum_all = self._partial_aggregation(xxz, delta_power, delta_power+1, '++++')
@@ -546,14 +548,13 @@ class SlidingWindow:
 
             xyz_sum_all = self._partial_aggregation(xyz, delta_power, delta_power+1, '++++')
 
-            xxz = 0.25*(xxz_sum_all + pixels_aggre*xz_sum_right + 0.25*(pixels_aggre**2)*z_sum_all)
-            yyz = 0.25*(yyz_sum_all + yz_sum_top*pixels_aggre + 0.25*(pixels_aggre**2)*z_sum_all)
-            xyz = 0.25*(xyz_sum_all + 0.5*pixels_aggre*(xz_sum_top + yz_sum_right) + 0.25*(pixels_aggre**2)*z_sum_anti_diag)
-            xz = 0.25*(xz_sum_all + 0.5*pixels_aggre*z_sum_right)
-            yz = 0.25*(yz_sum_all + 0.5*pixels_aggre*z_sum_top)
             z = 0.25*z_sum_all
+            xz = 0.25*(xz_sum_all + 0.25*pixels_aggre*z_sum_right)
+            yz = 0.25*(yz_sum_all + 0.25*pixels_aggre*z_sum_bottom)
+            xxz = 0.25*(xxz_sum_all + .5*pixels_aggre*xz_sum_right + 0.0625*(pixels_aggre**2)*z_sum_all)
+            yyz = 0.25*(yyz_sum_all + .5*pixels_aggre*yz_sum_bottom + 0.0625*(pixels_aggre**2)*z_sum_all)
+            xyz = 0.25*(xyz_sum_all + 0.25*pixels_aggre*(xz_sum_bottom + yz_sum_right) + 0.0625*(pixels_aggre**2)*z_sum_main_diag)
 
-            pixels_aggre *= 2
             delta_power += 1
         
         self.__dem_arr_dict.update({'z': z, 'xz': xz, 'yz': yz, 'xxz': xxz, 'yyz': yyz, 'xyz': xyz})
@@ -564,7 +565,7 @@ class SlidingWindow:
             raise ValueError('Arrays must be initialized before performing aggregation steps')
 
         z, xz, yz, xxz, yyz, xyz = tuple (self.__dem_arr_dict[x] for x in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz'))
-        delta = self.__dem_pixels_aggre
+        delta = self.__dem_pixels_aggre * 2
         
         for _ in range(num_steps):
             x_max = z.shape[1] - delta
@@ -572,16 +573,16 @@ class SlidingWindow:
             for y in range (y_max):
                 for x in range (x_max):
                     z_sum_all = z[y, x] + z[y, x+delta] + z[y+delta, x] + z[y+delta, x+delta]
-                    z_sum_top = z[y, x] + z[y, x+delta] - z[y+delta, x] - z[y+delta, x+delta]
+                    z_sum_bottom = -z[y, x] - z[y, x+delta] + z[y+delta, x] + z[y+delta, x+delta]
                     z_sum_right = -z[y, x] + z[y, x+delta] - z[y+delta, x] + z[y+delta, x+delta]
-                    z_sum_anti_diag = -z[y,x] + z[y, x+delta] + z[y+delta, x] - z[y+delta, x+delta]
+                    z_sum_main_diag = z[y,x] - z[y, x+delta] - z[y+delta, x] + z[y+delta, x+delta]
 
                     xz_sum_all = xz[y, x] + xz[y, x+delta] + xz[y+delta, x] + xz[y+delta, x+delta]
-                    xz_sum_top = xz[y, x] + xz[y, x+delta] - xz[y+delta, x] - xz[y+delta, x+delta]
+                    xz_sum_bottom = -xz[y, x] - xz[y, x+delta] + xz[y+delta, x] + xz[y+delta, x+delta]
                     xz_sum_right = -xz[y, x] + xz[y, x+delta] - xz[y+delta, x] + xz[y+delta, x+delta]
 
                     yz_sum_all = yz[y, x] + yz[y, x+delta] + yz[y+delta, x] + yz[y+delta, x+delta]
-                    yz_sum_top = yz[y, x] + yz[y, x+delta] - yz[y+delta, x] - yz[y+delta, x+delta]
+                    yz_sum_bottom = -yz[y, x] - yz[y, x+delta] + yz[y+delta, x] + yz[y+delta, x+delta]
                     yz_sum_right = -yz[y, x] + yz[y, x+delta] - yz[y+delta, x] + yz[y+delta, x+delta]
 
                     xxz_sum_all = xxz[y, x] + xxz[y, x+delta] + xxz[y+delta, x] + xxz[y+delta, x+delta]
@@ -590,11 +591,11 @@ class SlidingWindow:
 
                     xyz_sum_all = xyz[y, x] + xyz[y, x+delta] + xyz[y+delta, x] + xyz[y+delta, x+delta]
 
-                    xz[y, x] = 0.25*(xz_sum_all + 0.5*delta*z_sum_right)
-                    yz[y, x] = 0.25*(yz_sum_all + 0.5*delta*z_sum_top)
-                    xxz[y, x] = 0.25*(xxz_sum_all + delta*xz_sum_right + 0.25*(delta**2)*z_sum_all)
-                    yyz[y, x] = 0.25*(yyz_sum_all + delta*yz_sum_top + 0.25*(delta**2)*z_sum_all)
-                    xyz[y, x] = 0.25*(xyz_sum_all + 0.5*delta*(xz_sum_top + yz_sum_right) + 0.25*(delta**2)*z_sum_anti_diag)
+                    xz[y, x] = 0.25*(xz_sum_all + 0.25*delta*z_sum_right)
+                    yz[y, x] = 0.25*(yz_sum_all + 0.25*delta*z_sum_bottom)
+                    xxz[y, x] = 0.25*(xxz_sum_all + .5*delta*xz_sum_right + 0.0625*(delta**2)*z_sum_all)
+                    yyz[y, x] = 0.25*(yyz_sum_all + .5*delta*yz_sum_bottom + 0.0625*(delta**2)*z_sum_all)
+                    xyz[y, x] = 0.25*(xyz_sum_all + 0.25*delta*(xz_sum_bottom + yz_sum_right) + 0.0625*(delta**2)*z_sum_main_diag)
                     z[y, x] = 0.25*z_sum_all
             delta *= 2
         
@@ -634,9 +635,9 @@ class SlidingWindow:
         xz = self.__dem_arr_dict['xz']
         yz = self.__dem_arr_dict['yz']
 
-        slope_x = xz*(12/(pixels_aggre**2 - 1))
-        slope_y = yz*(12/(pixels_aggre**2 - 1))
-        len_opp = np.absolute(slope_x)*xz + np.absolute(slope_y)*yz
+        slope_x = xz*12/(pixels_aggre**2 - 1)
+        slope_y = yz*12/(pixels_aggre**2 - 1)
+        len_opp = slope_x*xz + slope_y*yz
         len_adj = np.sqrt( ((pixel_width*xz)**2) + ((pixel_height*yz)**2) )
         slope = np.arctan(len_opp/len_adj)
 
