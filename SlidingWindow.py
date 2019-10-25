@@ -616,29 +616,29 @@ class SlidingWindow:
         self.__create_tif(arr, pixels_aggre=pixels_aggre, fn=fn)
 
     # generate image of aggregated slope values
-    def dem_slope(self):
-        slope = self.__slope()
+    def dem_slope(self, cell_width, cell_height):
+        slope = self.__slope(cell_width, cell_height)
         slope = self.__arr_dtype_conversion(slope, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.file_name)[0] + '_slope_w' + str(pixels_aggre) +'.tif'
         self.__create_tif(slope, pixels_aggre=pixels_aggre, fn=fn)
 
     # return array of aggregated slope values
-    def __slope(self):
+    def __slope(self, cell_width, cell_height):
         if (self.__dem_arr_dict['z'].size == 0):
             raise ValueError('Arrays must be initialized before calculating slope')
 
         pixels_aggre = self.__dem_pixels_aggre
         transform = self.img.profile['transform']
-        pixel_width = math.sqrt(transform[0]**2 + transform[3]**2)
-        pixel_height = math.sqrt(transform[1]**2 + transform[4]**2)
+        map_width = math.sqrt(transform[0]**2 + transform[3]**2)
+        map_height = math.sqrt(transform[1]**2 + transform[4]**2)
         xz = self.__dem_arr_dict['xz']
         yz = self.__dem_arr_dict['yz']
 
         slope_x = xz*12/(pixels_aggre**2 - 1)
         slope_y = yz*12/(pixels_aggre**2 - 1)
-        len_opp = slope_x*xz + slope_y*yz
-        len_adj = np.sqrt( ((pixel_width*xz)**2) + ((pixel_height*yz)**2) )
+        len_opp = np.absolute(slope_x + slope_y)
+        len_adj = np.sqrt( ((cell_width*map_width)**2) + ((cell_height*map_height)**2) )
         slope = np.arctan(len_opp/len_adj)
 
         return slope

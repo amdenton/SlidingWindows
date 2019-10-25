@@ -83,13 +83,13 @@ class TestSlidingWindow(unittest.TestCase):
     def test_dem(self):
         slide_window = SlidingWindow(self.test_path_dem)
 
-        slide_window.dem_initialize_arrays(1)
+        slide_window.dem_initialize_arrays()
         slide_window.dem_aggregation_step(6)
-        arr_dic = slide_window.dem_arr_dic
+        arr_dic = slide_window.dem_arr_dict
 
-        slide_window.dem_initialize_arrays(1)
+        slide_window.dem_initialize_arrays()
         slide_window._dem_aggregation_step_brute(6)
-        arr_dic_brute = slide_window.dem_arr_dic
+        arr_dic_brute = slide_window.dem_arr_dict
 
         for key in arr_dic:
             self.assertTrue(np.array_equal(arr_dic[key], arr_dic_brute[key]))
