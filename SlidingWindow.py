@@ -637,7 +637,7 @@ class SlidingWindow:
 
         slope_x = xz*12/(pixels_aggre**2 - 1)
         slope_y = yz*12/(pixels_aggre**2 - 1)
-        len_opp = np.absolute(slope_x + slope_y)
+        len_opp = np.absolute(slope_x) + np.absolute(slope_y)
         len_adj = np.sqrt( ((cell_width*map_width)**2) + ((cell_height*map_height)**2) )
         slope = np.arctan(len_opp/len_adj)
 
@@ -677,9 +677,9 @@ class SlidingWindow:
         pixels_aggre = self.__dem_pixels_aggre
         z, xz, yz, yyz, xxz, xyz = tuple (self.__dem_arr_dict[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
 
-        a00 = (180*xxz - 15*(pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
+        a00 = (180*xxz - 15*(pixels_aggre**2)*z + 15*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
         a10 = 72*xyz / ((pixels_aggre**4) - 2*(pixels_aggre**2) + 1)
-        a11 = (180*yyz - 15*(pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
+        a11 = (180*yyz - 15*(pixels_aggre**2)*z + 15*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
         
         profile = (a00*(xz**2) + 2*a10*xz*yz + a11*(yz*2)) / ((xz**2) + (yz**2))
         return profile
@@ -700,9 +700,9 @@ class SlidingWindow:
         pixels_aggre = self.__dem_pixels_aggre
         z, xz, yz, yyz, xxz, xyz = tuple (self.__dem_arr_dict[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
 
-        a00 = (180*xxz - 15*(pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
+        a00 = (180*xxz - 15*(pixels_aggre**2)*z + 15*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
         a10 = 72*xyz / ((pixels_aggre**4) - 2*(pixels_aggre**2) + 1)
-        a11 = (180*yyz - 15*(pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
+        a11 = (180*yyz - 15*(pixels_aggre**2)*z + 15*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
         
         planform = (a00*(yz**2) - 2*a10*xz*yz + a11*(xz*2)) / ((xz**2) + (yz**2))   
         return planform
@@ -711,6 +711,7 @@ class SlidingWindow:
     def dem_standard(self):
         standard = self.__standard()
         standard = self.__arr_dtype_conversion(standard, np.uint16)
+        
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.file_name)[0] + '_standard_w' + str(pixels_aggre) +'.tif'
         self.__create_tif(standard, pixels_aggre=pixels_aggre, fn=fn)
@@ -723,7 +724,7 @@ class SlidingWindow:
         pixels_aggre = self.__dem_pixels_aggre
         z, yyz, xxz = tuple (self.__dem_arr_dict[i] for i in ('z', 'yyz', 'xxz'))
 
-        a00 = (180*xxz - 15*(pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
-        a11 = (180*yyz - 15*(pixels_aggre**2 - 1)*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
+        a00 = (180*xxz - 15*(pixels_aggre**2)*z + 15*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
+        a11 = (180*yyz - 15*(pixels_aggre**2)*z + 15*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
         standard = (a00 + a11) / 2
         return standard
