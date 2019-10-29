@@ -10,7 +10,7 @@ class SlidingWindow:
 
     # TODO create more tests
     # test geoTransform update in __create_tif()
-    # test averages (e.g. xz, yz) in DEM_UTILS   TODO also figure out how to initialize arrays
+    # test averages (e.g. xz, yz) in DEM_UTILS
 
     # TODO do I have all required functionality?
     # image creation with geoTransform update

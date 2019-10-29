@@ -1,5 +1,5 @@
 import numpy as np
-from sliding_window import SlidingWindow
+from windowagg.sliding_window import SlidingWindow
 import rasterio
 import matplotlib.pyplot as plt
 import math

@@ -1,21 +1,33 @@
-# SlidingWindows
+# WindowAgg
 
-## Installing dependencies for WindowFractalCode.py
-## For Git Bash on Windows
+## Window based aggregation methods for analyzing geographic images
 
-1. Create a virtual environment and activate it.
-cd /path/to/repo
-python -m venv env
-source env/Scripts/activate
+### METHODS
+#### RGB IR IMAGES
+    ndvi
+    binary
+    aggregation
+    regression
+    Pearson
+    fractal
+    fractal 3D
+#### DEM IMAGES
+    window mean
+    slope
+    aspect
+    standard curve
+    profile curve
+    planform curve
 
-2. Upgrade pip.
-pip install --upgrade pip
 
-3. Download and install rasterio/GDAL Binaries
+### INSTALL
+pip install windowagg
+
+### IMPORT
+from windowagg.sliding_window import SlidingWindow
+
+But first, you must download and install rasterio/GDAL Binaries
 [rasterio](https://www.lfd.uci.edu/~gohlke/pythonlibs/#rasterio)
 [GDAL](https://www.lfd.uci.edu/~gohlke/pythonlibs/#gdal)
 pip install /path/to/GDAL_binaries
 pip install /path/to/rasterio_binaries
-
-3. Install the rest of the dependencies
-pip install -r requirements.txt
