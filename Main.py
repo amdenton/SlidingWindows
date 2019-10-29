@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import math
 
 slide_window = SlidingWindow('test.tif')
-slide_window_2 = SlidingWindow('gunsite_dem-2-1_export_w64.tif')
+slide_window_2 = SlidingWindow('gunsite_dem-2-1.tif')
 cell_width = 4928
 cell_height = 3264
 

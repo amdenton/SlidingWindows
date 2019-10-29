@@ -110,7 +110,7 @@ class SlidingWindow:
         if (threshold < 0 or threshold > 1):
             raise ValueError('threshold must be between 0 and 1')
         dtype = arr.dtype
-        maximum = self.__get_max_min(arr.dtype)[0]
+        maximum = self.__get_max_min(dtype)[0]
         return np.where(arr < (threshold*maximum), 0, maximum).astype(dtype)
 
     # check if an image is black and white or not
@@ -140,10 +140,12 @@ class SlidingWindow:
         if (type(arr_in) == np.ndarray):
             arr_in = [arr_in]
         dtype = arr_in[0].dtype
+        shape = arr_in[0].shape
         for x in range(1, len(arr_in)):
-            if (arr_in[x].dtype is not dtype):
-                raise TypeError('arrays must have the same dtype')
-
+            if (arr_in[x].dtype != dtype):
+                raise ValueError('arrays must have the same dtype')
+            if (arr_in[x].shape != shape):
+                  raise ValueError('arrays must have the same shape')
 
         profile = self.img.profile
         transform = profile['transform']
@@ -165,6 +167,7 @@ class SlidingWindow:
             temp[4] = transform[4] * pixels_aggre
             transform = affine.Affine(temp[0], temp[1], temp[2], temp[3] , temp[4], temp[5])
 
+        # TODO should nodata be 0?
         profile.update(
             nodata=0,
             transform=transform,
@@ -497,9 +500,10 @@ class SlidingWindow:
 
     # TODO should I assume dem band is the only band?
     def dem_initialize_arrays(self):
-        z = self.img.read(1)
+        z = self.img.read(1).astype(float)
         xz, yz, xxz, yyz, xyz = (np.zeros(z.shape).astype(z.dtype) for _ in range(5))
         self.__dem_arr_dict.update({'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz})
+        self.__dem_pixels_aggre = 1
     
     def dem_export_arrays(self):
         pixels_aggre = self.__dem_pixels_aggre
@@ -565,11 +569,12 @@ class SlidingWindow:
             raise ValueError('Arrays must be initialized before performing aggregation steps')
 
         z, xz, yz, xxz, yyz, xyz = tuple (self.__dem_arr_dict[x] for x in ('z', 'xz', 'yz', 'xxz', 'yyz', 'xyz'))
-        delta = self.__dem_pixels_aggre * 2
+        delta = self.__dem_pixels_aggre
         
         for _ in range(num_steps):
             x_max = z.shape[1] - delta
             y_max = z.shape[0] - delta
+            pixels_aggre = delta*2
             for y in range (y_max):
                 for x in range (x_max):
                     z_sum_all = z[y, x] + z[y, x+delta] + z[y+delta, x] + z[y+delta, x+delta]
@@ -591,16 +596,16 @@ class SlidingWindow:
 
                     xyz_sum_all = xyz[y, x] + xyz[y, x+delta] + xyz[y+delta, x] + xyz[y+delta, x+delta]
 
-                    xz[y, x] = 0.25*(xz_sum_all + 0.25*delta*z_sum_right)
-                    yz[y, x] = 0.25*(yz_sum_all + 0.25*delta*z_sum_bottom)
-                    xxz[y, x] = 0.25*(xxz_sum_all + .5*delta*xz_sum_right + 0.0625*(delta**2)*z_sum_all)
-                    yyz[y, x] = 0.25*(yyz_sum_all + .5*delta*yz_sum_bottom + 0.0625*(delta**2)*z_sum_all)
-                    xyz[y, x] = 0.25*(xyz_sum_all + 0.25*delta*(xz_sum_bottom + yz_sum_right) + 0.0625*(delta**2)*z_sum_main_diag)
+                    xz[y, x] = 0.25*(xz_sum_all + 0.25*pixels_aggre*z_sum_right)
+                    yz[y, x] = 0.25*(yz_sum_all + 0.25*pixels_aggre*z_sum_bottom)
+                    xxz[y, x] = 0.25*(xxz_sum_all + .5*pixels_aggre*xz_sum_right + 0.0625*(pixels_aggre**2)*z_sum_all)
+                    yyz[y, x] = 0.25*(yyz_sum_all + .5*pixels_aggre*yz_sum_bottom + 0.0625*(pixels_aggre**2)*z_sum_all)
+                    xyz[y, x] = 0.25*(xyz_sum_all + 0.25*pixels_aggre*(xz_sum_bottom + yz_sum_right) + 0.0625*(pixels_aggre**2)*z_sum_main_diag)
                     z[y, x] = 0.25*z_sum_all
             delta *= 2
         
         self.__dem_arr_dict.update({'z': z, 'xz': xz, 'yz': yz, 'xxz': xxz, 'yyz': yyz, 'xyz': xyz})
-        self.__dem_pixels_aggre = delta
+        self.__dem_pixels_aggre = pixels_aggre
 
     # generate image of aggregated mean values of designated array
     def dem_mean(self, arr_name='z'):
