@@ -4,20 +4,21 @@
 
 ### METHODS
 #### RGB IR IMAGES
-    * ndvi
-    * binary
-    * aggregation
-    * regression
-    * Pearson
-    * fractal
-    * fractal 3D
+* ndvi
+* binary
+* aggregation
+* regression
+* Pearson
+* fractal
+* fractal 3D
+
 #### DEM IMAGES
-    * window mean
-    * slope
-    * aspect
-    * standard curve
-    * profile curve
-    * planform curve
+* window mean
+* slope
+* aspect
+* standard curve
+* profile curve
+* planform curve
 
 
 ### INSTALL
