@@ -1,5 +1,5 @@
 import unittest
-from SlidingWindow import SlidingWindow
+from sliding_window import SlidingWindow
 import numpy as np
 import rasterio
 
