@@ -50,6 +50,15 @@ class SlidingWindow:
         self.file_name = os.path.split(file_path)[-1]
         self.img = rasterio.open(file_path)
 
+    def __enter__(self):
+        return self
+    def __exit__(self, exc_type, exc_val, traceback):
+        self.img.close()
+    def close(self):
+        self.img.close()
+    def __del__(self):
+        self.img.close()
+
     # operations for image aggregation
     __valid_ops = {'++++', '--++', '-+-+', '+--+', 'MAX', 'MIN'}
     @property
