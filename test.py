@@ -7,11 +7,12 @@ import os
 
 class TestSlidingWindow(unittest.TestCase):
 
-    test_path = 'test_img/'
+    fp = 'test_img/'
+    create_tif_test_img = ('SEgradient', 'SEgradient_-45skew', 'Sgradient', 'Sgradient_-45skew')
 
     def test_aggregation(self):
-        with SlidingWindow(self.test_path + 'random.tif') as slide_window:
-            with rasterio.open(self.test_path + 'random.tif') as img:
+        with SlidingWindow(self.fp + 'random.tif') as slide_window:
+            with rasterio.open(self.fp + 'random.tif') as img:
                 arr = img.read(1).astype(float)
 
             sum_all = slide_window._partial_aggregation(arr, 0, 5, '++++')
@@ -69,8 +70,8 @@ class TestSlidingWindow(unittest.TestCase):
         self.assertTrue(np.array_equal(partial_minimum, brute_minimum))
 
     def test_regression(self):
-        with SlidingWindow(self.test_path + 'random4band.tif') as slide_window:
-            with rasterio.open(self.test_path + 'random4band.tif') as img:
+        with SlidingWindow(self.fp + 'random4band.tif') as slide_window:
+            with rasterio.open(self.fp + 'random4band.tif') as img:
                 arr1 = img.read(1).astype(float)
                 arr2 = img.read(2).astype(float)
             arr_good = slide_window._regression(arr1, arr2, 5)
@@ -79,7 +80,7 @@ class TestSlidingWindow(unittest.TestCase):
         self.assertTrue(np.allclose(arr_good, arr_brute))
 
     def test_dem_aggregation(self):
-        with SlidingWindow(self.test_path + 'SEgradient.tif') as slide_window:
+        with SlidingWindow(self.fp + 'SEgradient.tif') as slide_window:
             slide_window.dem_initialize_arrays()
             slide_window.dem_aggregation_step(5)
             arr_dic = slide_window.dem_arr_dict
@@ -91,69 +92,53 @@ class TestSlidingWindow(unittest.TestCase):
         for key in arr_dic:
             self.assertTrue(np.array_equal(arr_dic[key], arr_dic_brute[key]))
 
-    def test_create_tif(self):
-        with SlidingWindow(self.test_path + 'SEgradient.tif') as slide_window:
-            slide_window.dem_initialize_arrays()
-            slide_window.dem_aggregation_step(2)
-            slide_window.dem_mean('z')
-            slide_window.dem_aggregation_step(1)
-            slide_window.dem_mean('z')
+    def test_create_tif_transform(self):
+        agg_num_1 = 2
+        agg_num_2 = 5
 
-        with rasterio.open(self.test_path + 'SEgradient.tif') as img:
-            transform_w1 = img.profile['transform']
-        with rasterio.open('SEgradient_z_mean_w4.tif') as img:
-            transform_w4 = img.profile['transform']
-        with rasterio.open('SEgradient_z_mean_w8.tif') as img:
-            transform_w8 = img.profile['transform']
+        pix_agg_1 = 2**agg_num_1
+        pix_agg_2 = 2**agg_num_2
+        for path in self.create_tif_test_img:
+            with self.subTest(path=path):
+                paths = (self.fp+path+'.tif', path+'_z_mean_w'+str(pix_agg_1)+'.tif', path+'_z_mean_w'+str(pix_agg_2)+'.tif')
+                try:
+                    with SlidingWindow(paths[0]) as slide_window:
+                        slide_window.dem_initialize_arrays()
+                        slide_window.dem_aggregation_step(agg_num_1)
+                        slide_window.dem_mean('z')
+                        slide_window.dem_aggregation_step(agg_num_2 - agg_num_1)
+                        slide_window.dem_mean('z')
 
-        self.assertTrue(transform_w4[0] == transform_w1[0]*4)
-        self.assertTrue(transform_w4[1] == transform_w1[1]*4)
-        self.assertTrue(transform_w4[2] == (transform_w1[2] + (math.sqrt(transform_w1[0]**2 + transform_w1[3]**2)*3/2)))
-        self.assertTrue(transform_w4[3] == transform_w1[3]*4)
-        self.assertTrue(transform_w4[4] == transform_w1[4]*4)
-        self.assertTrue(transform_w4[5] == (transform_w1[5] - (math.sqrt(transform_w1[1]**2 + transform_w1[4]**2)*3/2)))
+                    with rasterio.open(paths[0]) as img:
+                        transform = img.profile['transform']
+                    with rasterio.open(paths[1]) as img:
+                        transform_1 = img.profile['transform']
+                    with rasterio.open(paths[2]) as img:
+                        transform_2 = img.profile['transform']
 
-        self.assertTrue(transform_w8[0] == transform_w1[0]*8)
-        self.assertTrue(transform_w8[1] == transform_w1[1]*8)
-        self.assertTrue(transform_w8[2] == (transform_w1[2] + (math.sqrt(transform_w1[0]**2 + transform_w1[3]**2)*7/2)))
-        self.assertTrue(transform_w8[3] == transform_w1[3]*8)
-        self.assertTrue(transform_w8[4] == transform_w1[4]*8)
-        self.assertTrue(transform_w8[5] == (transform_w1[5] - (math.sqrt(transform_w1[1]**2 + transform_w1[4]**2)*7/2)))
+                    map_width = math.sqrt(transform[0]**2 + transform[3]**2)
+                    map_height = math.sqrt(transform[1]**2 + transform[4]**2)
+                    self.assertTrue(transform_1[0] == transform[0]*pix_agg_1)
+                    self.assertTrue(transform_1[1] == transform[1]*pix_agg_1)
+                    self.assertTrue(transform_1[2] == (transform[2] + (map_width*(pix_agg_1 - 1)/2)))
+                    self.assertTrue(transform_1[3] == transform[3]*pix_agg_1)
+                    self.assertTrue(transform_1[4] == transform[4]*pix_agg_1)
+                    self.assertTrue(transform_1[5] == (transform[5] - (map_height*(pix_agg_1 - 1)/2)))
 
-        os.remove('SEgradient_z_mean_w4.tif')
+                    self.assertTrue(transform_2[0] == transform[0]*pix_agg_2)
+                    self.assertTrue(transform_2[1] == transform[1]*pix_agg_2)
+                    self.assertTrue(transform_2[2] == (transform[2] + (map_width*(pix_agg_2 - 1)/2)))
+                    self.assertTrue(transform_2[3] == transform[3]*pix_agg_2)
+                    self.assertTrue(transform_2[4] == transform[4]*pix_agg_2)
+                    self.assertTrue(transform_2[5] == (transform[5] - (map_height*(pix_agg_2 - 1)/2)))
 
+                    for i in range(1, len(paths)):
+                        self.assertTrue(os.path.exists(paths[i]))
 
-def test_create_tif_skew(self):
-        with SlidingWindow(self.test_path + 'SEgradient_-45skew.tif') as slide_window:
-            slide_window.dem_initialize_arrays()
-            slide_window.dem_aggregation_step(2)
-            slide_window.dem_mean('z')
-            slide_window.dem_aggregation_step(1)
-            slide_window.dem_mean('z')
-
-        with rasterio.open(self.test_path + 'SEgradient_-45skew.tif') as img:
-            transform_w1 = img.profile['transform']
-        with rasterio.open('SEgradient_-45skew_z_mean_w4.tif') as img:
-            transform_w4 = img.profile['transform']
-        with rasterio.open('SEgradient_-45skew_z_mean_w8.tif') as img:
-            transform_w8 = img.profile['transform']
-
-        self.assertTrue(transform_w4[0] == transform_w1[0]*4)
-        self.assertTrue(transform_w4[1] == transform_w1[1]*4)
-        self.assertTrue(transform_w4[2] == (transform_w1[2] + (math.sqrt(transform_w1[0]**2 + transform_w1[3]**2)*3/2)))
-        self.assertTrue(transform_w4[3] == transform_w1[3]*4)
-        self.assertTrue(transform_w4[4] == transform_w1[4]*4)
-        self.assertTrue(transform_w4[5] == (transform_w1[5] - (math.sqrt(transform_w1[1]**2 + transform_w1[4]**2)*3/2)))
-
-        self.assertTrue(transform_w8[0] == transform_w1[0]*8)
-        self.assertTrue(transform_w8[1] == transform_w1[1]*8)
-        self.assertTrue(transform_w8[2] == (transform_w1[2] + (math.sqrt(transform_w1[0]**2 + transform_w1[3]**2)*7/2)))
-        self.assertTrue(transform_w8[3] == transform_w1[3]*8)
-        self.assertTrue(transform_w8[4] == transform_w1[4]*8)
-        self.assertTrue(transform_w8[5] == (transform_w1[5] - (math.sqrt(transform_w1[1]**2 + transform_w1[4]**2)*7/2)))
-
-        os.remove('SEgradient_-45skew_z_mean_w4.tif')
-        os.remove('SEgradient_-45skew_z_mean_w8.tif')
+                finally:
+                    for i in range(1, len(paths)):
+                        if os.path.exists(paths[i]):
+                            os.remove(paths[i])
 
 if __name__ == '__main__':
     unittest.main()
