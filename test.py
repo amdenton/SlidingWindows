@@ -94,22 +94,66 @@ class TestSlidingWindow(unittest.TestCase):
     def test_create_tif(self):
         with SlidingWindow(self.test_path + 'SEgradient.tif') as slide_window:
             slide_window.dem_initialize_arrays()
+            slide_window.dem_aggregation_step(2)
+            slide_window.dem_mean('z')
             slide_window.dem_aggregation_step(1)
             slide_window.dem_mean('z')
 
         with rasterio.open(self.test_path + 'SEgradient.tif') as img:
-            transform = img.profile['transform']
-        with rasterio.open('SEgradient_z_mean_w2.tif') as img:
-            transform_agg = img.profile['transform']
+            transform_w1 = img.profile['transform']
+        with rasterio.open('SEgradient_z_mean_w4.tif') as img:
+            transform_w4 = img.profile['transform']
+        with rasterio.open('SEgradient_z_mean_w8.tif') as img:
+            transform_w8 = img.profile['transform']
 
-        self.assertTrue(transform_agg[0] == transform[0]*2)
-        self.assertTrue(transform_agg[1] == transform[1]*2)
-        self.assertTrue(transform_agg[2] == (transform[2] + (math.sqrt(transform[0]**2 + transform[3]**2)/2)))
-        self.assertTrue(transform_agg[3] == transform[3]*2)
-        self.assertTrue(transform_agg[4] == transform[4]*2)
-        self.assertTrue(transform_agg[5] == (transform[5] - (math.sqrt(transform[1]**2 + transform[4]**2)/2)))
+        self.assertTrue(transform_w4[0] == transform_w1[0]*4)
+        self.assertTrue(transform_w4[1] == transform_w1[1]*4)
+        self.assertTrue(transform_w4[2] == (transform_w1[2] + (math.sqrt(transform_w1[0]**2 + transform_w1[3]**2)*3/2)))
+        self.assertTrue(transform_w4[3] == transform_w1[3]*4)
+        self.assertTrue(transform_w4[4] == transform_w1[4]*4)
+        self.assertTrue(transform_w4[5] == (transform_w1[5] - (math.sqrt(transform_w1[1]**2 + transform_w1[4]**2)*3/2)))
 
-        os.remove('SEgradient_z_mean_w2.tif')
+        self.assertTrue(transform_w8[0] == transform_w1[0]*8)
+        self.assertTrue(transform_w8[1] == transform_w1[1]*8)
+        self.assertTrue(transform_w8[2] == (transform_w1[2] + (math.sqrt(transform_w1[0]**2 + transform_w1[3]**2)*7/2)))
+        self.assertTrue(transform_w8[3] == transform_w1[3]*8)
+        self.assertTrue(transform_w8[4] == transform_w1[4]*8)
+        self.assertTrue(transform_w8[5] == (transform_w1[5] - (math.sqrt(transform_w1[1]**2 + transform_w1[4]**2)*7/2)))
+
+        os.remove('SEgradient_z_mean_w4.tif')
+
+
+def test_create_tif_skew(self):
+        with SlidingWindow(self.test_path + 'SEgradient_-45skew.tif') as slide_window:
+            slide_window.dem_initialize_arrays()
+            slide_window.dem_aggregation_step(2)
+            slide_window.dem_mean('z')
+            slide_window.dem_aggregation_step(1)
+            slide_window.dem_mean('z')
+
+        with rasterio.open(self.test_path + 'SEgradient_-45skew.tif') as img:
+            transform_w1 = img.profile['transform']
+        with rasterio.open('SEgradient_-45skew_z_mean_w4.tif') as img:
+            transform_w4 = img.profile['transform']
+        with rasterio.open('SEgradient_-45skew_z_mean_w8.tif') as img:
+            transform_w8 = img.profile['transform']
+
+        self.assertTrue(transform_w4[0] == transform_w1[0]*4)
+        self.assertTrue(transform_w4[1] == transform_w1[1]*4)
+        self.assertTrue(transform_w4[2] == (transform_w1[2] + (math.sqrt(transform_w1[0]**2 + transform_w1[3]**2)*3/2)))
+        self.assertTrue(transform_w4[3] == transform_w1[3]*4)
+        self.assertTrue(transform_w4[4] == transform_w1[4]*4)
+        self.assertTrue(transform_w4[5] == (transform_w1[5] - (math.sqrt(transform_w1[1]**2 + transform_w1[4]**2)*3/2)))
+
+        self.assertTrue(transform_w8[0] == transform_w1[0]*8)
+        self.assertTrue(transform_w8[1] == transform_w1[1]*8)
+        self.assertTrue(transform_w8[2] == (transform_w1[2] + (math.sqrt(transform_w1[0]**2 + transform_w1[3]**2)*7/2)))
+        self.assertTrue(transform_w8[3] == transform_w1[3]*8)
+        self.assertTrue(transform_w8[4] == transform_w1[4]*8)
+        self.assertTrue(transform_w8[5] == (transform_w1[5] - (math.sqrt(transform_w1[1]**2 + transform_w1[4]**2)*7/2)))
+
+        os.remove('SEgradient_-45skew_z_mean_w4.tif')
+        os.remove('SEgradient_-45skew_z_mean_w8.tif')
 
 if __name__ == '__main__':
     unittest.main()
