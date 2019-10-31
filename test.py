@@ -140,5 +140,33 @@ class TestSlidingWindow(unittest.TestCase):
                         if os.path.exists(paths[i]):
                             os.remove(paths[i])
 
+    def test_create_tif_export(self):
+        num_aggre = 0
+        path = self.fp + self.create_tif_test_img[1] + '.tif'
+        new_path = self.create_tif_test_img[1] + '_export_w' + str(2**num_aggre) + '.tif'
+        try:
+            with SlidingWindow(path) as slide_window:
+                slide_window.dem_initialize_arrays()
+                slide_window.dem_aggregation_step(num_aggre)
+                slide_window.dem_export_arrays()
+            self.assertTrue(os.path.exists(new_path))
+
+            with rasterio.open(path) as img:
+                transform = img.profile['transform']
+            with rasterio.open(new_path) as img:
+                transform_new = img.profile['transform']
+
+            with SlidingWindow(new_path) as slide_window:
+                slide_window.dem_import_arrays()
+                self.assertTrue(slide_window.dem_pixels_aggre == 2**num_aggre)
+                self.assertTrue(len(slide_window.dem_arr_dict) == 6)
+
+            for i in range(6):
+                self.assertTrue(transform_new[i] == transform[i])
+            
+        finally:
+            if os.path.exists(new_path):
+                os.remove(new_path)
+
 if __name__ == '__main__':
     unittest.main()

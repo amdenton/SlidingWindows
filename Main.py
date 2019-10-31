@@ -5,29 +5,29 @@ import matplotlib.pyplot as plt
 import math
 
 slide_window = SlidingWindow('test.tif')
-slide_window_2 = SlidingWindow('gunsite_dem-2-1.tif')
+slide_window_2 = SlidingWindow('gunsite_dem-2-1_export_w64.tif')
 cell_width = 4928
 cell_height = 3264
 
 #img = rasterio.open('gunsite_dem-2-1.tif').read(1)
 #plt.imshow(img)
 #plt.show()
-#img = rasterio.open('gunsite_dem-2-1_export_w64_z_mean_w64.tif').read(1)
+#img = rasterio.open('gunsite_dem-2-1_z_mean_w64.tif').read(1)
 #plt.imshow(img)
 #plt.show()
-#img = rasterio.open('gunsite_dem-2-1_export_w64_standard_w64.tif').read(1)
+#img = rasterio.open('gunsite_dem-2-1_standard_w64.tif').read(1)
 #plt.imshow(img)
 #plt.show()
-#img = rasterio.open('gunsite_dem-2-1_export_w64_slope_w64.tif').read(1)
+#img = rasterio.open('gunsite_dem-2-1_slope_w64.tif').read(1)
 #plt.imshow(img)
 #plt.show()
-#img = rasterio.open('gunsite_dem-2-1_export_w64_profile_w64.tif').read(1)
+#img = rasterio.open('gunsite_dem-2-1_profile_w64.tif').read(1)
 #plt.imshow(img)
 #plt.show()
-#img = rasterio.open('gunsite_dem-2-1_export_w64_planform_w64.tif').read(1)
+#img = rasterio.open('gunsite_dem-2-1_planform_w64.tif').read(1)
 #plt.imshow(img)
 #plt.show()
-#img = rasterio.open('gunsite_dem-2-1_export_w64_aspect_w64.tif').read(1)
+#img = rasterio.open('gunsite_dem-2-1_aspect_w64.tif').read(1)
 #plt.imshow(img)
 #plt.show()
 

@@ -5,6 +5,7 @@ import inspect
 import os
 import math
 import affine
+import re
 
 class SlidingWindow:
 
@@ -47,17 +48,17 @@ class SlidingWindow:
     # TODO should all these methods use floating point?
 
     def __init__(self, file_path):
-        self.file_name = os.path.split(file_path)[-1]
-        self.img = rasterio.open(file_path)
+        self.__file_name = os.path.split(file_path)[-1]
+        self.__img = rasterio.open(file_path)
 
     def __enter__(self):
         return self
     def __exit__(self, exc_type, exc_val, traceback):
-        self.img.close()
+        self.__img.close()
     def close(self):
-        self.img.close()
+        self.__img.close()
     def __del__(self):
-        self.img.close()
+        self.__img.close()
 
     # operations for image aggregation
     __valid_ops = {'++++', '--++', '-+-+', '+--+', 'MAX', 'MIN'}
@@ -80,12 +81,12 @@ class SlidingWindow:
 
     # create NDVI image
     def ndvi(self, red_band, ir_band):
-        bands = np.array(range(self.img.count))+1
+        bands = np.array(range(self.__img.count))+1
         if (red_band not in bands or ir_band not in bands):
             raise ValueError('bands must be in range of %r.' % bands)
         
-        red = self.img.read(red_band)
-        ir = self.img.read(ir_band)
+        red = self.__img.read(red_band)
+        ir = self.__img.read(ir_band)
         ndvi = self.__ndvi(red, ir)
         # TODO change later
         ndvi = self.__arr_dtype_conversion(ndvi, np.uint8)
@@ -102,11 +103,11 @@ class SlidingWindow:
 
     # create binary image
     def binary(self, band, threshold):
-        bands = np.array(range(self.img.count))+1
+        bands = np.array(range(self.__img.count))+1
         if (band not in bands):
             raise ValueError('band must be in range of %r.' % bands)
 
-        arr = self.img.read(band)
+        arr = self.__img.read(band)
         arr = self.__binary(arr, threshold)
         self.__create_tif(arr)
 
@@ -156,7 +157,7 @@ class SlidingWindow:
             if (arr_in[x].shape != shape):
                   raise ValueError('arrays must have the same shape')
 
-        profile = self.img.profile
+        profile = self.__img.profile
         transform = profile['transform']
         big_tiff = 'YES'
 
@@ -188,7 +189,7 @@ class SlidingWindow:
 
         if (fn == None):
             caller_name = inspect.stack()[1].function
-            fn = os.path.splitext(self.file_name)[0] + '_' + caller_name + '.tif'
+            fn = os.path.splitext(self.__file_name)[0] + '_' + caller_name + '.tif'
             
         with rasterio.open(fn, 'w', **profile, BIGTIFF=big_tiff) as dst:
             if (is_export):
@@ -246,8 +247,8 @@ class SlidingWindow:
     # create image with each band aggregated num_aggre times
     def aggregation(self, operation, num_aggre):        
         arr = []
-        for x in range(self.img.count):
-            arr.append(self.img.read(x+1))
+        for x in range(self.__img.count):
+            arr.append(self.__img.read(x+1))
             arr[x] = self._partial_aggregation(arr[x], 0, num_aggre, operation)
 
             # TODO remove later
@@ -305,12 +306,12 @@ class SlidingWindow:
 
     # create image with pixel values cooresponding to their aggregated regression slope
     def regression(self, band1, band2, num_aggre):
-        bands = np.array(range(self.img.count))+1
+        bands = np.array(range(self.__img.count))+1
         if (band1 not in bands or band2 not in bands):
             raise ValueError('bands must be in range of %r.' % bands)
 
-        arr_a = self.img.read(band1)
-        arr_b = self.img.read(band2)
+        arr_a = self.__img.read(band1)
+        arr_b = self.__img.read(band2)
         arr_m = self._regression(arr_a, arr_b, num_aggre)
 
         # TODO remove later
@@ -348,12 +349,12 @@ class SlidingWindow:
 
     # create image with pixel values cooresponding to their aggregated pearson correlation
     def pearson(self, band1, band2, num_aggre):
-        bands = np.array(range(self.img.count))+1
+        bands = np.array(range(self.__img.count))+1
         if (band1 not in bands or band2 not in bands):
             raise ValueError('bands must be in range of %r.' % bands)
 
-        arr_a = self.img.read(band1)
-        arr_b = self.img.read(band2)
+        arr_a = self.__img.read(band1)
+        arr_b = self.__img.read(band2)
         arr_r = self._pearson(arr_a, arr_b, num_aggre)
 
         # TODO remove later
@@ -411,11 +412,11 @@ class SlidingWindow:
 
     # create image with pixel values cooresponding to their aggregated fractal dimension
     def fractal(self, band, threshold, power_start, power_target):
-        bands = np.array(range(self.img.count))+1
+        bands = np.array(range(self.__img.count))+1
         if (band not in bands):
             raise ValueError('band must be in range of %r.' % bands)
 
-        arr = self.img.read(band)
+        arr = self.__img.read(band)
         arr = self._fractal(self.__binary(arr, threshold), power_start, power_target)
 
         # TODO remove later
@@ -465,11 +466,11 @@ class SlidingWindow:
         return arr_out
 
     def fractal_3d(self, band, num_aggre):
-        bands = np.array(range(self.img.count))+1
+        bands = np.array(range(self.__img.count))+1
         if (band not in bands):
             raise ValueError('band must be in range of %r.' % bands)
 
-        arr = self.img.read(band)
+        arr = self.__img.read(band)
         arr = self._fractal_3d(arr, num_aggre)
 
         # TODO remove later
@@ -509,7 +510,7 @@ class SlidingWindow:
 
     # TODO should I assume dem band is the only band?
     def dem_initialize_arrays(self):
-        z = self.img.read(1).astype(float)
+        z = self.__img.read(1).astype(float)
         xz, yz, xxz, yyz, xyz = (np.zeros(z.shape).astype(z.dtype) for _ in range(5))
         self.__dem_arr_dict.update({'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz})
         self.__dem_pixels_aggre = 1
@@ -519,17 +520,18 @@ class SlidingWindow:
         export = []
         for key in self.__dem_arr_dict:
             export.append(self.__dem_arr_dict[key])
-        fn = os.path.splitext(self.file_name)[0] + '_export_w' + str(pixels_aggre) +'.tif'
+        fn = os.path.splitext(self.__file_name)[0] + '_export_w' + str(pixels_aggre) +'.tif'
         self.__create_tif(export, pixels_aggre=pixels_aggre, is_export=True, fn=fn)
 
     def dem_import_arrays(self):
-        if (self.img.count != len(self.__dem_arr_dict)):
+        if (self.__img.count != len(self.__dem_arr_dict)):
             raise ValueError('Cannot import file, %d bands are required for DEM utilities' % len(self.__dem_arr_dict))
         i = 1
         for key in self.__dem_arr_dict:
-            self.__dem_arr_dict[key] = self.img.read(i)
+            self.__dem_arr_dict[key] = self.__img.read(i)
             i += 1
-        self.__dem_pixels_aggre = int(self.img.tags(ns='DEM_UTILITIES')['pixels_aggregated'])
+        self.__dem_pixels_aggre = int(self.__img.tags(ns='DEM_UTILITIES')['pixels_aggregated'])
+        self.__file_name = re.sub('_export.*','',self.__file_name) + '.tif'
 
     def dem_aggregation_step(self, num_steps):
         if (self.__dem_arr_dict['z'].size == 0):
@@ -626,7 +628,7 @@ class SlidingWindow:
         arr = self.__dem_arr_dict[arr_name]
         arr = self.__arr_dtype_conversion(arr, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
-        fn = os.path.splitext(self.file_name)[0] + '_' + arr_name + '_mean_w' + str(pixels_aggre) + '.tif'
+        fn = os.path.splitext(self.__file_name)[0] + '_' + arr_name + '_mean_w' + str(pixels_aggre) + '.tif'
         self.__create_tif(arr, pixels_aggre=pixels_aggre, fn=fn)
 
     # generate image of aggregated slope values
@@ -634,7 +636,7 @@ class SlidingWindow:
         slope = self.__slope(cell_width, cell_height)
         slope = self.__arr_dtype_conversion(slope, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
-        fn = os.path.splitext(self.file_name)[0] + '_slope_w' + str(pixels_aggre) +'.tif'
+        fn = os.path.splitext(self.__file_name)[0] + '_slope_w' + str(pixels_aggre) +'.tif'
         self.__create_tif(slope, pixels_aggre=pixels_aggre, fn=fn)
 
     # return array of aggregated slope values
@@ -643,7 +645,7 @@ class SlidingWindow:
             raise ValueError('Arrays must be initialized before calculating slope')
 
         pixels_aggre = self.__dem_pixels_aggre
-        transform = self.img.profile['transform']
+        transform = self.__img.profile['transform']
         map_width = math.sqrt(transform[0]**2 + transform[3]**2)
         map_height = math.sqrt(transform[1]**2 + transform[4]**2)
         xz = self.__dem_arr_dict['xz']
@@ -662,7 +664,7 @@ class SlidingWindow:
         aspect = self.__aspect()
         aspect = self.__arr_dtype_conversion(aspect, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
-        fn = os.path.splitext(self.file_name)[0] + '_aspect_w' + str(pixels_aggre) +'.tif'
+        fn = os.path.splitext(self.__file_name)[0] + '_aspect_w' + str(pixels_aggre) +'.tif'
         self.__create_tif(aspect, pixels_aggre=pixels_aggre, fn=fn)
 
     # return array of aggregated angle of steepest descent, calculated as clockwise angle from north
@@ -680,7 +682,7 @@ class SlidingWindow:
         profile = self.__profile()
         profile = self.__arr_dtype_conversion(profile, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
-        fn = os.path.splitext(self.file_name)[0] + '_profile_w' + str(pixels_aggre) +'.tif'
+        fn = os.path.splitext(self.__file_name)[0] + '_profile_w' + str(pixels_aggre) +'.tif'
         self.__create_tif(profile, pixels_aggre=pixels_aggre, fn=fn)
 
     # return array of aggregated profile curvature, second derivative parallel to steepest descent
@@ -703,7 +705,7 @@ class SlidingWindow:
         planform = self.__planform()
         planform = self.__arr_dtype_conversion(planform, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
-        fn = os.path.splitext(self.file_name)[0] + '_planform_w' + str(pixels_aggre) +'.tif'
+        fn = os.path.splitext(self.__file_name)[0] + '_planform_w' + str(pixels_aggre) +'.tif'
         self.__create_tif(planform, pixels_aggre=pixels_aggre, fn=fn)
 
     # return array of aggregated planform curvature, second derivative perpendicular to steepest descent
@@ -727,7 +729,7 @@ class SlidingWindow:
         standard = self.__arr_dtype_conversion(standard, np.uint16)
         
         pixels_aggre = self.__dem_pixels_aggre
-        fn = os.path.splitext(self.file_name)[0] + '_standard_w' + str(pixels_aggre) +'.tif'
+        fn = os.path.splitext(self.__file_name)[0] + '_standard_w' + str(pixels_aggre) +'.tif'
         self.__create_tif(standard, pixels_aggre=pixels_aggre, fn=fn)
     
     # return array of aggregated standard curvature
