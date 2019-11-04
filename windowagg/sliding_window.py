@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.polynomial import polynomial as poly
+from windowagg.utilities import _Utilities
 import rasterio
 import inspect
 import os
@@ -79,71 +80,6 @@ class SlidingWindow:
     def dem_pixels_aggre(self):
         return self.__dem_pixels_aggre
 
-    # create NDVI image
-    def ndvi(self, red_band, ir_band):
-        bands = np.array(range(self.__img.count))+1
-        if (red_band not in bands or ir_band not in bands):
-            raise ValueError('bands must be in range of %r.' % bands)
-        
-        red = self.__img.read(red_band)
-        ir = self.__img.read(ir_band)
-        ndvi = self.__ndvi(red, ir)
-        # TODO change later
-        ndvi = self.__arr_dtype_conversion(ndvi, np.uint8)
-        self.__create_tif(ndvi)
-
-    # i.e. Normalized Difference Vegetation Index
-    # for viewing live green vegetation
-    # requires red and infrared bands
-    # returns floating point array
-    def __ndvi(self, red_arr, ir_arr):
-        red_arr = red_arr.astype(float)
-        ir_arr = ir_arr.astype(float)
-        return ( (ir_arr - red_arr) / (ir_arr + red_arr) )
-
-    # create binary image
-    def binary(self, band, threshold):
-        bands = np.array(range(self.__img.count))+1
-        if (band not in bands):
-            raise ValueError('band must be in range of %r.' % bands)
-
-        arr = self.__img.read(band)
-        arr = self.__binary(arr, threshold)
-        self.__create_tif(arr)
-
-    # create black and white image
-    # values greater than or equal to threshold percentage will be white
-    # threshold: percent in decimal of maximum
-    # returns array of same data type
-    # TODO can I assume minimum is always 0, how would I handle it otherwise?
-    def __binary(self, arr, threshold):
-        if (threshold < 0 or threshold > 1):
-            raise ValueError('threshold must be between 0 and 1')
-        dtype = arr.dtype
-        maximum = self.__get_max_min(dtype)[0]
-        return np.where(arr < (threshold*maximum), 0, maximum).astype(dtype)
-
-    # check if an image is black and white or not
-    # i.e. only contains values of dtype.min and dtype.max
-    # TODO should min value be arr_in.dtype.min or 0?
-    def __is_binary(self, arr_in):
-        max_val = np.amax(arr_in)
-        return ((arr_in==0) | (arr_in==max_val)).all()
-
-    # get max and min of numpy data type
-    # returns tuple (max, min)
-    def __get_max_min(self, dtype):
-        max_val = 0
-        min_val = 0
-        if (np.issubdtype(dtype, np.floating)):
-            max_val = np.finfo(dtype).max
-            min_val = np.finfo(dtype).min
-        else:
-            max_val = np.iinfo(dtype).max
-            min_val = np.iinfo(dtype).min
-
-        return (max_val, min_val)
-
     # create tif with array of numpy arrays representing image bands
     # adjust geoTransform according to how many pixels were aggregated
     def __create_tif(self, arr_in, pixels_aggre=1, is_export=False, fn=None):
@@ -197,15 +133,49 @@ class SlidingWindow:
             for x in range(len(arr_in)): 
                 dst.write(arr_in[x], x+1)
 
-    # TODO fix later, not the best way to do this
-    # arr_in: array to be converted
-    # dtype: numpy type to convert to
-    def __arr_dtype_conversion(self, arr_in, dtype):
-        arr_max = np.amax(arr_in)
-        arr_min = np.amin(arr_in)
-        dtype_max = self.__get_max_min(dtype)[0]
-        arr_out = ((arr_in - arr_min)/(arr_max - arr_min)*dtype_max).astype(dtype) 
-        return arr_out
+    # create NDVI image
+    def ndvi(self, red_band, ir_band):
+        bands = np.array(range(self.__img.count))+1
+        if (red_band not in bands or ir_band not in bands):
+            raise ValueError('bands must be in range of %r.' % bands)
+        
+        red = self.__img.read(red_band)
+        ir = self.__img.read(ir_band)
+        ndvi = self.__ndvi(red, ir)
+        # TODO change later
+        ndvi = _Utilities._arr_dtype_conversion(ndvi, np.uint8)
+        self.__create_tif(ndvi)
+
+    # i.e. Normalized Difference Vegetation Index
+    # for viewing live green vegetation
+    # requires red and infrared bands
+    # returns floating point array
+    def __ndvi(self, red_arr, ir_arr):
+        red_arr = red_arr.astype(float)
+        ir_arr = ir_arr.astype(float)
+        return ( (ir_arr - red_arr) / (ir_arr + red_arr) )
+
+    # create binary image
+    def binary(self, band, threshold):
+        bands = np.array(range(self.__img.count))+1
+        if (band not in bands):
+            raise ValueError('band must be in range of %r.' % bands)
+
+        arr = self.__img.read(band)
+        arr = self.__binary(arr, threshold)
+        self.__create_tif(arr)
+
+    # create black and white image
+    # values greater than or equal to threshold percentage will be white
+    # threshold: percent in decimal of maximum
+    # returns array of same data type
+    # TODO can I assume minimum is always 0, how would I handle it otherwise?
+    def __binary(self, arr, threshold):
+        if (threshold < 0 or threshold > 1):
+            raise ValueError('threshold must be between 0 and 1')
+        dtype = arr.dtype
+        maximum = _Utilities._get_max_min(dtype)[0]
+        return np.where(arr < (threshold*maximum), 0, maximum).astype(dtype)
 
     # non-vectorized aggregation method
     # very slow
@@ -252,7 +222,7 @@ class SlidingWindow:
             arr[x] = self._partial_aggregation(arr[x], 0, num_aggre, operation)
 
             # TODO remove later
-            arr[x] = self.__arr_dtype_conversion(arr[x], np.uint8)
+            arr[x] = _Utilities._arr_dtype_conversion(arr[x], np.uint8)
         
         self.__create_tif(arr, pixels_aggre=2**num_aggre)
 
@@ -315,7 +285,7 @@ class SlidingWindow:
         arr_m = self._regression(arr_a, arr_b, num_aggre)
 
         # TODO remove later
-        arr_m = self.__arr_dtype_conversion(arr_m, np.uint8)
+        arr_m = _Utilities._arr_dtype_conversion(arr_m, np.uint8)
 
         self.__create_tif(arr_m, pixels_aggre=2**num_aggre)
 
@@ -358,7 +328,7 @@ class SlidingWindow:
         arr_r = self._pearson(arr_a, arr_b, num_aggre)
 
         # TODO remove later
-        arr_r = self.__arr_dtype_conversion(arr_r, np.uint8)
+        arr_r = _Utilities._arr_dtype_conversion(arr_r, np.uint8)
 
         self.__create_tif(arr_r, pixels_aggre=2**num_aggre)
 
@@ -420,13 +390,13 @@ class SlidingWindow:
         arr = self._fractal(self.__binary(arr, threshold), power_start, power_target)
 
         # TODO remove later
-        arr = self.__arr_dtype_conversion(arr, np.uint16)
+        arr = _Utilities._arr_dtype_conversion(arr, np.uint16)
 
         self.__create_tif(arr, pixels_aggre=2**power_target)
 
     # Compute fractal dimension on 2**power_target wide pixel areas
     def _fractal(self, arr_in, power_start, power_target):
-        if (not self.__is_binary(arr_in)):
+        if (not _Utilities._is_binary(arr_in)):
             raise ValueError('array must be binary')
         if (power_start < 0 or power_start >= power_target):
             raise ValueError('power_start must be nonzero and less than power_target')
@@ -474,7 +444,7 @@ class SlidingWindow:
         arr = self._fractal_3d(arr, num_aggre)
 
         # TODO remove later
-        arr = self.__arr_dtype_conversion(arr, np.uint8)
+        arr = _Utilities._arr_dtype_conversion(arr, np.uint8)
 
         self.__create_tif(arr, pixels_aggre=2**num_aggre)
 
@@ -626,7 +596,7 @@ class SlidingWindow:
             raise ValueError('%s must be a member of %r' % (arr_name, self.__dem_arr_dict))
         
         arr = self.__dem_arr_dict[arr_name]
-        arr = self.__arr_dtype_conversion(arr, np.uint16)
+        arr = _Utilities._arr_dtype_conversion(arr, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.__file_name)[0] + '_' + arr_name + '_mean_w' + str(pixels_aggre) + '.tif'
         self.__create_tif(arr, pixels_aggre=pixels_aggre, fn=fn)
@@ -634,7 +604,7 @@ class SlidingWindow:
     # generate image of aggregated slope values
     def dem_slope(self, cell_width, cell_height):
         slope = self.__slope(cell_width, cell_height)
-        slope = self.__arr_dtype_conversion(slope, np.uint16)
+        slope = _Utilities._arr_dtype_conversion(slope, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.__file_name)[0] + '_slope_w' + str(pixels_aggre) +'.tif'
         self.__create_tif(slope, pixels_aggre=pixels_aggre, fn=fn)
@@ -662,7 +632,7 @@ class SlidingWindow:
     # generate image of aggregated angle of steepest descent, calculated as clockwise angle from north 
     def dem_aspect(self):
         aspect = self.__aspect()
-        aspect = self.__arr_dtype_conversion(aspect, np.uint16)
+        aspect = _Utilities._arr_dtype_conversion(aspect, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.__file_name)[0] + '_aspect_w' + str(pixels_aggre) +'.tif'
         self.__create_tif(aspect, pixels_aggre=pixels_aggre, fn=fn)
@@ -680,7 +650,7 @@ class SlidingWindow:
     # generate image of aggregated profile curvature, second derivative parallel to steepest descent
     def dem_profile(self):
         profile = self.__profile()
-        profile = self.__arr_dtype_conversion(profile, np.uint16)
+        profile = _Utilities._arr_dtype_conversion(profile, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.__file_name)[0] + '_profile_w' + str(pixels_aggre) +'.tif'
         self.__create_tif(profile, pixels_aggre=pixels_aggre, fn=fn)
@@ -703,7 +673,7 @@ class SlidingWindow:
     # generate image of aggregated planform curvature, second derivative perpendicular to steepest descent
     def dem_planform(self):
         planform = self.__planform()
-        planform = self.__arr_dtype_conversion(planform, np.uint16)
+        planform = _Utilities._arr_dtype_conversion(planform, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.__file_name)[0] + '_planform_w' + str(pixels_aggre) +'.tif'
         self.__create_tif(planform, pixels_aggre=pixels_aggre, fn=fn)
@@ -726,7 +696,7 @@ class SlidingWindow:
     # generate image of aggregated standard curvature
     def dem_standard(self):
         standard = self.__standard()
-        standard = self.__arr_dtype_conversion(standard, np.uint16)
+        standard = _Utilities._arr_dtype_conversion(standard, np.uint16)
         
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.__file_name)[0] + '_standard_w' + str(pixels_aggre) +'.tif'
