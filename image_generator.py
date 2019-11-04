@@ -16,9 +16,9 @@ class ImageGenerator:
             os.makedirs(self.test_dir)
 
     def all(self, image_size, prefactor, sigma, mu, noise, angle=0, num_bands=4):
-        self.gauss(image_size=300, prefactor=100, sigma=100, mu=150, noise=0, angle=angle)
-        self.gauss_x(image_size=300, prefactor=100, sigma=100, mu=150 , noise=0, angle=angle)
-        self.cone(image_size=300, mu=150, angle=angle)
+        self.gauss(image_size=image_size, prefactor=prefactor, sigma=sigma, mu=mu, noise=noise, angle=angle)
+        self.gauss_x(image_size=image_size, prefactor=prefactor, sigma=sigma, mu=mu , noise=noise, angle=angle)
+        self.cone(image_size=image_size, mu=mu, angle=angle)
         self.se_gradient(angle=angle)
         self.nw_gradient(angle=angle)
         self.s_gradient(angle=angle)
