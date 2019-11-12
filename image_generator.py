@@ -15,48 +15,51 @@ class ImageGenerator:
         if not os.path.exists(self.test_dir):
             os.makedirs(self.test_dir)
 
-    def all(self, image_size, prefactor, sigma, mu, noise, angle=0, num_bands=4):
-        self.gauss(image_size=image_size, prefactor=prefactor, sigma=sigma, mu=mu, noise=noise, angle=angle)
-        self.gauss_x(image_size=image_size, prefactor=prefactor, sigma=sigma, mu=mu , noise=noise, angle=angle)
-        self.cone(image_size=image_size, mu=mu, angle=angle)
+    def all(self, image_size, sigma, noise=0, angle=0, num_bands=4):
+        self.gauss(image_size=image_size, sigma=sigma, noise=noise, angle=angle)
+        self.gauss_horizontal(image_size=image_size, sigma=sigma, noise=noise, angle=angle)
+        self.gauss_vertical(image_size=image_size, sigma=sigma, noise=noise, angle=angle)
         self.se_gradient(angle=angle)
         self.nw_gradient(angle=angle)
         self.s_gradient(angle=angle)
         self.n_gradient(angle=angle)
         self.random(num_bands=num_bands, angle=angle)
 
-    def gauss(self, image_size, prefactor, sigma, mu, noise, angle=0):
+    def gauss(self, image_size, sigma, noise=0, angle=0):
         arr = np.empty([image_size, image_size])
+        mu = image_size/2
 
         for y in range (image_size):
             for x in range (image_size):
-                value = prefactor*(math.exp(-((x-mu)**2 + (y-mu)**2) / sigma**2) + noise*rand.normal())
+                value = (1/math.sqrt(2*math.pi*sigma**2))*math.exp(-(((x-mu)**2+(y-mu)**2) / (2*sigma**2)) + noise*rand.normal())
                 arr[y][x] = value
 
         arr = _Utilities._arr_dtype_conversion(arr, np.uint8)
-        _Utilities._create_new_tif(arr, self.test_dir + 'gauss_image_no_noise.tif', angle)
+        _Utilities._create_new_tif(arr, self.test_dir + 'gauss_' + str(angle) + 'skew.tif', angle)
 
-    def gauss_x(self, image_size, prefactor, sigma, mu, noise, angle=0):
+    def gauss_horizontal(self, image_size, sigma, noise=0, angle=0):
         arr = np.empty([image_size, image_size])
+        mu = image_size/2
 
         for y in range (image_size):
             for x in range (image_size):
-                value = prefactor*(math.exp(-((x-mu)**2) / sigma**2) + noise*rand.normal())
+                value = (1/math.sqrt(2*math.pi*sigma**2))*math.exp(-((y-mu)**2 / (2*sigma**2)) + noise*rand.normal())
                 arr[y][x] = value
 
         arr = _Utilities._arr_dtype_conversion(arr, np.uint8)
-        _Utilities._create_new_tif(arr, self.test_dir + 'gauss_image_x_small.tif', angle)
+        _Utilities._create_new_tif(arr, self.test_dir + 'gauss_horizontal_' + str(angle) + 'skew.tif', angle)
 
-    def cone(self, image_size, mu, angle=0):
+    def gauss_vertical(self, image_size, sigma, noise=0, angle=0):
         arr = np.empty([image_size, image_size])
+        mu = image_size/2
 
         for y in range (image_size):
             for x in range (image_size):
-                value = (1 - math.sqrt((x-mu)**2 + (y-mu)**2) / image_size)
+                value = (1/math.sqrt(2*math.pi*sigma**2))*math.exp(-((x-mu)**2 / (2*sigma**2)) + noise*rand.normal())
                 arr[y][x] = value
 
         arr = _Utilities._arr_dtype_conversion(arr, np.uint8)
-        _Utilities._create_new_tif(arr, self.test_dir + 'cone_image.tif', angle)
+        _Utilities._create_new_tif(arr, self.test_dir + 'gauss_vertical_' + str(angle) + 'skew.tif', angle)
 
     def se_gradient(self, angle=0):
         arr = np.empty([128, 129]).astype(np.uint8)
@@ -69,7 +72,7 @@ class ImageGenerator:
                 i += 1
             j += 1
         
-        _Utilities._create_new_tif(arr, self.test_dir + 'se_gradient.tif', angle)
+        _Utilities._create_new_tif(arr, self.test_dir + 'se_gradient_' + str(angle) + 'skew.tif', angle)
 
     def nw_gradient(self, angle=0):
         arr = np.empty([128, 129]).astype(np.uint8)
@@ -82,7 +85,7 @@ class ImageGenerator:
                 i -= 1
             j -= 1
         
-        _Utilities._create_new_tif(arr, self.test_dir + 'nw_gradient.tif', angle)
+        _Utilities._create_new_tif(arr, self.test_dir + 'nw_gradient_' + str(angle) + 'skew.tif', angle)
 
     def s_gradient(self, angle=0):
         arr = np.empty([256, 256]).astype(np.uint8)
@@ -93,7 +96,7 @@ class ImageGenerator:
                 arr[y][x] = i
             i += 1
         
-        _Utilities._create_new_tif(arr, self.test_dir + 's_gradient.tif', angle)
+        _Utilities._create_new_tif(arr, self.test_dir + 's_gradient_' + str(angle) + 'skew.tif', angle)
 
     def n_gradient(self, angle=0):
         arr = np.empty([256, 256]).astype(np.uint8)
@@ -104,13 +107,13 @@ class ImageGenerator:
                 arr[y][x] = i
             i -= 1
         
-        _Utilities._create_new_tif(arr, self.test_dir + 'n_gradient.tif', angle)
+        _Utilities._create_new_tif(arr, self.test_dir + 'n_gradient_' + str(angle) + 'skew.tif', angle)
 
     def random(self, num_bands=4, angle=0):
         arr = []
         for _ in range(num_bands):
             arr.append(np.random.random_integers(0,255, [256, 256]).astype(np.uint8))
         
-        _Utilities._create_new_tif(arr, self.test_dir + 'rand.tif', angle)
+        _Utilities._create_new_tif(arr, self.test_dir + 'rand_' + str(angle) + 'skew.tif', angle)
 
     

@@ -7,11 +7,12 @@ import math
 
 img_gen = ImageGenerator()
 slide_window = SlidingWindow('test.tif')
-slide_window_2 = SlidingWindow('gunsite_dem-2-1_export_w64.tif')
+slide_window_2 = SlidingWindow('test_img/gauss_0skew.tif')
 cell_width = 4928
 cell_height = 3264
 
-img_gen.all(image_size=311, prefactor=100, sigma=100, mu=150, noise=0, angle=0, num_bands=4)
+img_gen.all(image_size=300, sigma=75, noise=0, angle=0, num_bands=4)
+img_gen.all(image_size=300, sigma=75, noise=0, angle=45, num_bands=4)
 
 #img = rasterio.open('gunsite_dem-2-1.tif').read(1)
 #plt.imshow(img)
@@ -35,7 +36,7 @@ img_gen.all(image_size=311, prefactor=100, sigma=100, mu=150, noise=0, angle=0, 
 #plt.imshow(img)
 #plt.show()
 
-slide_window_2.dem_import_arrays()
+#slide_window_2.dem_import_arrays()
 #slide_window_2.dem_initialize_arrays()
 #for _ in range(6):
 #    slide_window_2.dem_aggregation_step(1)
@@ -43,7 +44,7 @@ slide_window_2.dem_import_arrays()
 #slide_window_2.dem_mean()
 #slide_window_2.dem_slope(cell_width, cell_height)
 #slide_window_2.dem_aspect()
-slide_window_2.dem_profile()
+#slide_window_2.dem_profile()
 #slide_window_2.dem_planform()
 #slide_window_2.dem_standard()
 

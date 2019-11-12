@@ -48,6 +48,9 @@ class SlidingWindow:
     # TODO add more documentation
     # TODO should all these methods use floating point?
 
+    __file_name = None
+    __img = None
+
     def __init__(self, file_path):
         self.__file_name = os.path.split(file_path)[-1]
         self.__img = rasterio.open(file_path)
@@ -55,11 +58,14 @@ class SlidingWindow:
     def __enter__(self):
         return self
     def __exit__(self, exc_type, exc_val, traceback):
-        self.__img.close()
+        if (self.__img):
+            self.__img.close()
     def close(self):
-        self.__img.close()
+        if (self.__img):
+            self.__img.close()
     def __del__(self):
-        self.__img.close()
+        if (self.__img):
+            self.__img.close()
 
     # operations for image aggregation
     __valid_ops = {'++++', '--++', '-+-+', '+--+', 'MAX', 'MIN'}

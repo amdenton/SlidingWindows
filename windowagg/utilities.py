@@ -35,7 +35,7 @@ class _Utilities:
     # i.e. only contains values of dtype.min and dtype.max
     # TODO should min value be arr_in.dtype.min or 0?
     @staticmethod
-    def __is_binary(self, arr_in):
+    def _is_binary(arr_in):
         max_val = np.amax(arr_in)
         return ((arr_in==0) | (arr_in==max_val)).all()
 

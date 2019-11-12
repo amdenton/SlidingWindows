@@ -1,5 +1,6 @@
 import unittest
 from windowagg.sliding_window import SlidingWindow
+from image_generator import ImageGenerator
 import numpy as np
 import rasterio
 import math
@@ -7,12 +8,15 @@ import os
 
 class TestSlidingWindow(unittest.TestCase):
 
+    img_gen = ImageGenerator()
+    img_gen.all(image_size=300, sigma=75, noise=0, angle=0, num_bands=4)
+    img_gen.all(image_size=300, sigma=75, noise=0, angle=45, num_bands=4)
     fp = 'test_img/'
-    create_tif_test_img = ('SEgradient', 'SEgradient_-45skew', 'Sgradient', 'Sgradient_-45skew')
+    create_tif_test_img = ('se_gradient_0skew', 'se_gradient_45skew', 's_gradient_0skew', 's_gradient_45skew')
 
     def test_aggregation(self):
-        with SlidingWindow(self.fp + 'random.tif') as slide_window:
-            with rasterio.open(self.fp + 'random.tif') as img:
+        with SlidingWindow(self.fp + 'rand_0skew.tif') as slide_window:
+            with rasterio.open(self.fp + 'rand_0skew.tif') as img:
                 arr = img.read(1).astype(float)
 
             sum_all = slide_window._partial_aggregation(arr, 0, 5, '++++')
@@ -70,8 +74,8 @@ class TestSlidingWindow(unittest.TestCase):
         self.assertTrue(np.array_equal(partial_minimum, brute_minimum))
 
     def test_regression(self):
-        with SlidingWindow(self.fp + 'random4band.tif') as slide_window:
-            with rasterio.open(self.fp + 'random4band.tif') as img:
+        with SlidingWindow(self.fp + 'rand_0skew.tif') as slide_window:
+            with rasterio.open(self.fp + 'rand_0skew.tif') as img:
                 arr1 = img.read(1).astype(float)
                 arr2 = img.read(2).astype(float)
             arr_good = slide_window._regression(arr1, arr2, 5)
@@ -80,7 +84,7 @@ class TestSlidingWindow(unittest.TestCase):
         self.assertTrue(np.allclose(arr_good, arr_brute))
 
     def test_dem_aggregation(self):
-        with SlidingWindow(self.fp + 'SEgradient.tif') as slide_window:
+        with SlidingWindow(self.fp + 'se_gradient_0skew.tif') as slide_window:
             slide_window.dem_initialize_arrays()
             slide_window.dem_aggregation_step(5)
             arr_dic = slide_window.dem_arr_dict
@@ -167,6 +171,8 @@ class TestSlidingWindow(unittest.TestCase):
         finally:
             if os.path.exists(new_path):
                 os.remove(new_path)
+
+                
 
 if __name__ == '__main__':
     unittest.main()
