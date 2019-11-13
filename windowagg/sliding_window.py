@@ -50,10 +50,14 @@ class SlidingWindow:
 
     __file_name = None
     __img = None
+    __cell_width = None
+    __cell_height = None
 
-    def __init__(self, file_path):
+    def __init__(self, file_path, cell_width=1, cell_height=1):
         self.__file_name = os.path.split(file_path)[-1]
         self.__img = rasterio.open(file_path)
+        self.__cell_width = cell_width
+        self.__cell_height = cell_height
 
     def __enter__(self):
         return self
@@ -608,15 +612,15 @@ class SlidingWindow:
         self.__create_tif(arr, pixels_aggre=pixels_aggre, fn=fn)
 
     # generate image of aggregated slope values
-    def dem_slope(self, cell_width, cell_height):
-        slope = self.__slope(cell_width, cell_height)
+    def dem_slope(self):
+        slope = self.__slope()
         slope = _Utilities._arr_dtype_conversion(slope, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.__file_name)[0] + '_slope_w' + str(pixels_aggre) +'.tif'
         self.__create_tif(slope, pixels_aggre=pixels_aggre, fn=fn)
 
     # return array of aggregated slope values
-    def __slope(self, cell_width, cell_height):
+    def __slope(self):
         if (self.__dem_arr_dict['z'].size == 0):
             raise ValueError('Arrays must be initialized before calculating slope')
 
@@ -624,14 +628,12 @@ class SlidingWindow:
         transform = self.__img.profile['transform']
         map_width = math.sqrt(transform[0]**2 + transform[3]**2)
         map_height = math.sqrt(transform[1]**2 + transform[4]**2)
-        xz = self.__dem_arr_dict['xz']
-        yz = self.__dem_arr_dict['yz']
+        z, xz, yz = tuple (self.__dem_arr_dict[i] for i in ('z', 'xz', 'yz'))
+        xx = (pixels_aggre^2-1)/12
+        b0 = xz/xx
+        b1 = yz/xx
 
-        slope_x = xz*12/(pixels_aggre**2 - 1)
-        slope_y = yz*12/(pixels_aggre**2 - 1)
-        len_opp = np.absolute(slope_x) + np.absolute(slope_y)
-        len_adj = np.sqrt( ((cell_width*map_width)**2) + ((cell_height*map_height)**2) )
-        slope = np.arctan(len_opp/len_adj)
+        slope = np.sqrt(np.power(b0,2)+np.power(b1,2))
 
         return slope
 
@@ -668,12 +670,17 @@ class SlidingWindow:
 
         pixels_aggre = self.__dem_pixels_aggre
         z, xz, yz, yyz, xxz, xyz = tuple (self.__dem_arr_dict[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
+        xxxxminusxx2 = (pixels_aggre^4 - 5*pixels_aggre^2 + 4)/180
+        xx = (pixels_aggre^2-1)/12
+        a00 = (xxz - xx*z)/xxxxminusxx2
+        a10 = xyz/(2*np.power(xx,2))
+        a11 = (yyz - xx*z)/xxxxminusxx2
+        b0 = xz/xx
+        b1 = yz/xx
+        slope = np.sqrt(np.power(b0,2)+np.power(b1,2))
 
-        a00 = (180*xxz - 15*(pixels_aggre**2)*z + 15*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
-        a10 = 72*xyz / ((pixels_aggre**4) - 2*(pixels_aggre**2) + 1)
-        a11 = (180*yyz - 15*(pixels_aggre**2)*z + 15*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
-        
-        profile = (a00*(xz**2) + 2*a10*xz*yz + a11*(yz*2)) / ((xz**2) + (yz**2))
+        profile = 2*(a00*b0 + a11*b1 + a10*(b0+b1))/slope
+
         return profile
 
     # generate image of aggregated planform curvature, second derivative perpendicular to steepest descent
@@ -690,13 +697,17 @@ class SlidingWindow:
             raise ValueError('Arrays must be initialized before calculating planform')
 
         pixels_aggre = self.__dem_pixels_aggre
-        z, xz, yz, yyz, xxz, xyz = tuple (self.__dem_arr_dict[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
-
-        a00 = (180*xxz - 15*(pixels_aggre**2)*z + 15*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
-        a10 = 72*xyz / ((pixels_aggre**4) - 2*(pixels_aggre**2) + 1)
-        a11 = (180*yyz - 15*(pixels_aggre**2)*z + 15*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
+        z, xz, yz, yyz, xxz = tuple (self.__dem_arr_dict[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz'))
+        xxxxminusxx2 = (pixels_aggre^4 - 5*pixels_aggre^2 + 4)/180
+        xx = (pixels_aggre^2-1)/12
+        a00 = (xxz - xx*z)/xxxxminusxx2
+        a11 = (yyz - xx*z)/xxxxminusxx2
+        b0 = xz/xx
+        b1 = yz/xx
         
-        planform = (a00*(yz**2) - 2*a10*xz*yz + a11*(xz*2)) / ((xz**2) + (yz**2))   
+        ## TODO does it matter perpendicular direction the calculation is in?
+        planform = (-2*a00*np.power(b0,2) + 2*a11*np.power(b1,2)) / (np.power(b0,2) + np.power(b1,2))
+
         return planform
 
     # generate image of aggregated standard curvature
@@ -714,9 +725,16 @@ class SlidingWindow:
             raise ValueError('Arrays must be initialized before calculating standard curvature')
         
         pixels_aggre = self.__dem_pixels_aggre
-        z, yyz, xxz = tuple (self.__dem_arr_dict[i] for i in ('z', 'yyz', 'xxz'))
+        z, xz, yz, yyz, xxz, xyz = tuple (self.__dem_arr_dict[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
+        xxxxminusxx2 = (pixels_aggre^4 - 5*pixels_aggre^2 + 4)/180
+        xx = (pixels_aggre^2-1)/12
+        a00 = (xxz - xx*z)/xxxxminusxx2
+        a10 = xyz/(2*np.power(xx,2))
+        a11 = (yyz - xx*z)/xxxxminusxx2
+        b0 = xz/xx
+        b1 = yz/xx
+        slope = np.sqrt(np.power(b0,2)+np.power(b1,2))
 
-        a00 = (180*xxz - 15*(pixels_aggre**2)*z + 15*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
-        a11 = (180*yyz - 15*(pixels_aggre**2)*z + 15*z) / (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)
-        standard = (a00 + a11) / 2
+        standard = (a10*(b0+b1)*slope + a00*b0*(-b0+slope) + a11*b1*(b1+slope)) / (np.power(b0 ,2) + np.power(b1, 2))
+
         return standard
