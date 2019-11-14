@@ -43,7 +43,7 @@ cell_height = 3264
 #    slide_window_2.dem_aggregation_step(1)
 #    slide_window_2.dem_export_arrays()
 #slide_window_2.dem_mean()
-#slide_window_2.dem_slope()
+#slide_window_2.dem_slope(1,1)
 #slide_window_2.dem_aspect()
 #slide_window_2.dem_profile()
 #slide_window_2.dem_planform()

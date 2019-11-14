@@ -16,6 +16,7 @@ class ImageGenerator:
             os.makedirs(self.test_dir)
 
     def all(self, image_size, sigma, noise=0, angle=0, num_bands=4):
+        star(self, image_size=image_size, angle=0):
         self.gauss(image_size=image_size, sigma=sigma, noise=noise, angle=angle)
         self.gauss_horizontal(image_size=image_size, sigma=sigma, noise=noise, angle=angle)
         self.gauss_vertical(image_size=image_size, sigma=sigma, noise=noise, angle=angle)
@@ -24,6 +25,36 @@ class ImageGenerator:
         self.s_gradient(angle=angle)
         self.n_gradient(angle=angle)
         self.random(num_bands=num_bands, angle=angle)
+
+    def star(self, image_size=21, angle=0):
+        arr = np.zeros([image_size,image_size])
+
+        i=j=1
+        decx = decy = False
+        for y in range(image_size):
+            i=j
+            for x in range(image_size):
+                arr[y][x] = i
+                if (decx):
+                    i -= 1
+                elif (i == j+math.ceil(image_size/2)-1):
+                    decx = True
+                    if (image_size%2 == 1):
+                        i -= 1
+                else:
+                    i += 1
+            decx = False
+            if (decy):
+                j -= 1
+            elif (j == math.ceil(image_size/2)):
+                decy = True
+                if (image_size%2 == 1):
+                        j -= 1
+            else:
+                j += 1
+            
+        arr = _Utilities._arr_dtype_conversion(arr, np.uint8)
+        _Utilities._create_new_tif(arr, self.test_dir + 'star_' + str(angle) + 'skew.tif', angle)
 
     def gauss(self, image_size, sigma, noise=0, angle=0):
         arr = np.empty([image_size, image_size])
