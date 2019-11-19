@@ -16,7 +16,7 @@ class ImageGenerator:
             os.makedirs(self.test_dir)
 
     def all(self, image_size, sigma, noise=0, angle=0, num_bands=4):
-        star(self, image_size=image_size, angle=0):
+        self.star(image_size=image_size, angle=angle)
         self.gauss(image_size=image_size, sigma=sigma, noise=noise, angle=angle)
         self.gauss_horizontal(image_size=image_size, sigma=sigma, noise=noise, angle=angle)
         self.gauss_vertical(image_size=image_size, sigma=sigma, noise=noise, angle=angle)
