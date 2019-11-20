@@ -644,6 +644,33 @@ class SlidingWindow:
 
         return slope
 
+        # generate image of aggregated slope values
+    def dem_slope_angle(self):
+        slope_angle = self.__slope_angle()
+        slope_angle = _Utilities._arr_dtype_conversion(slope_angle, np.uint16)
+        pixels_aggre = self.__dem_pixels_aggre
+        fn = os.path.splitext(self.__file_name)[0] + '_slope_angle_w' + str(pixels_aggre) +'.tif'
+        self.__create_tif(slope_angle, pixels_aggre=pixels_aggre, fn=fn)
+
+    # return array of aggregated slope values
+    def __slope_angle(self):
+        if (self.__dem_arr_dict['z'].size == 0):
+            raise ValueError('Arrays must be initialized before calculating slope')
+
+        w = self.__real_width
+        h = self.__real_height
+        pixels_aggre = self.__dem_pixels_aggre
+        xz, yz = tuple (self.__dem_arr_dict[i] for i in ('xz', 'yz'))
+
+        slope_x = xz*12/(pixels_aggre**2 - 1)
+        slope_y = yz*12/(pixels_aggre**2 - 1)
+        mag = np.sqrt(np.power(slope_x, 2) + np.power(slope_y, 2))
+        len_opp = (np.power(slope_x, 2) + np.power(slope_y, 2)) / mag
+        len_adj = np.sqrt( ((w)**2) + ((h)**2) )
+        slope_angle = np.arctan(len_opp/len_adj)
+
+        return slope_angle
+
     # generate image of aggregated angle of steepest descent, calculated as clockwise angle from north 
     def dem_aspect(self):
         aspect = self.__aspect()
@@ -718,6 +745,7 @@ class SlidingWindow:
         a11 = (yyz - xx*z)/xxxxminusxx2
         b0 = xz/xx
         b1 = yz/xx
+
         
         # directional derivative of the slope of the following equation
         # in the direction perpendicular to slope, derived in mathematica

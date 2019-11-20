@@ -40,7 +40,7 @@ class _Utilities:
         return ((arr_in==0) | (arr_in==max_val)).all()
 
     @staticmethod
-    def _create_new_tif(arr_in, fn, angle=0):
+    def _create_new_tif(arr_in, fn, angle=0, x_offset=1, y_offset=1):
         if (type(arr_in) == np.ndarray):
             arr_in = [arr_in]
         dtype = arr_in[0].dtype
@@ -52,7 +52,7 @@ class _Utilities:
                 raise ValueError('arrays must have the same shape')
 
         rotate = math.pi/2
-        transform = affine.Affine(math.cos(angle), -math.cos(angle+rotate), 1, math.sin(angle), -math.sin(angle+rotate), 1)
+        transform = affine.Affine(math.cos(angle)*x_offset, -math.cos(angle+rotate)*y_offset, 1, math.sin(angle)*x_offset, -math.sin(angle+rotate)*y_offset, 1)
 
         # TODO should nodata be 0?
         # TODO is the crs appropriate?

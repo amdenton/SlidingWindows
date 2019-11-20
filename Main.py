@@ -6,14 +6,13 @@ import matplotlib.pyplot as plt
 import math
 
 img_gen = ImageGenerator()
-img_gen.all(image_size=300, sigma=75, noise=0, angle=0, num_bands=4)
-#img_gen.all(image_size=300, sigma=75, noise=0, angle=45, num_bands=4)
+img_gen.all()
 
 #slide_window = SlidingWindow('test.tif')
-slide_window_2 = SlidingWindow('test_img/gauss_0skew.tif')
-#slide_window_2 = SlidingWindow('gunsite_dem-2-1_export_w64.tif',cell_width=4928, cell_height=3264)
+#slide_window_2 = SlidingWindow('test_img/se_gradient_0skew_1-1offset.tif')
+#slide_window_2 = SlidingWindow('gunsite_dem-2-1_export_w64.tif', cell_width=4928, cell_height=3264)
 
-#img = rasterio.open('gauss_0skew_planform_w32.tif').read(1)
+#img = rasterio.open('test_img/gauss_0skew.tif').read(1)
 #plt.imshow(img)
 #plt.show()
 
@@ -24,6 +23,7 @@ slide_window_2 = SlidingWindow('test_img/gauss_0skew.tif')
 #    slide_window_2.dem_export_arrays()
 #slide_window_2.dem_mean()
 #slide_window_2.dem_slope()
+#slide_window_2.dem_slope_angle()
 #slide_window_2.dem_aspect()
 #slide_window_2.dem_profile()
 #slide_window_2.dem_planform()
