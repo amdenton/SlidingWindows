@@ -5,18 +5,25 @@ import numpy as np
 import rasterio
 import math
 import os
+import shutil
 
 class TestSlidingWindow(unittest.TestCase):
 
+    # used in tearDownClass method
+    test_dir = 'test_img/'
+
     img_gen = ImageGenerator()
-    img_gen.all(image_size=300, sigma=75, noise=0, angle=0, num_bands=4)
-    img_gen.all(image_size=300, sigma=75, noise=0, angle=45, num_bands=4)
-    fp = 'test_img/'
-    create_tif_test_img = ('se_gradient_0skew', 'se_gradient_45skew', 's_gradient_0skew', 's_gradient_45skew')
+    img_gen.test_dir = test_dir
+
+    # remove test folder after testing completes
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(TestSlidingWindow.test_dir)
 
     def test_aggregation(self):
-        with SlidingWindow(self.fp + 'rand_0skew.tif') as slide_window:
-            with rasterio.open(self.fp + 'rand_0skew.tif') as img:
+        path = self.img_gen.random()
+        with SlidingWindow(path) as slide_window:
+            with rasterio.open(path) as img:
                 arr = img.read(1).astype(float)
 
             sum_all = slide_window._partial_aggregation(arr, 0, 5, '++++')
@@ -74,8 +81,9 @@ class TestSlidingWindow(unittest.TestCase):
         self.assertTrue(np.array_equal(partial_minimum, brute_minimum))
 
     def test_regression(self):
-        with SlidingWindow(self.fp + 'rand_0skew.tif') as slide_window:
-            with rasterio.open(self.fp + 'rand_0skew.tif') as img:
+        path = self.img_gen.random()
+        with SlidingWindow(path) as slide_window:
+            with rasterio.open(path) as img:
                 arr1 = img.read(1).astype(float)
                 arr2 = img.read(2).astype(float)
             arr_good = slide_window._regression(arr1, arr2, 5)
@@ -84,7 +92,8 @@ class TestSlidingWindow(unittest.TestCase):
         self.assertTrue(np.allclose(arr_good, arr_brute))
 
     def test_dem_aggregation(self):
-        with SlidingWindow(self.fp + 'se_gradient_0skew.tif') as slide_window:
+        path = self.img_gen.random()
+        with SlidingWindow(path) as slide_window:
             slide_window.dem_initialize_arrays()
             slide_window.dem_aggregation_step(5)
             arr_dic = slide_window.dem_arr_dict
@@ -102,22 +111,24 @@ class TestSlidingWindow(unittest.TestCase):
 
         pix_agg_1 = 2**agg_num_1
         pix_agg_2 = 2**agg_num_2
-        for path in self.create_tif_test_img:
-            with self.subTest(path=path):
-                paths = (self.fp+path+'.tif', path+'_z_mean_w'+str(pix_agg_1)+'.tif', path+'_z_mean_w'+str(pix_agg_2)+'.tif')
-                try:
-                    with SlidingWindow(paths[0]) as slide_window:
+        paths = [self.img_gen.random(), self.img_gen.random(angle=45), self.img_gen.random(angle=75)]
+        # initalize to remove files later
+        path1 = path2 = ''
+        for i in range(len(paths)):
+            try:
+                with self.subTest(path=paths[i]):
+                    with SlidingWindow(paths[i]) as slide_window:
                         slide_window.dem_initialize_arrays()
                         slide_window.dem_aggregation_step(agg_num_1)
-                        slide_window.dem_mean('z')
+                        path1 = slide_window.dem_mean('z')
                         slide_window.dem_aggregation_step(agg_num_2 - agg_num_1)
-                        slide_window.dem_mean('z')
+                        path2 = slide_window.dem_mean('z')
 
-                    with rasterio.open(paths[0]) as img:
+                    with rasterio.open(paths[i]) as img:
                         transform = img.profile['transform']
-                    with rasterio.open(paths[1]) as img:
+                    with rasterio.open(path1) as img:
                         transform_1 = img.profile['transform']
-                    with rasterio.open(paths[2]) as img:
+                    with rasterio.open(path2) as img:
                         transform_2 = img.profile['transform']
 
                     map_width = math.sqrt(transform[0]**2 + transform[3]**2)
@@ -135,24 +146,20 @@ class TestSlidingWindow(unittest.TestCase):
                     self.assertTrue(transform_2[3] == transform[3]*pix_agg_2)
                     self.assertTrue(transform_2[4] == transform[4]*pix_agg_2)
                     self.assertTrue(transform_2[5] == (transform[5] - (map_height*(pix_agg_2 - 1)/2)))
-
-                    for i in range(1, len(paths)):
-                        self.assertTrue(os.path.exists(paths[i]))
-
-                finally:
-                    for i in range(1, len(paths)):
-                        if os.path.exists(paths[i]):
-                            os.remove(paths[i])
+            finally:
+                if (os.path.exists(path1)):
+                    os.remove(path1)
+                if (os.path.exists(path2)):
+                        os.remove(path2)
 
     def test_create_tif_export(self):
-        num_aggre = 0
-        path = self.fp + self.create_tif_test_img[1] + '.tif'
-        new_path = self.create_tif_test_img[1] + '_export_w' + str(2**num_aggre) + '.tif'
+        num_aggre = 5
+        path = self.img_gen.random()
         try:
             with SlidingWindow(path) as slide_window:
                 slide_window.dem_initialize_arrays()
                 slide_window.dem_aggregation_step(num_aggre)
-                slide_window.dem_export_arrays()
+                new_path = slide_window.dem_export_arrays()
             self.assertTrue(os.path.exists(new_path))
 
             with rasterio.open(path) as img:
@@ -167,9 +174,8 @@ class TestSlidingWindow(unittest.TestCase):
 
             for i in range(6):
                 self.assertTrue(transform_new[i] == transform[i])
-            
         finally:
-            if os.path.exists(new_path):
+            if (os.path.exists(new_path)):
                 os.remove(new_path)
 
                 

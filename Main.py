@@ -4,9 +4,10 @@ from image_generator import ImageGenerator
 import rasterio
 import matplotlib.pyplot as plt
 import math
+import os
 
-img_gen = ImageGenerator()
-img_gen.all()
+#img_gen = ImageGenerator()
+#img_gen.all()
 
 #slide_window = SlidingWindow('test.tif')
 #slide_window_2 = SlidingWindow('test_img/se_gradient_0skew_1-1offset.tif')

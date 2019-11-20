@@ -148,6 +148,8 @@ class SlidingWindow:
             for x in range(len(arr_in)): 
                 dst.write(arr_in[x], x+1)
 
+        return fn
+
     # create NDVI image
     def ndvi(self, red_band, ir_band):
         bands = np.array(range(self.__img.count))+1
@@ -159,7 +161,7 @@ class SlidingWindow:
         ndvi = self.__ndvi(red, ir)
         # TODO change later
         ndvi = _Utilities._arr_dtype_conversion(ndvi, np.uint8)
-        self.__create_tif(ndvi)
+        return self.__create_tif(ndvi)
 
     # i.e. Normalized Difference Vegetation Index
     # for viewing live green vegetation
@@ -178,7 +180,7 @@ class SlidingWindow:
 
         arr = self.__img.read(band)
         arr = self.__binary(arr, threshold)
-        self.__create_tif(arr)
+        return self.__create_tif(arr)
 
     # create black and white image
     # values greater than or equal to threshold percentage will be white
@@ -239,7 +241,7 @@ class SlidingWindow:
             # TODO remove later
             arr[x] = _Utilities._arr_dtype_conversion(arr[x], np.uint8)
         
-        self.__create_tif(arr, pixels_aggre=2**num_aggre)
+        return self.__create_tif(arr, pixels_aggre=2**num_aggre)
 
     # do power_target-power_start aggregations on window
     # starting with delta=2**power_start aggregation offset
@@ -302,7 +304,7 @@ class SlidingWindow:
         # TODO remove later
         arr_m = _Utilities._arr_dtype_conversion(arr_m, np.uint8)
 
-        self.__create_tif(arr_m, pixels_aggre=2**num_aggre)
+        return self.__create_tif(arr_m, pixels_aggre=2**num_aggre)
 
     # Do num_aggre aggregations and return the regression slope between two bands
     # returns floating point array
@@ -345,7 +347,7 @@ class SlidingWindow:
         # TODO remove later
         arr_r = _Utilities._arr_dtype_conversion(arr_r, np.uint8)
 
-        self.__create_tif(arr_r, pixels_aggre=2**num_aggre)
+        return self.__create_tif(arr_r, pixels_aggre=2**num_aggre)
 
     # Do num_aggre aggregations and return the regression slope between two bands
     # returns floating point array
@@ -407,7 +409,7 @@ class SlidingWindow:
         # TODO remove later
         arr = _Utilities._arr_dtype_conversion(arr, np.uint16)
 
-        self.__create_tif(arr, pixels_aggre=2**power_target)
+        return self.__create_tif(arr, pixels_aggre=2**power_target)
 
     # Compute fractal dimension on 2**power_target wide pixel areas
     def _fractal(self, arr_in, power_start, power_target):
@@ -461,7 +463,7 @@ class SlidingWindow:
         # TODO remove later
         arr = _Utilities._arr_dtype_conversion(arr, np.uint8)
 
-        self.__create_tif(arr, pixels_aggre=2**num_aggre)
+        return self.__create_tif(arr, pixels_aggre=2**num_aggre)
 
     # TODO does this need to be binary too? probably not?
     # TODO should this have a power_start?
@@ -506,7 +508,7 @@ class SlidingWindow:
         for key in self.__dem_arr_dict:
             export.append(self.__dem_arr_dict[key])
         fn = os.path.splitext(self.__file_name)[0] + '_export_w' + str(pixels_aggre) +'.tif'
-        self.__create_tif(export, pixels_aggre=pixels_aggre, is_export=True, fn=fn)
+        return self.__create_tif(export, pixels_aggre=pixels_aggre, is_export=True, fn=fn)
 
     def dem_import_arrays(self):
         if (self.__img.count != len(self.__dem_arr_dict)):
@@ -614,7 +616,7 @@ class SlidingWindow:
         arr = _Utilities._arr_dtype_conversion(arr, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.__file_name)[0] + '_' + arr_name + '_mean_w' + str(pixels_aggre) + '.tif'
-        self.__create_tif(arr, pixels_aggre=pixels_aggre, fn=fn)
+        return self.__create_tif(arr, pixels_aggre=pixels_aggre, fn=fn)
 
     # generate image of aggregated slope values
     def dem_slope(self):
@@ -622,7 +624,7 @@ class SlidingWindow:
         slope = _Utilities._arr_dtype_conversion(slope, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.__file_name)[0] + '_slope_w' + str(pixels_aggre) +'.tif'
-        self.__create_tif(slope, pixels_aggre=pixels_aggre, fn=fn)
+        return self.__create_tif(slope, pixels_aggre=pixels_aggre, fn=fn)
 
     # return array of aggregated slope values
     def __slope(self):
@@ -650,7 +652,7 @@ class SlidingWindow:
         slope_angle = _Utilities._arr_dtype_conversion(slope_angle, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.__file_name)[0] + '_slope_angle_w' + str(pixels_aggre) +'.tif'
-        self.__create_tif(slope_angle, pixels_aggre=pixels_aggre, fn=fn)
+        return self.__create_tif(slope_angle, pixels_aggre=pixels_aggre, fn=fn)
 
     # return array of aggregated slope values
     def __slope_angle(self):
@@ -677,7 +679,7 @@ class SlidingWindow:
         aspect = _Utilities._arr_dtype_conversion(aspect, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.__file_name)[0] + '_aspect_w' + str(pixels_aggre) +'.tif'
-        self.__create_tif(aspect, pixels_aggre=pixels_aggre, fn=fn)
+        return self.__create_tif(aspect, pixels_aggre=pixels_aggre, fn=fn)
 
     # return array of aggregated angle of steepest descent, calculated as clockwise angle from north
     def __aspect(self):
@@ -695,7 +697,7 @@ class SlidingWindow:
         profile = _Utilities._arr_dtype_conversion(profile, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.__file_name)[0] + '_profile_w' + str(pixels_aggre) +'.tif'
-        self.__create_tif(profile, pixels_aggre=pixels_aggre, fn=fn)
+        return self.__create_tif(profile, pixels_aggre=pixels_aggre, fn=fn)
 
     # return array of aggregated profile curvature, second derivative parallel to steepest descent
     def __profile(self):
@@ -727,7 +729,7 @@ class SlidingWindow:
         planform = _Utilities._arr_dtype_conversion(planform, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.__file_name)[0] + '_planform_w' + str(pixels_aggre) +'.tif'
-        self.__create_tif(planform, pixels_aggre=pixels_aggre, fn=fn)
+        return self.__create_tif(planform, pixels_aggre=pixels_aggre, fn=fn)
 
     # return array of aggregated planform curvature, second derivative perpendicular to steepest descent
     def __planform(self):
@@ -761,7 +763,7 @@ class SlidingWindow:
         
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.__file_name)[0] + '_standard_w' + str(pixels_aggre) +'.tif'
-        self.__create_tif(standard, pixels_aggre=pixels_aggre, fn=fn)
+        return self.__create_tif(standard, pixels_aggre=pixels_aggre, fn=fn)
     
     # return array of aggregated standard curvature
     def __standard(self):
