@@ -10,7 +10,7 @@ import os
 class ImageGenerator:
 
     test_dir = 'test_img/'
-    __dtype = np.uint16
+    dtype = np.uint16
 
     def __init__(self):
         if not os.path.exists(self.test_dir):
@@ -55,7 +55,7 @@ class ImageGenerator:
                 j += 1
             
         fn = self.test_dir + 'star_' + str(angle) + 'skew_' + str(x_offset) + '-' + str(y_offset) + 'offset.tif'
-        _Utilities._create_new_tif(arr.astype(self.__dtype), fn, angle, x_offset, y_offset)
+        _Utilities._create_new_tif(arr.astype(self.dtype), fn, angle, x_offset, y_offset)
         return fn
 
     def gauss(self, image_size=300, sigma=None, mu=None, noise=0, angle=0, x_offset=1, y_offset=1):
@@ -73,7 +73,7 @@ class ImageGenerator:
                 value = (1/math.sqrt(2*math.pi*sigma**2))*math.exp(-(((x-mu)**2+(y-mu)**2) / (2*sigma**2)) + noise*rand.normal())
                 arr[y][x] = value
 
-        arr = _Utilities._arr_dtype_conversion(arr, self.__dtype)
+        arr = _Utilities._arr_dtype_conversion(arr, self.dtype)
         fn = self.test_dir + 'gauss_' + str(angle) + 'skew_' + str(x_offset) + '-' + str(y_offset) + 'offset.tif'
         _Utilities._create_new_tif(arr, fn, angle, x_offset, y_offset)
         return fn
@@ -93,7 +93,7 @@ class ImageGenerator:
                 value = (1/math.sqrt(2*math.pi*sigma**2))*math.exp(-((y-mu)**2 / (2*sigma**2)) + noise*rand.normal())
                 arr[y][x] = value
 
-        arr = _Utilities._arr_dtype_conversion(arr, self.__dtype)
+        arr = _Utilities._arr_dtype_conversion(arr, self.dtype)
         fn = self.test_dir + 'gauss_horizontal_' + str(angle) + 'skew_' + str(x_offset) + '-' + str(y_offset) + 'offset.tif'
         _Utilities._create_new_tif(arr, fn, angle, x_offset, y_offset)
         return fn
@@ -113,7 +113,7 @@ class ImageGenerator:
                 value = (1/math.sqrt(2*math.pi*sigma**2))*math.exp(-((x-mu)**2 / (2*sigma**2)) + noise*rand.normal())
                 arr[y][x] = value
 
-        arr = _Utilities._arr_dtype_conversion(arr, self.__dtype)
+        arr = _Utilities._arr_dtype_conversion(arr, self.dtype)
         fn = self.test_dir + 'gauss_vertical_' + str(angle) + 'skew_' + str(x_offset) + '-' + str(y_offset) + 'offset.tif'
         _Utilities._create_new_tif(arr, fn, angle, x_offset, y_offset)
         return fn
@@ -130,13 +130,13 @@ class ImageGenerator:
             j += 1
         
         fn = self.test_dir + 'se_gradient_' + str(angle) + 'skew_' + str(x_offset) + '-' + str(y_offset) + 'offset.tif'
-        _Utilities._create_new_tif(arr.astype(self.__dtype), fn, angle, x_offset, y_offset)
+        _Utilities._create_new_tif(arr.astype(self.dtype), fn, angle, x_offset, y_offset)
         return fn
 
     def nw_gradient(self, image_size=300, angle=0, x_offset=1, y_offset=1):
         arr = np.empty([image_size, image_size])
 
-        i = j = np.iinfo(self.__dtype).max
+        i = j = np.iinfo(self.dtype).max
         for y in range(arr.shape[0]):
             i = j
             for x in range(arr.shape[1]):
@@ -145,7 +145,7 @@ class ImageGenerator:
             j -= 1
         
         fn = self.test_dir + 'nw_gradient_' + str(angle) + 'skew_' + str(x_offset) + '-' + str(y_offset) + 'offset.tif'
-        _Utilities._create_new_tif(arr.astype(self.__dtype), fn, angle, x_offset, y_offset)
+        _Utilities._create_new_tif(arr.astype(self.dtype), fn, angle, x_offset, y_offset)
         return fn
 
     def s_gradient(self, image_size=300, angle=0, x_offset=1, y_offset=1):
@@ -158,29 +158,27 @@ class ImageGenerator:
             i += 1
         
         fn = self.test_dir + 's_gradient_' + str(angle) + 'skew_' + str(x_offset) + '-' + str(y_offset) + 'offset.tif'
-        _Utilities._create_new_tif(arr.astype(self.__dtype), fn, angle, x_offset, y_offset)
+        _Utilities._create_new_tif(arr.astype(self.dtype), fn, angle, x_offset, y_offset)
         return fn
 
     def n_gradient(self, image_size=300, angle=0, x_offset=1, y_offset=1):
         arr = np.empty([image_size, image_size])
 
-        i = np.iinfo(self.__dtype).max
+        i = np.iinfo(self.dtype).max
         for y in range(arr.shape[0]):
             for x in range(arr.shape[1]):
                 arr[y][x] = i
             i -= 1
         
         fn = self.test_dir + 'n_gradient_' + str(angle) + 'skew_' + str(x_offset) + '-' + str(y_offset) + 'offset.tif'
-        _Utilities._create_new_tif(arr.astype(self.__dtype), fn, angle, x_offset, y_offset)
+        _Utilities._create_new_tif(arr.astype(self.dtype), fn, angle, x_offset, y_offset)
         return fn
 
     def random(self, image_size=300, num_bands=4, angle=0, x_offset=1, y_offset=1):
         arr = []
         for _ in range(num_bands):
-            arr.append(np.random.randint(0, np.iinfo(self.__dtype).max, [image_size, image_size]).astype(self.__dtype))
+            arr.append(np.random.randint(0, np.iinfo(self.dtype).max, [image_size, image_size]).astype(self.dtype))
         
         fn = self.test_dir + 'rand_' + str(angle) + 'skew_' + str(x_offset) + '-' + str(y_offset) + 'offset.tif'
         _Utilities._create_new_tif(arr, fn, angle, x_offset, y_offset)
         return fn
-
-    

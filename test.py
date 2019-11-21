@@ -105,6 +105,65 @@ class TestSlidingWindow(unittest.TestCase):
         for key in arr_dic:
             self.assertTrue(np.array_equal(arr_dic[key], arr_dic_brute[key]))
 
+    def test_dem_aggregation2(self):
+        # image size must be even
+        image_size = 4
+        path = self.img_gen.random(image_size=image_size, num_bands=1)
+        with rasterio.open(path) as img:
+                arr = img.read(1).astype(float)
+        with SlidingWindow(path) as slide_window:
+            slide_window.dem_initialize_arrays()
+            arr_dict = slide_window.dem_arr_dict
+            new_arr_dict = {}
+            new_arr_dict['z'] = arr
+            for key in arr_dict:
+                if (key != 'z'):
+                    self.assertTrue(np.count_nonzero(arr_dict[key]) == 0)
+                elif (key == 'z'):
+                    self.assertTrue(np.array_equal(arr_dict[key], arr))
+
+            slide_window.dem_aggregation_step(2)
+            arr_dict = slide_window.dem_arr_dict
+            new_arr_dict['z'] = np.array([np.sum(arr)/16])
+
+            new_arr_dict['xz'] = np.zeros([1])
+            new_arr_dict['xz'][0] += -1.5*arr[0][0] + -.5*arr[0][1] + .5*arr[0][2] + 1.5*arr[0][3]
+            new_arr_dict['xz'][0] += -1.5*arr[1][0] + -.5*arr[1][1] + .5*arr[1][2] + 1.5*arr[1][3]
+            new_arr_dict['xz'][0] += -1.5*arr[2][0] + -.5*arr[2][1] + .5*arr[2][2] + 1.5*arr[2][3]
+            new_arr_dict['xz'][0] += -1.5*arr[3][0] + -.5*arr[3][1] + .5*arr[3][2] + 1.5*arr[3][3]
+            new_arr_dict['xz'][0] /= 16
+
+            new_arr_dict['xxz'] = np.zeros([1])
+            new_arr_dict['xxz'][0] += (-1.5)**2*arr[0][0] + (-.5)**2*arr[0][1] + .5**2*arr[0][2] + 1.5**2*arr[0][3]
+            new_arr_dict['xxz'][0] += (-1.5)**2*arr[1][0] + (-.5)**2*arr[1][1] + .5**2*arr[1][2] + 1.5**2*arr[1][3]
+            new_arr_dict['xxz'][0] += (-1.5)**2*arr[2][0] + (-.5)**2*arr[2][1] + .5**2*arr[2][2] + 1.5**2*arr[2][3]
+            new_arr_dict['xxz'][0] += (-1.5)**2*arr[3][0] + (-.5)**2*arr[3][1] + .5**2*arr[3][2] + 1.5**2*arr[3][3]
+            new_arr_dict['xxz'][0] /= 16
+
+            new_arr_dict['yz'] = np.zeros([1])
+            new_arr_dict['yz'][0] += -1.5*arr[0][0] + -1.5*arr[0][1] + -1.5*arr[0][2] + -1.5*arr[0][3]
+            new_arr_dict['yz'][0] += -.5*arr[1][0] + -.5*arr[1][1] + -.5*arr[1][2] + -.5*arr[1][3]
+            new_arr_dict['yz'][0] += .5*arr[2][0] + .5*arr[2][1] + .5*arr[2][2] + .5*arr[2][3]
+            new_arr_dict['yz'][0] += 1.5*arr[3][0] + 1.5*arr[3][1] + 1.5*arr[3][2] + 1.5*arr[3][3]
+            new_arr_dict['yz'][0] /= 16
+
+            new_arr_dict['yyz'] = np.zeros([1])
+            new_arr_dict['yyz'][0] += (-1.5)**2*arr[0][0] + (-1.5)**2*arr[0][1] + (-1.5)**2*arr[0][2] + (-1.5)**2*arr[0][3]
+            new_arr_dict['yyz'][0] += (-.5)**2*arr[1][0] + (-.5)**2*arr[1][1] + (-.5)**2*arr[1][2] + (-.5)**2*arr[1][3]
+            new_arr_dict['yyz'][0] += .5**2*arr[2][0] + .5**2*arr[2][1] + .5**2*arr[2][2] + .5**2*arr[2][3]
+            new_arr_dict['yyz'][0] += 1.5**2*arr[3][0] + 1.5**2*arr[3][1] + 1.5**2*arr[3][2] + 1.5**2*arr[3][3]
+            new_arr_dict['yyz'][0] /= 16
+
+            new_arr_dict['xyz'] = np.zeros([1])
+            new_arr_dict['xyz'][0] += -1.5*-1.5*arr[0][0] + -1.5*-.5*arr[0][1] + -1.5*.5*arr[0][2] + -1.5*1.5*arr[0][3]
+            new_arr_dict['xyz'][0] += -.5*-1.5*arr[1][0] + -.5*-.5*arr[1][1] + -.5*.5*arr[1][2] + -.5*1.5*arr[1][3]
+            new_arr_dict['xyz'][0] += .5*-1.5*arr[2][0] + .5*-.5*arr[2][1] + .5*.5*arr[2][2] + .5*1.5*arr[2][3]
+            new_arr_dict['xyz'][0] += 1.5*-1.5*arr[3][0] + 1.5*-.5*arr[3][1] + 1.5*.5*arr[3][2] + 1.5*1.5*arr[3][3]
+            new_arr_dict['xyz'][0] /= 16
+
+            for key in arr_dict:
+                self.assertTrue(np.allclose(arr_dict[key], new_arr_dict[key]))
+
     def test_create_tif_transform(self):
         agg_num_1 = 2
         agg_num_2 = 5
@@ -177,6 +236,28 @@ class TestSlidingWindow(unittest.TestCase):
         finally:
             if (os.path.exists(new_path)):
                 os.remove(new_path)
+
+    def test_aspect(self):
+        path = self.img_gen.se_gradient()
+        with SlidingWindow(path) as slide_window:
+            slide_window.dem_initialize_arrays()
+            slide_window.dem_aggregation_step(5)
+            aspect_path = ''
+            try:
+                aspect_path = slide_window.dem_aspect()
+                with rasterio.open(aspect_path) as img:
+                    arr = img.read(1).astype(float)
+
+                aspect_angle_perc = (7*math.pi/4)/(2*math.pi)
+                aspect_value = aspect_angle_perc*np.iinfo(self.img_gen.dtype).max
+                self.assertTrue(np.all(arr == round(aspect_value)))
+            finally:
+                if (os.path.exists(aspect_path)):
+                    os.remove(aspect_path)
+
+
+    
+
 
                 
 
