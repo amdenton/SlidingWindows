@@ -81,3 +81,5 @@ class _Utilities:
         with rasterio.open(fn, 'w', **profile) as dst:
             for x in range(len(arr_in)): 
                 dst.write(arr_in[x], x+1)
+
+        return fn

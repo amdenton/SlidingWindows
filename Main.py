@@ -1,5 +1,6 @@
 import numpy as np
 from windowagg.sliding_window import SlidingWindow
+from windowagg.utilities import _Utilities as util
 from image_generator import ImageGenerator
 import rasterio
 import matplotlib.pyplot as plt
@@ -13,7 +14,7 @@ import os
 #slide_window_2 = SlidingWindow('test_img/se_gradient_0skew_1-1offset.tif')
 #slide_window_2 = SlidingWindow('gunsite_dem-2-1_export_w64.tif', cell_width=4928, cell_height=3264)
 
-#img = rasterio.open('test_img/gauss_0skew.tif').read(1)
+#img = rasterio.open('test_img/se_gradient_0skew_1-1offset.tif').read(1)
 #plt.imshow(img)
 #plt.show()
 

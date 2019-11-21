@@ -245,20 +245,24 @@ class TestSlidingWindow(unittest.TestCase):
             aspect_path = ''
             try:
                 aspect_path = slide_window.dem_aspect()
+                slope_angle_path = slide_window.dem_slope_angle()
                 with rasterio.open(aspect_path) as img:
-                    arr = img.read(1).astype(float)
+                    arr_aspect = img.read(1).astype(float)
+                with rasterio.open(slope_angle_path) as img:
+                    arr_slope_angle = img.read(1).astype(float)
 
                 aspect_angle_perc = (7*math.pi/4)/(2*math.pi)
                 aspect_value = aspect_angle_perc*np.iinfo(self.img_gen.dtype).max
-                self.assertTrue(np.all(arr == round(aspect_value)))
+                self.assertTrue(np.all(arr_aspect == math.floor(aspect_value)))
+
+                slope_angle_perc = math.atan(2/math.sqrt(2))/(math.pi/2)
+                slope_value = slope_angle_perc*np.iinfo(self.img_gen.dtype).max
+                self.assertTrue(np.all(arr_slope_angle == math.floor(slope_value)))
             finally:
                 if (os.path.exists(aspect_path)):
                     os.remove(aspect_path)
-
-
-    
-
-
+                if (os.path.exists(slope_angle_path)):
+                    os.remove(slope_angle_path)
                 
 
 if __name__ == '__main__':

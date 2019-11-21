@@ -649,7 +649,7 @@ class SlidingWindow:
         # generate image of aggregated slope values
     def dem_slope_angle(self):
         slope_angle = self.__slope_angle()
-        slope_angle = _Utilities._arr_dtype_conversion(slope_angle, dtype=np.uint16, low_bound=0, up_bound=2*math.pi)
+        slope_angle = _Utilities._arr_dtype_conversion(slope_angle, dtype=np.uint16, low_bound=0, up_bound=math.pi/2)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.__file_name)[0] + '_slope_angle_w' + str(pixels_aggre) +'.tif'
         return self.__create_tif(slope_angle, pixels_aggre=pixels_aggre, fn=fn)
@@ -667,8 +667,10 @@ class SlidingWindow:
         slope_x = xz*12/(pixels_aggre**2 - 1)
         slope_y = yz*12/(pixels_aggre**2 - 1)
         mag = np.sqrt(np.power(slope_x, 2) + np.power(slope_y, 2))
-        len_opp = (np.power(slope_x, 2) + np.power(slope_y, 2)) / mag
-        len_adj = np.sqrt( ((w)**2) + ((h)**2) )
+        x_unit = slope_x / mag
+        y_unit = slope_y / mag
+        len_opp = x_unit*slope_x + y_unit*slope_y
+        len_adj = np.sqrt( ((x_unit*w)**2) + ((y_unit*h)**2) )
         slope_angle = np.arctan(len_opp/len_adj)
 
         return slope_angle
