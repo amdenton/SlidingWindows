@@ -710,7 +710,7 @@ class SlidingWindow:
         h = self.__real_height
         pixels_aggre = self.__dem_pixels_aggre
         z, xz, yz, yyz, xxz, xyz = tuple (self.__dem_arr_dict[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
-        xxxxminusxx2 = (pixels_aggre^4 - 5*pixels_aggre^2 + 4)/180
+        xxxxminusxx2 = (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)/180
         xx = (pixels_aggre**2-1)/12
         a00 = (xxz - xx*z)/xxxxminusxx2
         a10 = xyz/(2*(xx**2))
@@ -742,7 +742,7 @@ class SlidingWindow:
         h = self.__real_height
         pixels_aggre = self.__dem_pixels_aggre
         z, xz, yz, yyz, xxz, xyz = tuple (self.__dem_arr_dict[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
-        xxxxminusxx2 = (pixels_aggre^4 - 5*pixels_aggre^2 + 4)/180
+        xxxxminusxx2 = (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)/180
         xx = (pixels_aggre**2-1)/12
         a00 = (xxz - xx*z)/xxxxminusxx2
         a10 = xyz/(2*(xx**2))
@@ -754,7 +754,7 @@ class SlidingWindow:
         # directional derivative of the slope of the following equation
         # in the direction perpendicular to slope, derived in mathematica
         # a00(x*w)**2 + 2a10(x*w)(y*h) + a11(y*h)**2 + b0(x*w) + b1(y*h) + cc
-        planform = (2*h*w*(-a11*b0*b1*(h**2) + a10*(b1**2)*(h**2) - a10*(b0**2)*(w**2) + a00*b0*b1*(w**2))) / ((b1*h)**2 + (b0*w)**2)
+        planform = (2*h*w*(a11*b0*b1*(h**2) - a10*(b1**2)*(h**2) + a10*(b0**2)*(w**2) - a00*b0*b1*(w**2))) / ((b1*h)**2 + (b0*w)**2)
 
         return planform
 
@@ -776,7 +776,7 @@ class SlidingWindow:
         h = self.__real_height
         pixels_aggre = self.__dem_pixels_aggre
         z, xz, yz, yyz, xxz, xyz = tuple (self.__dem_arr_dict[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
-        xxxxminusxx2 = (pixels_aggre^4 - 5*pixels_aggre^2 + 4)/180
+        xxxxminusxx2 = (pixels_aggre**4 - 5*(pixels_aggre**2) + 4)/180
         xx = (pixels_aggre**2-1)/12
         a00 = (xxz - xx*z)/xxxxminusxx2
         a10 = xyz/(2*(xx**2))
@@ -786,6 +786,6 @@ class SlidingWindow:
 
         # (profile + planform) / 2
         # derived in mathematica
-        standard = (a11*b1*(h**3)*(b1*h - b0*w) + a00*b0*(w**3)*(b1*h + b0*w) + a10*h*w*((b1**2)*(h**2) + 2*b0*b1*h*w - (b0**2)*(w**2))) / ((b1*h)**2 + (b0*w)**2)
+        standard = (a00*b0*(w**3)*(-b1*h + b0*w) + a11*b1*(h**3)*(b1*h + b0*w) + a10*h*w*((-b1**2)*(h**2) + 2*b0*b1*h*w + (b0**2)*(w**2))) / ((b1*h)**2 + (b0*w)**2)
 
         return standard
