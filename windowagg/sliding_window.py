@@ -649,7 +649,7 @@ class SlidingWindow:
         # generate image of aggregated slope values
     def dem_slope_angle(self):
         slope_angle = self.__slope_angle()
-        slope_angle = _Utilities._arr_dtype_conversion(slope_angle, dtype=np.uint16, low_bound=0, up_bound=math.pi/2)
+        slope_angle = _Utilities._arr_dtype_conversion(slope_angle, dtype=np.uint16, low_bound=0, high_bound=math.pi/2)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.__file_name)[0] + '_slope_angle_w' + str(pixels_aggre) +'.tif'
         return self.__create_tif(slope_angle, pixels_aggre=pixels_aggre, fn=fn)
@@ -663,14 +663,17 @@ class SlidingWindow:
         h = self.__real_height
         pixels_aggre = self.__dem_pixels_aggre
         xz, yz = tuple (self.__dem_arr_dict[i] for i in ('xz', 'yz'))
+        xx = (pixels_aggre**2-1)/12
+        b0 = xz/xx
+        b1 = yz/xx
 
-        slope_x = xz*12/(pixels_aggre**2 - 1)
-        slope_y = yz*12/(pixels_aggre**2 - 1)
-        mag = np.sqrt(np.power(slope_x, 2) + np.power(slope_y, 2))
+        slope_x = b0*w
+        slope_y = b1*h
+        mag = np.sqrt(slope_x**2 + slope_y**2)
         x_unit = slope_x / mag
         y_unit = slope_y / mag
         len_opp = x_unit*slope_x + y_unit*slope_y
-        len_adj = np.sqrt( ((x_unit*w)**2) + ((y_unit*h)**2) )
+        len_adj = np.sqrt((x_unit*w)**2 + (y_unit*h)**2)
         slope_angle = np.arctan(len_opp/len_adj)
 
         return slope_angle
@@ -678,7 +681,7 @@ class SlidingWindow:
     # generate image of aggregated angle of steepest descent, calculated as clockwise angle from north 
     def dem_aspect(self):
         aspect = self.__aspect()
-        aspect = _Utilities._arr_dtype_conversion(aspect, dtype=np.uint16, low_bound=0, up_bound=2*math.pi)
+        aspect = _Utilities._arr_dtype_conversion(aspect, dtype=np.uint16, low_bound=0, high_bound=2*math.pi)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.__file_name)[0] + '_aspect_w' + str(pixels_aggre) +'.tif'
         return self.__create_tif(aspect, pixels_aggre=pixels_aggre, fn=fn)
@@ -695,14 +698,14 @@ class SlidingWindow:
 
     # generate image of aggregated profile curvature, second derivative parallel to steepest descent
     def dem_profile(self):
-        profile = self.__profile()
+        profile = self._profile().astype(float)
         profile = _Utilities._arr_dtype_conversion(profile, np.uint16)
         pixels_aggre = self.__dem_pixels_aggre
         fn = os.path.splitext(self.__file_name)[0] + '_profile_w' + str(pixels_aggre) +'.tif'
         return self.__create_tif(profile, pixels_aggre=pixels_aggre, fn=fn)
 
     # return array of aggregated profile curvature, second derivative parallel to steepest descent
-    def __profile(self):
+    def _profile(self):
         if (self.__dem_arr_dict['z'].size == 0):
             raise ValueError('Arrays must be initialized before calculating profile')
 
@@ -718,10 +721,7 @@ class SlidingWindow:
         b0 = xz/xx
         b1 = yz/xx
 
-        # directional derivative of the slope of the following equation
-        # in the direction of the slope, derived in mathematica
-        # a00(x*w)**2 + 2a10(x*w)(y*h) + a11(y*h)**2 + b0(x*w) + b1(y*h) + cc
-        profile = (2*(a11*(b1**2)*(h**4) + b0*(w**2)*(2*a10*b1*(h**2) + a00*b0*(w**2)))) / ((b1*h)**2 + (b0*w)**2)
+        profile = 2*np.sqrt( (a11*b1**2*h**4 + 2*a10*b0*b1*h**2*w**2 + a00*b0**2*w**4)**2 / ((b1**2*h**2 + b0**2*w**2)**2*(1+b1**2*h**2+b0**2*w**2)**3) )
 
         return profile
 
@@ -750,11 +750,7 @@ class SlidingWindow:
         b0 = xz/xx
         b1 = yz/xx
 
-        
-        # directional derivative of the slope of the following equation
-        # in the direction perpendicular to slope, derived in mathematica
-        # a00(x*w)**2 + 2a10(x*w)(y*h) + a11(y*h)**2 + b0(x*w) + b1(y*h) + cc
-        planform = (2*h*w*(a11*b0*b1*(h**2) - a10*(b1**2)*(h**2) + a10*(b0**2)*(w**2) - a00*b0*b1*(w**2))) / ((b1*h)**2 + (b0*w)**2)
+        planform = 2*np.sqrt( ((a11*b0**2-2*a10*b0*b1+a00*b1**2)**2*h**4*w**4) / (b1**2*h**2+b0**2*w**2)**2 )
 
         return planform
 
@@ -786,6 +782,6 @@ class SlidingWindow:
 
         # (profile + planform) / 2
         # derived in mathematica
-        standard = (a00*b0*(w**3)*(-b1*h + b0*w) + a11*b1*(h**3)*(b1*h + b0*w) + a10*h*w*((-b1**2)*(h**2) + 2*b0*b1*h*w + (b0**2)*(w**2))) / ((b1*h)**2 + (b0*w)**2)
+        standard = np.sqrt(((a11*b0**2-2*a10*b0*b1+a00*b1**2)**2*h**4*w**4)/(b1**2*h**2+b0**2*w**2)**2) + np.sqrt((a11*b1**2*h**4+2*a10*b0*b1*h**2*w**2+a00*b0**2*w**4)**2/((b1**2*h**2+b0**2*w**2)**2*(1+b1**2*h**2+b0**2*w**2)**3))
 
         return standard

@@ -263,6 +263,20 @@ class TestSlidingWindow(unittest.TestCase):
                     os.remove(aspect_path)
                 if (os.path.exists(slope_angle_path)):
                     os.remove(slope_angle_path)
+
+    def test_profile(self):
+        image_size = 300
+        sigma = image_size/4
+        path = self.img_gen.gauss()
+        with SlidingWindow(path) as slide_window:
+            slide_window.dem_initialize_arrays()
+            slide_window.dem_aggregation_step(5)
+            arr_profile = slide_window._profile()
+            for y in range(arr_profile.shape[0]):
+                for x in range(arr_profile.shape[1]):
+                    test_val = 2*math.pi*math.sqrt( (math.exp((2*(x**2+y**2))/sigma**2)*sigma**8*(-sigma**2+x**2+y**2)**2) / (2*math.exp((x**2+y**2)/sigma**2)*math.pi*sigma**6+x**2+y**2)**3 )
+                    my_value = arr_profile[y][x]
+                    math.isclose(my_value, test_val)
                 
 
 if __name__ == '__main__':

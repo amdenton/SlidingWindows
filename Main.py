@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 import math
 import os
 
-#img_gen = ImageGenerator()
-#img_gen.all()
+img_gen = ImageGenerator()
+img_gen.all(convert=False)
 
 #slide_window = SlidingWindow('test.tif')
 #slide_window_2 = SlidingWindow('test_img/gauss_0skew_1-1offset.tif')

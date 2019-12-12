@@ -9,7 +9,7 @@ class _Utilities:
     # arr_in: array to be converted
     # dtype: numpy type to convert to
     @staticmethod
-    def _arr_dtype_conversion(arr_in, dtype=np.uint16, low_bound=None, up_bound=None):
+    def _arr_dtype_conversion(arr_in, dtype=np.uint16, low_bound=None, high_bound=None):
         arr_max = np.amax(arr_in)
         arr_min = np.amin(arr_in)
         if (low_bound == None):
@@ -17,14 +17,14 @@ class _Utilities:
         else:
             if (arr_min < low_bound):
                 raise ValueError('Lower bound must be smaller than all values')
-        if (up_bound == None):
-            up_bound = arr_max
+        if (high_bound == None):
+            high_bound = arr_max
         else:
-            if (arr_max > up_bound):
+            if (arr_max > high_bound):
                 raise ValueError('Upper bound must be greater than all values')
 
         dtype_max = _Utilities._get_max_min(dtype)[0]
-        arr_out = ((arr_in - low_bound)/(up_bound - low_bound)*dtype_max).astype(dtype) 
+        arr_out = ((arr_in - low_bound)/(high_bound - low_bound)*dtype_max).astype(dtype)
         return arr_out
 
     # get max and min of numpy data type
