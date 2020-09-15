@@ -623,7 +623,7 @@ class SlidingWindow:
     # generate image of aggregated slope values
     def dem_slope(self):
         slope = self.__slope()
-        slope = _Utilities._arr_dtype_conversion(slope, np.uint16, low_bound=0, up_bound=np.iinfo(np.uint16).max)
+        slope = _Utilities._arr_dtype_conversion(slope, np.uint16, low_bound=0, high_bound=np.iinfo(np.uint16).max)
         agg_window_len = self.__agg_window_len
         file_name = os.path.splitext(self.__file_name)[0] + '_slope_w' + str(agg_window_len) +'.tif'
         return self.__create_tif(slope, agg_window_len=agg_window_len, file_name=file_name)
@@ -651,7 +651,7 @@ class SlidingWindow:
         # generate image of aggregated slope values
     def dem_slope_angle(self):
         slope_angle = self.__slope_angle()
-        slope_angle = _Utilities._arr_dtype_conversion(slope_angle, dtype=np.uint16, low_bound=0, up_bound=math.pi/2)
+        slope_angle = _Utilities._arr_dtype_conversion(slope_angle, dtype=np.uint16, low_bound=0, high_bound=math.pi/2)
         agg_window_len = self.__agg_window_len
         file_name = os.path.splitext(self.__file_name)[0] + '_slope_angle_w' + str(agg_window_len) +'.tif'
         return self.__create_tif(slope_angle, agg_window_len=agg_window_len, file_name=file_name)
@@ -680,7 +680,7 @@ class SlidingWindow:
     # generate image of aggregated angle of steepest descent, calculated as clockwise angle from north 
     def dem_aspect(self):
         aspect = self.__aspect()
-        aspect = _Utilities._arr_dtype_conversion(aspect, dtype=np.uint16, low_bound=0, up_bound=(2 * math.pi))
+        aspect = _Utilities._arr_dtype_conversion(aspect, dtype=np.uint16, low_bound=0, high_bound=(2 * math.pi))
         agg_window_len = self.__agg_window_len
         file_name = os.path.splitext(self.__file_name)[0] + '_aspect_w' + str(agg_window_len) +'.tif'
         return self.__create_tif(aspect, agg_window_len=agg_window_len, file_name=file_name)
