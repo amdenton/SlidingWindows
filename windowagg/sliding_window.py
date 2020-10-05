@@ -1,15 +1,16 @@
-import numpy as np
-from numpy.polynomial import polynomial as poly
-from windowagg.utilities import _Utilities
-from windowagg.agg_ops import Agg_ops
-from windowagg.dem_arrays import Dem_arrays
-import rasterio
-import inspect
-import os
-import math
-import affine
-import re
+import windowagg.rbg as rbg
+import windowagg.dem as dem
+import windowagg.aggregation as aggregation
+from windowagg.dem_data import Dem_data
+import windowagg.helper as helper
 
+import math
+import os
+import inspect
+
+import numpy as np
+import rasterio
+import affine
 import matplotlib.pyplot as plt
 
 class SlidingWindow:
@@ -57,11 +58,7 @@ class SlidingWindow:
     def __init__(self, file_path, cell_width=1, cell_height=1):
         self._file_name = os.path.split(file_path)[-1]
         self._img = rasterio.open(file_path)
-        transform = self._img.profile['transform']
-        pixel_width = math.sqrt(transform[0]**2 + transform[3]**2)
-        pixel_height = math.sqrt(transform[1]**2 + transform[4]**2)
-        self._width_meters = pixel_width * cell_width
-        self._height_meters = pixel_height * cell_height
+        self._dem_data = None
 
     def __enter__(self):
         return self
@@ -75,22 +72,31 @@ class SlidingWindow:
         if (self._img):
             self._img.close()
 
-    # dictionary of all arrays required for DEM utils
-    z, xz, yz, xxz, yyz, xyz = (np.zeros(0) for _ in range(6))
-    _dem_arr_dict = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz}
-    @property
-    def dem_arr_dict(self):
-        return self._dem_arr_dict
+    # TODO fix later, not the best way to do this
+    # arr_in: array to be converted
+    # dtype: numpy type to convert to
+    @staticmethod
+    def _arr_dtype_conversion(arr_in, dtype=np.uint16, low_bound=None, high_bound=None):
+        arr_max = np.amax(arr_in)
+        arr_min = np.amin(arr_in)
+        if (low_bound == None):
+            low_bound = arr_min
+        else:
+            if (arr_min < low_bound):
+                raise ValueError('Lower bound must be smaller than all values')
+        if (high_bound == None):
+            high_bound = arr_max
+        else:
+            if (arr_max > high_bound):
+                raise ValueError('Upper bound must be greater than all values')
 
-    # number of pixels aggregated
-    _agg_window_len = 1
-    @property
-    def _agg_window_len(self):
-        return self._agg_window_len
+        dtype_max = helper.get_max_min(dtype)[0]
+        arr_out = ((arr_in - low_bound)/(high_bound - low_bound)*dtype_max).astype(dtype)
+        return arr_out
 
     # create tif with array of numpy arrays representing image bands
     # adjust geoTransform according to how many pixels were aggregated
-    def _create_tif(self, arr_in, agg_window_len=1, is_export=False, file_name=None):
+    def _create_tif(self, arr_in, file_name, num_aggre=0):
         if (type(arr_in) != list):
             arr_in = [arr_in]
 
@@ -103,7 +109,14 @@ class SlidingWindow:
                 raise ValueError('arrays must have the same shape')
 
         profile = self._img.profile
-        transform = profile['transform']
+        transform = profile["transform"]
+
+        num_trunc = 2**num_aggre
+        img_offset = num_trunc / 2
+
+        x = transform[2] + ((transform[0] + transform[1]) * img_offset)
+        y = transform[5] + ((transform[3] + transform[4]) * img_offset)
+        transform = affine.Affine(transform[0], transform[1], x, transform[3] , transform[4], y)
 
         big_tiff = 'NO'
         n_bytes = 0
@@ -121,17 +134,18 @@ class SlidingWindow:
             height=len(arr_in[0]),
             width=len(arr_in[0][0])
             )
-
-        if (file_name == None):
-            caller_name = inspect.stack()[1].function
-            file_name = os.path.splitext(self._file_name)[0] + '_' + caller_name + '.tif'
             
         with rasterio.open(file_name, 'w', **profile, BIGTIFF=big_tiff) as dst:
-            if (is_export):
-                dst.update_tags(ns='DEM_UTILITIES', aggregation_window_length=str(self._agg_window_len))
-            for x in range(len(arr_in)): 
-                dst.write(arr_in[x], x + 1)
+            for i in range(len(arr_in)): 
+                dst.write(arr_in[i], i + 1)
 
+        return file_name
+
+    def _create_file_name(self, algo_name, num_aggre=0):
+        if (num_aggre == 0):
+            file_name = self._file_name + '_' + algo_name + '.tif'
+        else:
+            file_name = self._file_name + '_' + algo_name + '_w=' + str(2**num_aggre) + '.tif'
         return file_name
 
     # create NDVI image
@@ -142,19 +156,11 @@ class SlidingWindow:
         
         red = self._img.read(red_band)
         ir = self._img.read(ir_band)
-        ndvi = self._ndvi(red, ir)
-        # TODO change later
-        ndvi = _Utilities._arr_dtype_conversion(ndvi, np.uint8)
-        return self._create_tif(ndvi)
-
-    # i.e. Normalized Difference Vegetation Index
-    # for viewing live green vegetation
-    # requires red and infrared bands
-    # returns floating point array
-    def _ndvi(self, red_arr, ir_arr):
-        red_arr = red_arr.astype(float)
-        ir_arr = ir_arr.astype(float)
-        return ( (ir_arr - red_arr) / (ir_arr + red_arr) )
+        ndvi = rbg.ndvi(red, ir)
+        # TODO change later?
+        ndvi = self._arr_dtype_conversion(ndvi, np.uint8)
+        file_name = self._create_file_name('ndvi')
+        return self._create_tif(ndvi, file_name)
 
     # create binary image
     def binary(self, band, threshold):
@@ -163,32 +169,22 @@ class SlidingWindow:
             raise ValueError('band must be in range of %r.' % bands)
 
         arr = self._img.read(band)
-        arr = self._binary(arr, threshold)
-        return self._create_tif(arr)
-
-    # create black and white image
-    # values greater than or equal to threshold percentage will be white
-    # threshold: percent in decimal of maximum
-    # returns array of same data type
-    # TODO can I assume minimum is always 0, how would I handle it otherwise?
-    def _binary(self, arr, threshold):
-        if (threshold < 0 or threshold > 1):
-            raise ValueError('threshold must be between 0 and 1')
-        dtype = arr.dtype
-        maximum = _Utilities._get_max_min(dtype)[0]
-        return np.where(arr < (threshold * maximum), 0, maximum).astype(dtype)
+        arr = rbg.binary(arr, threshold)
+        file_name = self._create_file_name('binary')
+        return self._create_tif(arr, file_name)
 
     # create image with each band aggregated num_aggre times
     def aggregation(self, operation, num_aggre):        
         arr = []
         for x in range(self._img.count):
             arr.append(self._img.read(x + 1))
-            arr[x] = self._partial_aggregation(arr[x], 0, num_aggre, operation)
+            arr[x] = aggregation.aggregate(arr[x], 0, num_aggre, operation)
 
             # TODO remove later
-            arr[x] = _Utilities._arr_dtype_conversion(arr[x], np.uint8)
+            arr[x] = self._arr_dtype_conversion(arr[x], np.uint8)
         
-        return self._create_tif(arr, agg_window_len=2**num_aggre)
+        file_name = self._create_file_name('aggregation', num_aggre)
+        return self._create_tif(arr, file_name, num_aggre)
 
     # create image with pixel values cooresponding to their aggregated regression slope
     def regression(self, band1, band2, num_aggre):
@@ -198,38 +194,13 @@ class SlidingWindow:
 
         arr_a = self._img.read(band1)
         arr_b = self._img.read(band2)
-        arr_m = self._regression(arr_a, arr_b, num_aggre)
+        arr_m = rbg.regression(arr_a, arr_b, num_aggre)
 
         # TODO remove later
-        arr_m = _Utilities._arr_dtype_conversion(arr_m, np.uint8)
+        arr_m = self._arr_dtype_conversion(arr_m, np.uint8)
 
-        return self._create_tif(arr_m, agg_window_len=2**num_aggre)
-
-    # Do num_aggre aggregations and return the regression slope between two bands
-    # returns floating point array
-    def _regression(self, arr_a, arr_b, num_aggre):
-        arr_a = arr_a.astype(float)
-        arr_b = arr_b.astype(float)
-        arr_aa = arr_a**2
-        arr_ab = (arr_a * arr_b)
-
-        arr_a = self._partial_aggregation(arr_a, 0, num_aggre, Agg_ops.add_all)
-        arr_b = self._partial_aggregation(arr_b, 0, num_aggre, Agg_ops.add_all)
-        arr_aa = self._partial_aggregation(arr_aa, 0, num_aggre, Agg_ops.add_all)
-        arr_ab = self._partial_aggregation(arr_ab, 0, num_aggre, Agg_ops.add_all)
-
-        # total input pixels aggregated per output pixel
-        count = (2**num_aggre)**2
-
-        # regression coefficient, i.e. slope of best fit line
-        numerator = count * arr_ab - arr_a * arr_b
-        denominator = count * arr_aa - arr_a**2
-        # avoid division by zero
-        # TODO is this required? Zero only occurs when there is no variance in the a band
-        denominator = np.maximum(denominator, 1)
-        arr_m = numerator/denominator
-
-        return arr_m
+        file_name = self._create_file_name('regression', num_aggre)
+        return self._create_tif(arr_m, file_name, num_aggre)
 
     # TODO potentially add R squared method?
 
@@ -241,60 +212,13 @@ class SlidingWindow:
 
         arr_a = self._img.read(band1)
         arr_b = self._img.read(band2)
-        arr_r = self._pearson(arr_a, arr_b, num_aggre)
+        arr_r = rbg.pearson(arr_a, arr_b, num_aggre)
 
         # TODO remove later
-        arr_r = _Utilities._arr_dtype_conversion(arr_r, np.uint8)
+        arr_r = self._arr_dtype_conversion(arr_r, np.uint8)
 
-        return self._create_tif(arr_r, agg_window_len=2**num_aggre)
-
-    # Do num_aggre aggregations and return the regression slope between two bands
-    # returns floating point array
-    def _pearson(self, arr_a, arr_b, num_aggre):
-        arr_a = arr_a.astype(float)
-        arr_b = arr_b.astype(float)
-        arr_aa = arr_a**2
-        arr_bb = arr_b**2
-        arr_ab = (arr_a * arr_b)
-
-        arr_a = self._partial_aggregation(arr_a, 0, num_aggre, Agg_ops.add_all)
-        arr_b = self._partial_aggregation(arr_b, 0, num_aggre, Agg_ops.add_all)
-        arr_aa = self._partial_aggregation(arr_aa, 0, num_aggre, Agg_ops.add_all)
-        arr_bb = self._partial_aggregation(arr_bb, 0, num_aggre, Agg_ops.add_all)
-        arr_ab = self._partial_aggregation(arr_ab, 0, num_aggre, Agg_ops.add_all)
-
-        # total input pixels aggregated per output pixel
-        count = (2**num_aggre)**2
-
-        # pearson correlation
-        numerator = (count * arr_ab) - (arr_a * arr_b)
-        denominator = np.sqrt((count * arr_aa) - arr_a**2) * np.sqrt((count * arr_bb) - arr_b**2)
-        # avoid division by zero
-        # TODO is this required? Zero only occurs when there is no variance in the a or b bands
-        denominator = np.maximum(denominator, 1)
-        arr_r = numerator / denominator
-        
-        return arr_r
-
-    # Do num_aggre aggregations and return the regression slope between two bands
-    # non-vectorized using numpy's polyfit method
-    # returns floating point array
-    def _regression_brute(self, arr_a, arr_b, num_aggre):
-        arr_a = arr_a.astype(float)
-        arr_b = arr_b.astype(float)
-        w_out = 2**num_aggre
-        y_max =  arr_a.shape[0] - (w_out - 1)
-        x_max = arr_a.shape[1] - (w_out - 1)
-        arr_m = np.empty([x_max, y_max])
-        
-        for j in range (y_max):
-            for i in range (x_max):
-                arr_1 = arr_a[j:(j + w_out), i:(i + w_out)].flatten()
-                arr_2 = arr_b[j:(j + w_out), i:(i + w_out)].flatten()
-                arr_coef = poly.polyfit(arr_1, arr_2, 1)
-                arr_m[j][i] = arr_coef[1]
-
-        return arr_m
+        file_name = self._create_file_name('pearson', num_aggre)
+        return self._create_tif(arr_r, file_name, num_aggre)
 
     # create image with pixel values cooresponding to their aggregated fractal dimension
     def fractal(self, band, threshold, power_start, power_target):
@@ -303,53 +227,13 @@ class SlidingWindow:
             raise ValueError('band must be in range of %r.' % bands)
 
         arr = self._img.read(band)
-        arr = self._fractal(self._binary(arr, threshold), power_start, power_target)
+        arr = rbg.fractal(rbg.binary(arr, threshold), power_start, power_target)
 
         # TODO remove later
-        arr = _Utilities._arr_dtype_conversion(arr, np.uint16)
+        arr = self._arr_dtype_conversion(arr, np.uint16)
 
-        return self._create_tif(arr, agg_window_len=2**power_target)
-
-    # Compute fractal dimension on 2**power_target wide pixel areas
-    def _fractal(self, arr_in, power_start, power_target):
-        if (not _Utilities._is_binary(arr_in)):
-            raise ValueError('array must be binary')
-        if (power_start < 0 or power_start >= power_target):
-            raise ValueError('power_start must be nonzero and less than power_target')
-
-        arr = arr_in.astype(float)
-        x_max = arr.shape[1] - (2**power_target - 1)
-        y_max = arr.shape[0] - (2**power_target - 1)
-        denom_regress = np.empty(power_target - power_start)
-        num_regress = np.empty([(power_target - power_start), (x_max * y_max)])
-        
-        if power_start > 0:
-            arr = self._partial_aggregation(arr, 0, power_start, Agg_ops.maximum)
-
-        for i in range(power_start, power_target):
-            arr_sum = self._partial_aggregation(arr, i, power_target, Agg_ops.add_all)
-            arr_sum = np.maximum(arr_sum, 1)
-
-            arr_sum = np.log2(arr_sum)
-            denom_regress[i - power_start] = power_target - i
-            num_regress[(i - power_start), ] = arr_sum.flatten()
-            if i < (power_target - 1):
-                arr = self._partial_aggregation(arr, i, (i + 1), Agg_ops.maximum)
-
-        arr_slope = poly.polyfit(denom_regress, num_regress, 1)[1]
-        arr_out = np.reshape(arr_slope, (y_max, x_max))
-        return arr_out
-
-    # This is for the 3D fractal dimension that is between 2 and 3, but it isn't tested yet
-    def _boxed_array(self, arr_in, power_target):
-        arr_min = np.amin(arr_in)
-        arr_max = np.amax(arr_in)
-        arr_out = np.zeros(arr_in.size)
-        if (arr_max > arr_min):
-            n_boxes = 2**power_target - 1
-            buffer = (arr_in - arr_min) / (arr_max - arr_min)
-            arr_out = np.floor(n_boxes * buffer)
-        return arr_out
+        #file_name = self._create_file_name('fractal', num_aggre)
+        return self._create_tif(arr, power_target)
 
     def fractal_3d(self, band, num_aggre):
         bands = np.array(range(self._img.count)) + 1
@@ -357,249 +241,101 @@ class SlidingWindow:
             raise ValueError('band must be in range of %r.' % bands)
 
         arr = self._img.read(band)
-        arr = self._fractal_3d(arr, num_aggre)
+        arr = rbg.fractal_3d(arr, num_aggre)
 
         # TODO remove later
-        arr = _Utilities._arr_dtype_conversion(arr, np.uint8)
+        arr = self._arr_dtype_conversion(arr, np.uint8)
 
-        return self._create_tif(arr, agg_window_len=2**num_aggre)
+        return self._create_tif(arr, num_aggre)
 
-    # TODO does this need to be binary too? probably not?
-    # TODO should this have a power_start?
-    def _fractal_3d(self, arr_in, num_aggre):
-        if (num_aggre <= 1):
-            raise ValueError('number of aggregations must be greater than one')
-        y_max = arr_in.shape[0] - (2**num_aggre - 1)
-        x_max = arr_in.shape[1] - (2**num_aggre - 1)
-        arr_box = self._boxed_array(arr_in, num_aggre).astype(float)
-        arr_min = np.array(arr_box)
-        arr_max = np.array(arr_box)
-        denom_regress = np.empty(num_aggre - 1)
-        num_regress = np.empty([(num_aggre - 1), (x_max * y_max)])
-        
-        # TODO is this supposed to start at 1?
-        for i in range(1, num_aggre):
-            arr_min = self._partial_aggregation(arr_min, (i - 1), i, Agg_ops.minimum)
-            arr_max = self._partial_aggregation(arr_max, (i - 1), i, Agg_ops.maximum)
-            arr_sum = self._partial_aggregation((arr_max - arr_min + 1), i, num_aggre, Agg_ops.add_all)
-            arr_num = np.log2(arr_sum)
-            denom_regress[i - 1] = num_aggre - i
-            num_regress[(i - 1), ] = arr_num.flatten()
+    def import_dem(self, file_name):
+        self._dem_data = Dem_data.from_import(file_name)
 
-            # TODO why do we divide by two?
-            arr_min /= 2
-            arr_max /= 2
+    def export_dem(self, file_name):
+        if (self._dem_data is None):
+            print('No DEM data to export')
+        else:
+            self._dem_data.export(file_name)
 
-        arr_slope = poly.polyfit(denom_regress, num_regress, 1)[1]
-        arr_out = np.reshape(arr_slope, (y_max, x_max))
-        return arr_out
+    # Assumes first band is DEM
+    def initializ_dem(self, band):
+        transform = self._img.profile['transform']
+        pixel_width = math.sqrt(transform[0]**2 + transform[3]**2)
+        pixel_height = math.sqrt(transform[1]**2 + transform[4]**2)
 
-    # TODO should I assume dem band is the only band?
-    def dem_initialize_arrays(self):
-        z = self._img.read(1).astype(float)
-        xz, yz, xxz, yyz, xyz = (np.zeros(z.shape).astype(z.dtype) for _ in range(5))
-        self._dem_arr_dict.update({'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz})
-        self._agg_window_len = 1
-    
-    def dem_export_arrays(self):
-        agg_window_len = self._agg_window_len
-        export = []
-        for key in self._dem_arr_dict:
-            export.append(self._dem_arr_dict[key])
-        file_name = os.path.splitext(self._file_name)[0] + '_export_w' + str(agg_window_len) +'.tif'
-        return self._create_tif(export, agg_window_len=agg_window_len, is_export=True, file_name=file_name)
+        self._dem_data = Dem_data(self._img.read(band), pixel_width, pixel_height)
 
-    def dem_import_arrays(self):
-        if (self._img.count != len(self._dem_arr_dict)):
-            raise ValueError('Cannot import file, %d bands are required for DEM utilities' % len(self._dem_arr_dict))
-        i = 1
-        for key in self._dem_arr_dict:
-            self._dem_arr_dict[key] = self._img.read(i)
-            i += 1
-        self._agg_window_len = int(self._img.tags(ns='DEM_UTILITIES')['aggregation_window_length'])
-        self._file_name = re.sub('_export.*','',self._file_name) + '.tif'
-
-    # generate image of aggregated mean values of designated array
-    def dem_mean(self, arr_name='z'):
-        if (self._dem_arr_dict['z'].size == 0):
-            raise ValueError('Arrays must be initialized before exporting mean')
-        if (arr_name not in self._dem_arr_dict):
-            raise ValueError('%s must be a member of %r' % (arr_name, self._dem_arr_dict))
-        
-        arr = self._dem_arr_dict[arr_name]
-        arr = _Utilities._arr_dtype_conversion(arr, np.uint16)
-        agg_window_len = self._agg_window_len
-        file_name = os.path.splitext(self._file_name)[0] + '_' + arr_name + '_mean_w' + str(agg_window_len) + '.tif'
-        return self._create_tif(arr, agg_window_len=agg_window_len, file_name=file_name)
+    def aggregate_dem(self, num_aggre=1):
+        aggregation.aggregate_dem(self._dem_data, num_aggre)
 
     # generate image of aggregated slope values
     def dem_slope(self):
-        slope = self._slope()
-        slope = _Utilities._arr_dtype_conversion(slope, np.uint16, low_bound=0, high_bound=np.iinfo(np.uint16).max)
-        agg_window_len = self._agg_window_len
-        file_name = os.path.splitext(self._file_name)[0] + '_slope_w' + str(agg_window_len) +'.tif'
-        return self._create_tif(slope, agg_window_len=agg_window_len, file_name=file_name)
+        if (Dem_data is None):
+            print('Unable to calculate slope, DEM data not initialized')
+            return None
+        else:
+            slope = dem.slope(self._dem_data)
+            slope = self._arr_dtype_conversion(slope, np.uint16, low_bound=0, high_bound=np.iinfo(np.uint16).max)
 
-    # return array of aggregated slope values
-    def _slope(self):
-        if (self._dem_arr_dict['z'].size == 0):
-            raise ValueError('Arrays must be initialized before calculating slope')
+            file_name = self._create_file_name('slope', self._dem_data.num_aggre)
+            return self._create_tif(slope, file_name, self._dem_data.num_aggre)
 
-        w = self._width_meters
-        h = self._height_meters
-        agg_window_len = self._agg_window_len
-        xz, yz = tuple (self._dem_arr_dict[i] for i in ('xz', 'yz'))
-        xx = (agg_window_len**2 - 1) / 12
-        b0 = xz / xx
-        b1 = yz / xx
-
-        # directional derivative of the following equation
-        # in the direction of the positive gradient, derived in mathematica
-        # a00(x*w)**2 + 2a10(x*w)(y*h) + a11(y*h)**2 + b0(x*w) + b1(y*h) + cc
-        slope = np.sqrt((b1*h)**2 + (b0*w)**2)
-
-        return slope
-
-        # generate image of aggregated slope values
+    # generate image of aggregated slope values
     def dem_slope_angle(self):
-        slope_angle = self._slope_angle()
-        slope_angle = _Utilities._arr_dtype_conversion(slope_angle, dtype=np.uint16, low_bound=0, high_bound=math.pi/2)
-        agg_window_len = self._agg_window_len
-        file_name = os.path.splitext(self._file_name)[0] + '_slope_angle_w' + str(agg_window_len) +'.tif'
-        return self._create_tif(slope_angle, agg_window_len=agg_window_len, file_name=file_name)
+        if (Dem_data is None):
+            print('Unable to calculate slope angle, DEM data not initialized')
+            return None
+        else:
+            slope_angle = dem.slope_angle(self._dem_data)
+            slope_angle = self._arr_dtype_conversion(slope_angle, dtype=np.uint16, low_bound=0, high_bound=math.pi/2)
 
-    # return array of aggregated slope values
-    def _slope_angle(self):
-        if (self._dem_arr_dict['z'].size == 0):
-            raise ValueError('Arrays must be initialized before calculating slope')
-
-        w = self._width_meters
-        h = self._height_meters
-        agg_window_len = self._agg_window_len
-        xz, yz = tuple (self._dem_arr_dict[i] for i in ('xz', 'yz'))
-
-        slope_x = (xz * 12) / (agg_window_len**2 - 1)
-        slope_y = (yz * 12) / (agg_window_len**2 - 1)
-        mag = np.sqrt(np.power(slope_x, 2) + np.power(slope_y, 2))
-        x_unit = slope_x / mag
-        y_unit = slope_y / mag
-        len_opp = (x_unit * slope_x) + (y_unit * slope_y)
-        len_adj = np.sqrt( (x_unit * w)**2 + (y_unit * h)**2 )
-        slope_angle = np.arctan(len_opp / len_adj)
-
-        return slope_angle
+            file_name = self._create_file_name('slope_angle', self._dem_data.num_aggre)
+            return self._create_tif(slope_angle, file_name, self._dem_data.num_aggre)
 
     # generate image of aggregated angle of steepest descent, calculated as clockwise angle from north 
     def dem_aspect(self):
-        aspect = self._aspect()
-        aspect = _Utilities._arr_dtype_conversion(aspect, dtype=np.uint16, low_bound=0, high_bound=(2 * math.pi))
-        agg_window_len = self._agg_window_len
-        file_name = os.path.splitext(self._file_name)[0] + '_aspect_w' + str(agg_window_len) +'.tif'
-        return self._create_tif(aspect, agg_window_len=agg_window_len, file_name=file_name)
+        if (Dem_data is None):
+            print('Unable to calculate aspect, DEM data not initialized')
+            return None
+        else:
+            aspect = dem.aspect(self._dem_data)
+            aspect = self._arr_dtype_conversion(aspect, dtype=np.uint16, low_bound=0, high_bound=(2 * math.pi))
 
-    # return array of aggregated angle of steepest descent, calculated as clockwise angle from north
-    def _aspect(self):
-        if (self._dem_arr_dict['z'].size == 0):
-            raise ValueError('Arrays must be initialized before calculating aspect')
-
-        xz = self._dem_arr_dict['xz']
-        yz = self._dem_arr_dict['yz']
-        aspect = (-np.arctan(xz / yz) - (np.sign(yz) * math.pi / 2) + (math.pi / 2)) % (2 * math.pi)
-        return aspect
+            file_name = self._create_file_name('aspect', self._dem_data.num_aggre)
+            return self._create_tif(aspect, file_name, self._dem_data.num_aggre)
 
     # generate image of aggregated profile curvature, second derivative parallel to steepest descent
     def dem_profile(self):
-        profile = self._profile()
-        profile = _Utilities._arr_dtype_conversion(profile, np.uint16)
-        agg_window_len = self._agg_window_len
-        file_name = os.path.splitext(self._file_name)[0] + '_profile_w' + str(agg_window_len) +'.tif'
-        return self._create_tif(profile, agg_window_len=agg_window_len, file_name=file_name)
+        if (Dem_data is None):
+            print('Unable to calculate profile, DEM data not initialized')
+            return None
+        else:
+            profile = dem.profile(self._dem_data)
+            profile = self._arr_dtype_conversion(profile, np.uint16)
 
-    # return array of aggregated profile curvature, second derivative parallel to steepest descent
-    def _profile(self):
-        if (self._dem_arr_dict['z'].size == 0):
-            raise ValueError('Arrays must be initialized before calculating profile')
-
-        w = self._width_meters
-        h = self._height_meters
-        agg_window_len = self._agg_window_len
-        z, xz, yz, yyz, xxz, xyz = tuple (self._dem_arr_dict[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
-        xxxxminusxx2 = (agg_window_len**4 - (5 * agg_window_len**2) + 4) / 180
-        xx = (agg_window_len**2 - 1) / 12
-        a00 = (xxz - (xx * z)) / xxxxminusxx2
-        a10 = xyz / (2 * xx**2)
-        a11 = (yyz - (xx * z)) / xxxxminusxx2
-        b0 = xz / xx
-        b1 = yz / xx
-
-        # directional derivative of the slope of the following equation
-        # in the direction of the slope, derived in mathematica
-        # a00(x*w)**2 + 2a10(x*w)(y*h) + a11(y*h)**2 + b0(x*w) + b1(y*h) + cc
-        profile = (2*(a11*(b1**2)*(h**4) + b0*(w**2)*(2*a10*b1*(h**2) + a00*b0*(w**2)))) / ((b1*h)**2 + (b0*w)**2)
-
-        return profile
+            file_name = self._create_file_name('profile', self._dem_data.num_aggre)
+            return self._create_tif(profile, file_name, self._dem_data.num_aggre)
 
     # generate image of aggregated planform curvature, second derivative perpendicular to steepest descent
     def dem_planform(self):
-        planform = self._planform()
-        planform = _Utilities._arr_dtype_conversion(planform, np.uint16)
-        agg_window_len = self._agg_window_len
-        file_name = os.path.splitext(self._file_name)[0] + '_planform_w' + str(agg_window_len) +'.tif'
-        return self._create_tif(planform, agg_window_len=agg_window_len, file_name=file_name)
+        if (Dem_data is None):
+            print('Unable to calculate planform, DEM data not initialized')
+            return None
+        else:
+            planform = dem.planform(self._dem_data)
+            planform = self._arr_dtype_conversion(planform, np.uint16)
 
-    # return array of aggregated planform curvature, second derivative perpendicular to steepest descent
-    def _planform(self):
-        if (self._dem_arr_dict['z'].size == 0):
-            raise ValueError('Arrays must be initialized before calculating planform')
-
-        w = self._width_meters
-        h = self._height_meters
-        agg_window_len = self._agg_window_len
-        z, xz, yz, yyz, xxz, xyz = tuple (self._dem_arr_dict[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
-        xxxxminusxx2 = (agg_window_len**4 - (5 * agg_window_len**2) + 4) / 180
-        xx = (agg_window_len**2 - 1) / 12
-        a00 = (xxz - (xx * z)) / xxxxminusxx2
-        a10 = xyz / (2 * xx**2)
-        a11 = (yyz - (xx * z)) / xxxxminusxx2
-        b0 = xz / xx
-        b1 = yz / xx
-
-        
-        # directional derivative of the slope of the following equation
-        # in the direction perpendicular to slope, derived in mathematica
-        # a00(x*w)**2 + 2a10(x*w)(y*h) + a11(y*h)**2 + b0(x*w) + b1(y*h) + cc
-        planform = (2*h*w*(a11*b0*b1*(h**2) - a10*(b1**2)*(h**2) + a10*(b0**2)*(w**2) - a00*b0*b1*(w**2))) / ((b1*h)**2 + (b0*w)**2)
-
-        return planform
+            file_name = self._create_file_name('planform', self._dem_data.num_aggre)
+            return self._create_tif(planform, file_name, self._dem_data.num_aggre)
 
     # generate image of aggregated standard curvature
     def dem_standard(self):
-        standard = self._standard()
-        standard = _Utilities._arr_dtype_conversion(standard, np.uint16)
-        
-        agg_window_len = self._agg_window_len
-        file_name = os.path.splitext(self._file_name)[0] + '_standard_w' + str(agg_window_len) +'.tif'
-        return self._create_tif(standard, agg_window_len=agg_window_len, file_name=file_name)
-    
-    # return array of aggregated standard curvature
-    def _standard(self):
-        if (self._dem_arr_dict['z'].size == 0):
-            raise ValueError('Arrays must be initialized before calculating standard curvature')
-        
-        w = self._width_meters
-        h = self._height_meters
-        agg_window_len = self._agg_window_len
-        z, xz, yz, yyz, xxz, xyz = tuple (self._dem_arr_dict[i] for i in ('z', 'xz', 'yz', 'yyz', 'xxz', 'xyz'))
-        xxxxminusxx2 = (agg_window_len**4 - (5 * agg_window_len**2) + 4) / 180
-        xx = (agg_window_len**2 - 1) / 12
-        a00 = (xxz - (xx * z)) / xxxxminusxx2
-        a10 = xyz / (2 * (xx**2))
-        a11 = (yyz - (xx * z)) / xxxxminusxx2
-        b0 = xz / xx
-        b1 = yz / xx
-
-        # (profile + planform) / 2
-        # derived in mathematica
-        standard = (a00*b0*(w**3)*(-b1*h + b0*w) + a11*b1*(h**3)*(b1*h + b0*w) + a10*h*w*((-b1**2)*(h**2) + 2*b0*b1*h*w + (b0**2)*(w**2))) / ((b1*h)**2 + (b0*w)**2)
-
-        return standard
+        if (Dem_data is None):
+            print('Unable to calculate standard, DEM data not initialized')
+            return None
+        else:
+            standard = dem.standard(self._dem_data)
+            standard = self._arr_dtype_conversion(standard, np.uint16)
+            
+            file_name = self._create_file_name('standard', self._dem_data.num_aggre)
+            return self._create_tif(standard, file_name, self._dem_data.num_aggre)

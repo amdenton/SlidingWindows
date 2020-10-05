@@ -45,18 +45,18 @@ def aggregate_brute(arr_in, operation, num_aggre=1):
 # Aggregate arr_in
 # Assuming 2*prev_aggre size windows are already aggregated
 # returns floating point array
-def aggregate(arr_in, operation, num_prev_aggre=0, num_aggre=1):
+def aggregate(arr_in, operation, num_aggre=1, start_window_power=0):
     if (not isinstance(operation, Agg_ops)):
         raise ValueError('operation must be of type Agg_ops')
     if (num_aggre < 1):
         raise ValueError('num_aggre must be positive')
-    if (num_prev_aggre < 0):
+    if (start_window_power < 0):
         raise ValueError('prev_aggre must be non-negative')
 
     y_max = arr_in.shape[0]
     x_max = arr_in.shape[1]
     arr_out = arr_in.flatten().astype(float)
-    delta = 2**num_prev_aggre
+    delta = 2**start_window_power
     
     # iterate through sliding window sizes
     for _ in range(num_aggre):
@@ -84,7 +84,7 @@ def aggregate(arr_in, operation, num_prev_aggre=0, num_aggre=1):
         delta *= 2
 
     # remove last removal_num rows and columns, they are not aggregate pixels
-    removal_num = (2**(num_prev_aggre + num_aggre)) - (2**num_prev_aggre)
+    removal_num = (2**(start_window_power + num_aggre)) - (2**start_window_power)
 
     # pad to make array square
     arr_out = np.pad(arr_out, (0, removal_num), 'constant')
@@ -95,7 +95,7 @@ def aggregate(arr_in, operation, num_prev_aggre=0, num_aggre=1):
     
     return arr_out
 
-def dem_aggregation(dem_data, num_aggre=1):
+def aggregate_dem(dem_data, num_aggre=1):
     if (not isinstance(dem_data, Dem_data)):
         raise ValueError('den_data must be of type Dem_data')
 
@@ -137,7 +137,7 @@ def dem_aggregation(dem_data, num_aggre=1):
     dem_data.set_arrays(z, xz, yz, xxz, yyz, xyz)
     dem_data.num_aggre = num_prev_aggre
 
-def dem_aggregation_brute(dem_data, num_aggre=1):
+def aggregate_dem_brute(dem_data, num_aggre=1):
     if (not isinstance(dem_data, Dem_data)):
         raise ValueError('den_data must be of type Dem_data')
 

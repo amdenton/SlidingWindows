@@ -1,32 +1,50 @@
-import numpy as np
 import zipfile
 import pickle
 import os
+
+import numpy as np
 import affine
 
 class Dem_data:
 
     # TODO set to float?
-    def __init__(self, profile, z, xz=None, yz=None, xxz=None, yyz=None, xyz=None, num_aggre=0, num_aggre_updated=0):
-        self.profile = profile
-
+    def __init__(self, z, pixel_width=1, pixel_height=1, num_aggre=0, xz=None, yz=None, xxz=None, yyz=None, xyz=None):
         self.num_aggre = num_aggre
-        self._num_aggre_updated = num_aggre_updated
-
+        self.pixel_width = pixel_width
+        self.pixel_height = pixel_height
         self._z = z.astype(float)
+        
         shape = z.shape
-
         for array in [xz, yz, xxz, yyz, xyz]:
             if (array is None):
                 array = np.zeros(shape).astype(float)
             else:
+                array = array.astype(float)
                 if (array.shape != shape):
                     raise ValueError('All arrays must have the same shape')
         
         self.set_arrays(z, xz, yz, xxz, yyz, xyz)
 
-    def get_arrays(self):
+    def arrays(self):
         return self._z, self._xz, self._yz, self._xxz, self._yyz, self._xyz
+
+    def z(self):
+        return self._z
+    
+    def xz(self):
+        return self._xz
+    
+    def yz(self):
+        return self._yz
+                    
+    def xxz(self):
+        return self._xxz
+    
+    def yyz(self):
+        return self._yyz
+
+    def xyz(self):
+        return self._xyz
 
     def set_arrays(self, z, xz, yz, xxz, yyz, xyz):
         shape = z.shape
@@ -45,25 +63,8 @@ class Dem_data:
         self._yyz = yyz
         self._xyz = xyz
 
-    def update_img_tsfm(self, transform):
-        num_trunc = 2**self.num_aggre - 2**self._num_aggre_updated
-        img_offset = num_trunc / 2
-
-        x = transform[2] + ((transform[0] + transform[1]) * img_offset)
-        y = transform[5] + ((transform[3] + transform[4]) * img_offset)
-        transform = affine.Affine(transform[0], transform[1], x, transform[3] , transform[4], y)
-
-        self._num_aggre_updated += self.num_aggre
-
-    def img_tsfm_is_updated(self):
-        return (self.num_aggre == self._num_aggre_updated)
-
     @staticmethod
     def from_import(file_name):
-        with zipfile.ZipFile(file_name) as zip:
-            with zip.open('profile.pickle') as profile_pkl:
-                profile = pickle.load(profile_pkl)
-
         with np.load(file_name) as npz:
             z = npz['z']
             xz = npz['xz']
@@ -71,10 +72,11 @@ class Dem_data:
             xxz = npz['xxz']
             yyz = npz['yyz']
             xyz = npz['xyz']
+            pixel_width = npz['pixel_width']
+            pixel_height = npz['pixel_height']
             num_aggre = npz['num_aggre']
-            num_aggre_updated = npz['num_aggre_updated']
 
-        return Dem_data(profile, z, xz, yz, xxz, yyz, xyz, num_aggre, num_aggre_updated)
+        return Dem_data(z, pixel_width, pixel_height, num_aggre, xz, yz, xxz, yyz, xyz)
     
     def export(self, file_name):
         np.savez(
@@ -85,15 +87,7 @@ class Dem_data:
             xxz=self._xxz,
             yyz=self._yyz,
             xyz=self._xyz,
-            num_aggre=self.num_aggre,
-            num_aggre_updated = self._num_aggre_updated
+            pixel_width=self.pixel_width,
+            pixel_height=self.pixel_height,
+            num_aggre=self.num_aggre
         )
-
-        with open('profile.pickle', 'wb') as profile_pkl:
-            pickle.dump(self.profile, profile_pkl)
-
-        with zipfile.ZipFile(file_name, 'a') as zip:
-            zip.write('profile.pickle')
-
-        os.remove('profile.pickle')
-
