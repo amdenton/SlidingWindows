@@ -102,38 +102,31 @@ def regression_brute(arr_a, arr_b, num_aggre):
 # check if an image is black and white or not
 # i.e. only contains values of dtype.min and dtype.max
 # TODO should min value be arr_in.dtype.min or 0?
-def _is_binary(arr_in):
+# TODO maybe remove this later
+def is_binary(arr_in):
     max_val = np.amax(arr_in)
     return ((arr_in==0) | (arr_in==max_val)).all()
 
 # Compute fractal dimension on 2**power_target wide pixel areas
-def fractal(arr_in, power_start, power_target):
-    if (not _is_binary(arr_in)):
-        raise ValueError('array must be binary')
-    if (power_start < 0 or power_start >= power_target):
-        raise ValueError('power_start must be nonzero and less than power_target')
-
-    arr = arr_in.astype(float)
-    x_max = arr.shape[1] - (2**power_target - 1)
-    y_max = arr.shape[0] - (2**power_target - 1)
-    denom_regress = np.empty(power_target - power_start)
-    num_regress = np.empty([(power_target - power_start), (x_max * y_max)])
+def fractal(arr_in, threshold, num_aggre):
+    arr_binary = binary(arr_in, threshold)
+    removal_num = (2**num_aggre - 1)
+    y_max = arr_binary.shape[0] - removal_num
+    x_max = arr_binary.shape[1] - removal_num
+    denom_regress = np.empty(num_aggre)
+    num_regress = np.empty([(num_aggre), (x_max * y_max)])
     
-    if power_start > 1:
-        arr = aggregation.aggregate(arr, Agg_ops.maximum, (power_start-1))
-
-    num_aggre = (power_target - power_start)
     for i in range(num_aggre):
-        arr = aggregation.aggregate(arr, Agg_ops.maximum, 1, i)
+        if (i > 0):
+            arr_binary = aggregation.aggregate(arr_binary, Agg_ops.maximum, 1, i - 1)
 
-        arr_sum = aggregation.aggregate(arr, Agg_ops.add_all, (num_aggre - i), power_start + i)
-        arr_sum = np.maximum(arr_sum, 1)
+        arr_sum = aggregation.aggregate(arr_binary, Agg_ops.add_all, num_aggre - i, i)
 
         arr_sum = np.log2(arr_sum)
-        denom_regress[i] = (num_aggre - 1)
+        denom_regress[i] = i
         num_regress[i, ] = arr_sum.flatten()
 
-    arr_slope = np.polynomial.polynomial.polyfit(denom_regress, num_regress, 1)[1]
+    arr_slope = np.polynomial.polynomial.Polynomial.fit(denom_regress, num_regress, 1)[1]
     arr_out = np.reshape(arr_slope, (y_max, x_max))
     return arr_out
 

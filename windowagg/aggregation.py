@@ -48,10 +48,6 @@ def aggregate_brute(arr_in, operation, num_aggre=1):
 def aggregate(arr_in, operation, num_aggre=1, start_window_power=0):
     if (not isinstance(operation, Agg_ops)):
         raise ValueError('operation must be of type Agg_ops')
-    if (num_aggre < 1):
-        raise ValueError('num_aggre must be positive')
-    if (start_window_power < 0):
-        raise ValueError('prev_aggre must be non-negative')
 
     y_max = arr_in.shape[0]
     x_max = arr_in.shape[1]
@@ -85,13 +81,8 @@ def aggregate(arr_in, operation, num_aggre=1, start_window_power=0):
 
     # remove last removal_num rows and columns, they are not aggregate pixels
     removal_num = (2**(start_window_power + num_aggre)) - (2**start_window_power)
-
-    # pad to make array square
-    arr_out = np.pad(arr_out, (0, removal_num), 'constant')
-
-    y_max -= removal_num
-    arr_out = np.reshape(arr_out, (y_max, x_max))
-    arr_out = np.delete(arr_out, np.s_[-removal_num:], 1)
+    arr_out = np.delete(arr_out, np.s_[(x_max - removal_num)::x_max])
+    arr_out = np.reshape(arr_out, [(y_max - removal_num), (x_max - removal_num)])
     
     return arr_out
 
