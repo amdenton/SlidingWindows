@@ -39,3 +39,6 @@ tmp/**
 .vs/
 test-results.xml
 !build/
+
+## LOCAL DEBUGGING ##
+Main.py
