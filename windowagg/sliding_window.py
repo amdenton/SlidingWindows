@@ -257,85 +257,77 @@ class SlidingWindow:
         else:
             self._dem_data.export(file_name)
 
-    # Assumes first band is DEM
     def initializ_dem(self, band):
-        transform = self._img.profile['transform']
-        pixel_width = math.sqrt(transform[0]**2 + transform[3]**2)
-        pixel_height = math.sqrt(transform[1]**2 + transform[4]**2)
-
-        self._dem_data = Dem_data(self._img.read(band), pixel_width, pixel_height)
+        self._dem_data = Dem_data(self._img.read(band))
 
     def aggregate_dem(self, num_aggre=1):
+        if (Dem_data is None):
+            self.initializ_dem(0)
+
         aggregation.aggregate_dem(self._dem_data, num_aggre)
 
     # generate image of aggregated slope values
     def dem_slope(self):
         if (Dem_data is None):
-            print('Unable to calculate slope, DEM data not initialized')
-            return None
-        else:
-            slope = dem.slope(self._dem_data)
-            slope = self._arr_dtype_conversion(slope, np.uint16, low_bound=0, high_bound=np.iinfo(np.uint16).max)
+            self.initializ_dem(0)
 
-            file_name = self._create_file_name('slope', self._dem_data.num_aggre)
-            return self._create_tif(slope, file_name, self._dem_data.num_aggre)
+        slope = dem.slope(self._dem_data)
+        slope = self._arr_dtype_conversion(slope, np.uint16, low_bound=0, high_bound=np.iinfo(np.uint16).max)
+
+        file_name = self._create_file_name('slope', self._dem_data.num_aggre)
+        return self._create_tif(slope, file_name, self._dem_data.num_aggre)
 
     # generate image of aggregated slope values
     def dem_slope_angle(self):
         if (Dem_data is None):
-            print('Unable to calculate slope angle, DEM data not initialized')
-            return None
-        else:
-            slope_angle = dem.slope_angle(self._dem_data)
-            slope_angle = self._arr_dtype_conversion(slope_angle, dtype=np.uint16, low_bound=0, high_bound=math.pi/2)
+            self.initializ_dem(0)
 
-            file_name = self._create_file_name('slope_angle', self._dem_data.num_aggre)
-            return self._create_tif(slope_angle, file_name, self._dem_data.num_aggre)
+        slope_angle = dem.slope_angle(self._dem_data)
+        slope_angle = self._arr_dtype_conversion(slope_angle, dtype=np.uint16, low_bound=0, high_bound=math.pi/2)
+
+        file_name = self._create_file_name('slope_angle', self._dem_data.num_aggre)
+        return self._create_tif(slope_angle, file_name, self._dem_data.num_aggre)
 
     # generate image of aggregated angle of steepest descent, calculated as clockwise angle from north 
     def dem_aspect(self):
         if (Dem_data is None):
-            print('Unable to calculate aspect, DEM data not initialized')
-            return None
-        else:
-            aspect = dem.aspect(self._dem_data)
-            aspect = self._arr_dtype_conversion(aspect, dtype=np.uint16, low_bound=0, high_bound=(2 * math.pi))
+            self.initializ_dem(0)
 
-            file_name = self._create_file_name('aspect', self._dem_data.num_aggre)
-            return self._create_tif(aspect, file_name, self._dem_data.num_aggre)
+        aspect = dem.aspect(self._dem_data)
+        aspect = self._arr_dtype_conversion(aspect, dtype=np.uint16, low_bound=0, high_bound=(2 * math.pi))
+
+        file_name = self._create_file_name('aspect', self._dem_data.num_aggre)
+        return self._create_tif(aspect, file_name, self._dem_data.num_aggre)
 
     # generate image of aggregated profile curvature, second derivative parallel to steepest descent
     def dem_profile(self):
         if (Dem_data is None):
-            print('Unable to calculate profile, DEM data not initialized')
-            return None
-        else:
-            profile = dem.profile(self._dem_data)
-            profile = self._arr_dtype_conversion(profile, np.uint16)
+            self.initializ_dem(0)
 
-            file_name = self._create_file_name('profile', self._dem_data.num_aggre)
-            return self._create_tif(profile, file_name, self._dem_data.num_aggre)
+        profile = dem.profile(self._dem_data)
+        profile = self._arr_dtype_conversion(profile, np.uint16)
+
+        file_name = self._create_file_name('profile', self._dem_data.num_aggre)
+        return self._create_tif(profile, file_name, self._dem_data.num_aggre)
 
     # generate image of aggregated planform curvature, second derivative perpendicular to steepest descent
     def dem_planform(self):
         if (Dem_data is None):
-            print('Unable to calculate planform, DEM data not initialized')
-            return None
-        else:
-            planform = dem.planform(self._dem_data)
-            planform = self._arr_dtype_conversion(planform, np.uint16)
+            self.initializ_dem(0)
 
-            file_name = self._create_file_name('planform', self._dem_data.num_aggre)
-            return self._create_tif(planform, file_name, self._dem_data.num_aggre)
+        planform = dem.planform(self._dem_data)
+        planform = self._arr_dtype_conversion(planform, np.uint16)
+
+        file_name = self._create_file_name('planform', self._dem_data.num_aggre)
+        return self._create_tif(planform, file_name, self._dem_data.num_aggre)
 
     # generate image of aggregated standard curvature
     def dem_standard(self):
         if (Dem_data is None):
-            print('Unable to calculate standard, DEM data not initialized')
-            return None
-        else:
-            standard = dem.standard(self._dem_data)
-            standard = self._arr_dtype_conversion(standard, np.uint16)
-            
-            file_name = self._create_file_name('standard', self._dem_data.num_aggre)
-            return self._create_tif(standard, file_name, self._dem_data.num_aggre)
+            self.initializ_dem(0)
+
+        standard = dem.standard(self._dem_data)
+        standard = self._arr_dtype_conversion(standard, np.uint16)
+        
+        file_name = self._create_file_name('standard', self._dem_data.num_aggre)
+        return self._create_tif(standard, file_name, self._dem_data.num_aggre)
