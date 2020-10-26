@@ -173,19 +173,6 @@ class SlidingWindow:
         file_name = self._create_file_name('binary')
         return self._create_tif(arr, file_name)
 
-    # create image with each band aggregated num_aggre times
-    def aggregation(self, operation, num_aggre):        
-        arr = []
-        for x in range(self._img.count):
-            arr.append(self._img.read(x + 1))
-            arr[x] = aggregation.aggregate(arr[x], 0, num_aggre, operation)
-
-            # TODO remove later
-            arr[x] = self._arr_dtype_conversion(arr[x], np.uint8)
-        
-        file_name = self._create_file_name('aggregation', num_aggre)
-        return self._create_tif(arr, file_name, num_aggre)
-
     # create image with pixel values cooresponding to their aggregated regression slope
     def regression(self, band1, band2, num_aggre):
         bands = np.array(range(self._img.count)) + 1
