@@ -5,9 +5,9 @@ import math
 import numpy as np
 
 # return array of aggregated slope values
-def slope(dem_data):
-    w = dem_data.pixel_width
-    h = dem_data.pixel_height
+def slope(dem_data, pixel_width=1, pixel_height=1):
+    w = pixel_width
+    h = pixel_height
     agg_window_len = 2**dem_data.num_aggre
     xz = dem_data.xz()
     yz = dem_data.yz()
@@ -24,9 +24,9 @@ def slope(dem_data):
     return slope
 
 # return array of aggregated slope values
-def slope_angle(dem_data):
-    w = dem_data.pixel_width
-    h = dem_data.pixel_height
+def slope_angle(dem_data, pixel_width=1, pixel_height=1):
+    w = pixel_width
+    h = pixel_height
     agg_window_len = 2**dem_data.num_aggre
     xz = dem_data.xz()
     yz = dem_data.yz()
@@ -51,9 +51,9 @@ def aspect(dem_data):
     return aspect
 
 # return array of aggregated profile curvature, second derivative parallel to steepest descent
-def profile(dem_data):
-    w = dem_data.pixel_width
-    h = dem_data.pixel_height
+def profile(dem_data, pixel_width=1, pixel_height=1):
+    w = pixel_width
+    h = pixel_height
     agg_window_len = 2**dem_data.num_aggre
     z, xz, yz, yyz, xxz, xyz = dem_data.arrays()
 
@@ -73,9 +73,9 @@ def profile(dem_data):
     return profile
 
 # return array of aggregated planform curvature, second derivative perpendicular to steepest descent
-def planform(dem_data):
-    w = dem_data.pixel_width
-    h = dem_data.pixel_height
+def planform(dem_data, pixel_width=1, pixel_height=1):
+    w = pixel_width
+    h = pixel_height
     agg_window_len = 2**dem_data.num_aggre
     z, xz, yz, yyz, xxz, xyz = dem_data.arrays()
     
@@ -96,9 +96,9 @@ def planform(dem_data):
     return planform
 
 # return array of aggregated standard curvature
-def standard(dem_data):
-    w = dem_data.pixel_width
-    h = dem_data.pixel_height
+def standard(dem_data, pixel_width=1, pixel_height=1):
+    w = pixel_width
+    h = pixel_height
     agg_window_len = 2**dem_data.num_aggre
     z, xz, yz, yyz, xxz, xyz = dem_data.arrays()
     

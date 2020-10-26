@@ -46,6 +46,10 @@ class SlidingWindow:
         self._img = rasterio.open(file_path)
         self._dem_data = None
 
+        transform = self._img.profile['transform']
+        self.pixel_width = math.sqrt(transform[0]**2 + transform[3]**2)
+        self.pixel_height = math.sqrt(transform[1]**2 + transform[4]**2)
+
     def __enter__(self):
         return self
     def __exit__(self, exc_type, exc_val, traceback):
@@ -250,7 +254,7 @@ class SlidingWindow:
         if (Dem_data is None):
             self.initializ_dem(0)
 
-        slope = dem.slope(self._dem_data)
+        slope = dem.slope(self._dem_data, self.pixel_width, self.pixel_height)
         slope = self._arr_dtype_conversion(slope, np.uint16, low_bound=0, high_bound=np.iinfo(np.uint16).max)
 
         file_name = self._create_file_name('slope', self._dem_data.num_aggre)
@@ -261,7 +265,7 @@ class SlidingWindow:
         if (Dem_data is None):
             self.initializ_dem(0)
 
-        slope_angle = dem.slope_angle(self._dem_data)
+        slope_angle = dem.slope_angle(self._dem_data, self.pixel_width, self.pixel_height)
         slope_angle = self._arr_dtype_conversion(slope_angle, dtype=np.uint16, low_bound=0, high_bound=math.pi/2)
 
         file_name = self._create_file_name('slope_angle', self._dem_data.num_aggre)
@@ -283,7 +287,7 @@ class SlidingWindow:
         if (Dem_data is None):
             self.initializ_dem(0)
 
-        profile = dem.profile(self._dem_data)
+        profile = dem.profile(self._dem_data, self.pixel_width, self.pixel_height)
         profile = self._arr_dtype_conversion(profile, np.uint16)
 
         file_name = self._create_file_name('profile', self._dem_data.num_aggre)
@@ -294,7 +298,7 @@ class SlidingWindow:
         if (Dem_data is None):
             self.initializ_dem(0)
 
-        planform = dem.planform(self._dem_data)
+        planform = dem.planform(self._dem_data, self.pixel_width, self.pixel_height)
         planform = self._arr_dtype_conversion(planform, np.uint16)
 
         file_name = self._create_file_name('planform', self._dem_data.num_aggre)
@@ -305,7 +309,7 @@ class SlidingWindow:
         if (Dem_data is None):
             self.initializ_dem(0)
 
-        standard = dem.standard(self._dem_data)
+        standard = dem.standard(self._dem_data, self.pixel_width, self.pixel_height)
         standard = self._arr_dtype_conversion(standard, np.uint16)
         
         file_name = self._create_file_name('standard', self._dem_data.num_aggre)
