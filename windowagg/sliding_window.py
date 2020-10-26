@@ -90,7 +90,7 @@ class SlidingWindow:
             if (arr_max > high_bound):
                 raise ValueError('Upper bound must be greater than all values')
 
-        dtype_max = helper.get_max_min(dtype)[0]
+        dtype_max = helper.dtype_max(dtype)
         arr_out = ((arr_in - low_bound)/(high_bound - low_bound)*dtype_max).astype(dtype)
         return arr_out
 
@@ -111,7 +111,7 @@ class SlidingWindow:
         profile = self._img.profile
         transform = profile["transform"]
 
-        num_trunc = 2**num_aggre
+        num_trunc = (2**num_aggre - 1)
         img_offset = num_trunc / 2
 
         x = transform[2] + ((transform[0] + transform[1]) * img_offset)

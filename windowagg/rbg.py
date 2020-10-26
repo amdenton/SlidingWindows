@@ -22,7 +22,7 @@ def binary(arr, threshold):
     if (threshold < 0 or threshold > 1):
         raise ValueError('threshold must be between 0 and 1')
     dtype = arr.dtype
-    maximum, _ = helper.get_max_min(dtype)
+    maximum = helper.dtype_max(dtype)
     return np.where(arr < (threshold * maximum), 0, maximum).astype(dtype)
 
 # Do num_aggre aggregations and return the regression slope between two bands
