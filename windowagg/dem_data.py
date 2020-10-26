@@ -8,10 +8,8 @@ import affine
 class Dem_data:
 
     # TODO set to float?
-    def __init__(self, z, pixel_width=1, pixel_height=1, num_aggre=0, xz=None, yz=None, xxz=None, yyz=None, xyz=None):
+    def __init__(self, z, num_aggre=0, xz=None, yz=None, xxz=None, yyz=None, xyz=None):
         self.num_aggre = num_aggre
-        self.pixel_width = pixel_width
-        self.pixel_height = pixel_height
         self._z = z.astype(float)
         
         shape = z.shape
@@ -72,11 +70,9 @@ class Dem_data:
             xxz = npz['xxz']
             yyz = npz['yyz']
             xyz = npz['xyz']
-            pixel_width = npz['pixel_width']
-            pixel_height = npz['pixel_height']
             num_aggre = npz['num_aggre']
 
-        return Dem_data(z, pixel_width, pixel_height, num_aggre, xz, yz, xxz, yyz, xyz)
+        return Dem_data(z, num_aggre, xz, yz, xxz, yyz, xyz)
     
     def export(self, file_name):
         np.savez(
@@ -87,7 +83,5 @@ class Dem_data:
             xxz=self._xxz,
             yyz=self._yyz,
             xyz=self._xyz,
-            pixel_width=self.pixel_width,
-            pixel_height=self.pixel_height,
             num_aggre=self.num_aggre
         )
