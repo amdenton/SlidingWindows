@@ -24,7 +24,6 @@ class SlidingWindow:
     # array conversion TODO needs updating
     # ndvi
     # binary
-    # aggregation
     # regression
     # Pearson
     # fractal
@@ -38,22 +37,9 @@ class SlidingWindow:
     # DEM profile curve
     # DEM planform curve
 
-    # TODO what is the best way to handles aggregations?
-    # 1. generate all images at each step
-    # 2. specify what images to generate at each step
-    # 3. store the results of all aggregations and let user choose images to generate at which step
-
-    # TODO how should RBG and DEM be differentiated?
-
-    # TODO Is the current model for the application desirable?
-    # currently: intit with image -> execute operation -> image automatically created
-    # cannot currently stack bands, TODO do we want to?
-
     # TODO research how to create python package
     # TODO add more documentation
-    # TODO should all these methods use floating point?
-
-    # TODO should transform be updated in create tiff?
+    # TODO should all these methods use floating point? datatypes?!?!
 
     def __init__(self, file_path, cell_width=1, cell_height=1):
         self._file_name = os.path.split(file_path)[-1]
@@ -157,8 +143,10 @@ class SlidingWindow:
         red = self._img.read(red_band)
         ir = self._img.read(ir_band)
         ndvi = rbg.ndvi(red, ir)
+
         # TODO change later?
         ndvi = self._arr_dtype_conversion(ndvi, np.uint8)
+
         file_name = self._create_file_name('ndvi')
         return self._create_tif(ndvi, file_name)
 
@@ -170,6 +158,10 @@ class SlidingWindow:
 
         arr = self._img.read(band)
         arr = rbg.binary(arr, threshold)
+        
+        # TODO change later?
+        arr = self._arr_dtype_conversion(arr, np.uint8)
+
         file_name = self._create_file_name('binary')
         return self._create_tif(arr, file_name)
 
