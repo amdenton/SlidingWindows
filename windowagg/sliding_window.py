@@ -80,10 +80,10 @@ class SlidingWindow:
         ndvi = rbg.ndvi(red, ir)
 
         # TODO change later?
-        ndvi = self._arr_dtype_conversion(ndvi, np.uint8)
+        ndvi = helper.arr_dtype_conversion(ndvi, np.uint8)
 
         file_name = self._create_file_name('ndvi')
-        return helper.create_tif(ndvi, file_name)
+        return helper.create_tif(ndvi, file_name, self._img.profile)
 
     # create binary image
     def binary(self, band, threshold):
@@ -95,10 +95,10 @@ class SlidingWindow:
         arr = rbg.binary(arr, threshold)
         
         # TODO change later?
-        arr = self._arr_dtype_conversion(arr, np.uint8)
+        arr = helper.arr_dtype_conversion(arr, np.uint8)
 
         file_name = self._create_file_name('binary')
-        return helper.create_tif(arr, file_name)
+        return helper.create_tif(arr, file_name, self._img.profile)
 
     # create image with pixel values cooresponding to their aggregated regression slope
     def regression(self, band1, band2, num_aggre):
@@ -111,10 +111,10 @@ class SlidingWindow:
         arr_m = rbg.regression(arr_a, arr_b, num_aggre)
 
         # TODO remove later
-        arr_m = self._arr_dtype_conversion(arr_m, np.uint8)
+        arr_m = helper.arr_dtype_conversion(arr_m, np.uint8)
 
         file_name = self._create_file_name('regression', num_aggre)
-        return helper.create_tif(arr_m, file_name, num_aggre)
+        return helper.create_tif(arr_m, file_name, num_aggre, self._img.profile, num_aggre)
 
     # TODO potentially add R squared method?
 
@@ -129,25 +129,25 @@ class SlidingWindow:
         arr_r = rbg.pearson(arr_a, arr_b, num_aggre)
 
         # TODO remove later
-        arr_r = self._arr_dtype_conversion(arr_r, np.uint8)
+        arr_r = helper.arr_dtype_conversion(arr_r, np.uint8)
 
         file_name = self._create_file_name('pearson', num_aggre)
-        return helper.create_tif(arr_r, file_name, num_aggre)
+        return helper.create_tif(arr_r, file_name, num_aggre, self._img.profile, num_aggre)
 
     # create image with pixel values cooresponding to their aggregated fractal dimension
-    def fractal(self, band, threshold, power_start, power_target):
+    def fractal(self, band, threshold, num_aggre):
         bands = np.array(range(self._img.count)) + 1
         if (band not in bands):
             raise ValueError('band must be in range of %r.' % bands)
 
         arr = self._img.read(band)
-        arr = rbg.fractal(rbg.binary(arr, threshold), power_start, power_target)
+        arr = rbg.fractal(arr, threshold, num_aggre)
 
         # TODO remove later
-        arr = self._arr_dtype_conversion(arr, np.uint16)
+        arr = helper.arr_dtype_conversion(arr, np.uint16)
 
-        #file_name = self._create_file_name('fractal', num_aggre)
-        return helper.create_tif(arr, power_target)
+        file_name = self._create_file_name('fractal', num_aggre)
+        return helper.create_tif(arr, file_name, self._img.profile, num_aggre)
 
     def fractal_3d(self, band, num_aggre):
         bands = np.array(range(self._img.count)) + 1
@@ -158,9 +158,10 @@ class SlidingWindow:
         arr = rbg.fractal_3d(arr, num_aggre)
 
         # TODO remove later
-        arr = self._arr_dtype_conversion(arr, np.uint8)
+        arr = helper.arr_dtype_conversion(arr, np.uint8)
 
-        return helper.create_tif(arr, num_aggre)
+        file_name = self._create_file_name('fractal_3d', num_aggre)
+        return helper.create_tif(arr, file_name, self._img.profile, num_aggre)
 
     def import_dem(self, file_name):
         self._dem_data = Dem_data.from_import(file_name)
@@ -186,10 +187,10 @@ class SlidingWindow:
             self.initializ_dem(0)
 
         slope = dem.slope(self._dem_data, self.pixel_width, self.pixel_height)
-        slope = self._arr_dtype_conversion(slope, np.uint16, low_bound=0, high_bound=np.iinfo(np.uint16).max)
+        slope = helper.arr_dtype_conversion(slope, np.uint16, low_bound=0, high_bound=np.iinfo(np.uint16).max)
 
         file_name = self._create_file_name('slope', self._dem_data.num_aggre)
-        return helper.create_tif(slope, file_name, self._dem_data.num_aggre)
+        return helper.create_tif(slope, file_name, self._img.profile, self._dem_data.num_aggre)
 
     # generate image of aggregated slope values
     def dem_slope_angle(self):
@@ -197,10 +198,10 @@ class SlidingWindow:
             self.initializ_dem(0)
 
         slope_angle = dem.slope_angle(self._dem_data, self.pixel_width, self.pixel_height)
-        slope_angle = self._arr_dtype_conversion(slope_angle, dtype=np.uint16, low_bound=0, high_bound=math.pi/2)
+        slope_angle = helper.arr_dtype_conversion(slope_angle, dtype=np.uint16, low_bound=0, high_bound=math.pi/2)
 
         file_name = self._create_file_name('slope_angle', self._dem_data.num_aggre)
-        return helper.create_tif(slope_angle, file_name, self._dem_data.num_aggre)
+        return helper.create_tif(slope_angle, file_name, self._img.profile, self._dem_data.num_aggre)
 
     # generate image of aggregated angle of steepest descent, calculated as clockwise angle from north 
     def dem_aspect(self):
@@ -208,10 +209,10 @@ class SlidingWindow:
             self.initializ_dem(0)
 
         aspect = dem.aspect(self._dem_data)
-        aspect = self._arr_dtype_conversion(aspect, dtype=np.uint16, low_bound=0, high_bound=(2 * math.pi))
+        aspect = helper.arr_dtype_conversion(aspect, dtype=np.uint16, low_bound=0, high_bound=(2 * math.pi))
 
         file_name = self._create_file_name('aspect', self._dem_data.num_aggre)
-        return helper.create_tif(aspect, file_name, self._dem_data.num_aggre)
+        return helper.create_tif(aspect, file_name, self._img.profile, self._dem_data.num_aggre)
 
     # generate image of aggregated profile curvature, second derivative parallel to steepest descent
     def dem_profile(self):
@@ -219,10 +220,10 @@ class SlidingWindow:
             self.initializ_dem(0)
 
         profile = dem.profile(self._dem_data, self.pixel_width, self.pixel_height)
-        profile = self._arr_dtype_conversion(profile, np.uint16)
+        profile = helper.arr_dtype_conversion(profile, np.uint16)
 
         file_name = self._create_file_name('profile', self._dem_data.num_aggre)
-        return helper.create_tif(profile, file_name, self._dem_data.num_aggre)
+        return helper.create_tif(profile, file_name, self._img.profile, self._dem_data.num_aggre)
 
     # generate image of aggregated planform curvature, second derivative perpendicular to steepest descent
     def dem_planform(self):
@@ -230,10 +231,10 @@ class SlidingWindow:
             self.initializ_dem(0)
 
         planform = dem.planform(self._dem_data, self.pixel_width, self.pixel_height)
-        planform = self._arr_dtype_conversion(planform, np.uint16)
+        planform = helper.arr_dtype_conversion(planform, np.uint16)
 
         file_name = self._create_file_name('planform', self._dem_data.num_aggre)
-        return helper.create_tif(planform, file_name, self._dem_data.num_aggre)
+        return helper.create_tif(planform, file_name, self._img.profile, self._dem_data.num_aggre)
 
     # generate image of aggregated standard curvature
     def dem_standard(self):
@@ -241,7 +242,7 @@ class SlidingWindow:
             self.initializ_dem(0)
 
         standard = dem.standard(self._dem_data, self.pixel_width, self.pixel_height)
-        standard = self._arr_dtype_conversion(standard, np.uint16)
+        standard = helper.arr_dtype_conversion(standard, np.uint16)
         
         file_name = self._create_file_name('standard', self._dem_data.num_aggre)
-        return helper.create_tif(standard, file_name, self._dem_data.num_aggre)
+        return helper.create_tif(standard, file_name, self._img.profile, self._dem_data.num_aggre)
