@@ -116,6 +116,6 @@ def arr_dtype_conversion(arr_in, dtype=np.uint16, low_bound=None, high_bound=Non
         if (arr_max > high_bound):
             raise ValueError('Upper bound must be greater than all values')
 
-    dtype_max = helper.dtype_max(dtype)
-    arr_out = ((arr_in - low_bound)/(high_bound - low_bound)*dtype_max).astype(dtype)
+    maximum = dtype_max(dtype)
+    arr_out = ((arr_in - low_bound) / (high_bound - low_bound) * maximum).astype(dtype)
     return arr_out

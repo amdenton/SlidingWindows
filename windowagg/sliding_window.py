@@ -42,7 +42,8 @@ class SlidingWindow:
     # TODO should all these methods use floating point? datatypes?!?!
 
     def __init__(self, file_path, cell_width=1, cell_height=1):
-        self._file_name = os.path.split(file_path)[-1]
+        file_basename = os.path.basename(file_path)
+        self._file_name = os.path.splitext(file_basename)[0]
         self._img = rasterio.open(file_path)
         self._dem_data = None
 
@@ -114,7 +115,7 @@ class SlidingWindow:
         arr_m = helper.arr_dtype_conversion(arr_m, np.uint8)
 
         file_name = self._create_file_name('regression', num_aggre)
-        return helper.create_tif(arr_m, file_name, num_aggre, self._img.profile, num_aggre)
+        return helper.create_tif(arr_m, file_name, self._img.profile, num_aggre)
 
     # TODO potentially add R squared method?
 
@@ -132,7 +133,7 @@ class SlidingWindow:
         arr_r = helper.arr_dtype_conversion(arr_r, np.uint8)
 
         file_name = self._create_file_name('pearson', num_aggre)
-        return helper.create_tif(arr_r, file_name, num_aggre, self._img.profile, num_aggre)
+        return helper.create_tif(arr_r, file_name, self._img.profile, num_aggre)
 
     # create image with pixel values cooresponding to their aggregated fractal dimension
     def fractal(self, band, threshold, num_aggre):
@@ -166,25 +167,27 @@ class SlidingWindow:
     def import_dem(self, file_name):
         self._dem_data = Dem_data.from_import(file_name)
 
-    def export_dem(self, file_name):
+    def export_dem(self, file_name=None):
         if (self._dem_data is None):
             print('No DEM data to export')
         else:
+            if (file_name == None):
+                file_name = self._file_name + '_w=' + str(2**self._dem_data.num_aggre)
             self._dem_data.export(file_name)
 
-    def initializ_dem(self, band=0):
+    def initializ_dem(self, band=1):
         self._dem_data = Dem_data(self._img.read(band))
 
     def aggregate_dem(self, num_aggre=1):
-        if (Dem_data is None):
-            self.initializ_dem(0)
+        if (self._dem_data is None):
+            self.initializ_dem(1)
 
         aggregation.aggregate_dem(self._dem_data, num_aggre)
 
     # generate image of aggregated slope values
     def dem_slope(self):
-        if (Dem_data is None):
-            self.initializ_dem(0)
+        if (self._dem_data is None):
+            self.initializ_dem(1)
 
         slope = dem.slope(self._dem_data, self.pixel_width, self.pixel_height)
         slope = helper.arr_dtype_conversion(slope, np.uint16, low_bound=0, high_bound=np.iinfo(np.uint16).max)
@@ -194,8 +197,8 @@ class SlidingWindow:
 
     # generate image of aggregated slope values
     def dem_slope_angle(self):
-        if (Dem_data is None):
-            self.initializ_dem(0)
+        if (self._dem_data is None):
+            self.initializ_dem(1)
 
         slope_angle = dem.slope_angle(self._dem_data, self.pixel_width, self.pixel_height)
         slope_angle = helper.arr_dtype_conversion(slope_angle, dtype=np.uint16, low_bound=0, high_bound=math.pi/2)
@@ -205,8 +208,8 @@ class SlidingWindow:
 
     # generate image of aggregated angle of steepest descent, calculated as clockwise angle from north 
     def dem_aspect(self):
-        if (Dem_data is None):
-            self.initializ_dem(0)
+        if (self._dem_data is None):
+            self.initializ_dem(1)
 
         aspect = dem.aspect(self._dem_data)
         aspect = helper.arr_dtype_conversion(aspect, dtype=np.uint16, low_bound=0, high_bound=(2 * math.pi))
@@ -216,8 +219,8 @@ class SlidingWindow:
 
     # generate image of aggregated profile curvature, second derivative parallel to steepest descent
     def dem_profile(self):
-        if (Dem_data is None):
-            self.initializ_dem(0)
+        if (self._dem_data is None):
+            self.initializ_dem(1)
 
         profile = dem.profile(self._dem_data, self.pixel_width, self.pixel_height)
         profile = helper.arr_dtype_conversion(profile, np.uint16)
@@ -227,8 +230,8 @@ class SlidingWindow:
 
     # generate image of aggregated planform curvature, second derivative perpendicular to steepest descent
     def dem_planform(self):
-        if (Dem_data is None):
-            self.initializ_dem(0)
+        if (self._dem_data is None):
+            self.initializ_dem(1)
 
         planform = dem.planform(self._dem_data, self.pixel_width, self.pixel_height)
         planform = helper.arr_dtype_conversion(planform, np.uint16)
@@ -238,8 +241,8 @@ class SlidingWindow:
 
     # generate image of aggregated standard curvature
     def dem_standard(self):
-        if (Dem_data is None):
-            self.initializ_dem(0)
+        if (self._dem_data is None):
+            self.initializ_dem(1)
 
         standard = dem.standard(self._dem_data, self.pixel_width, self.pixel_height)
         standard = helper.arr_dtype_conversion(standard, np.uint16)

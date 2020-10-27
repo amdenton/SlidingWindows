@@ -8,20 +8,16 @@ import affine
 class Dem_data:
 
     # TODO set to float?
-    def __init__(self, z, num_aggre=0, xz=None, yz=None, xxz=None, yyz=None, xyz=None):
+    def __init__(self, z, xz=None, yz=None, xxz=None, yyz=None, xyz=None, num_aggre=0):
         self.num_aggre = num_aggre
-        self._z = z.astype(float)
+        arrays = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz}
         
         shape = z.shape
-        for array in [xz, yz, xxz, yyz, xyz]:
-            if (array is None):
-                array = np.zeros(shape).astype(float)
-            else:
-                array = array.astype(float)
-                if (array.shape != shape):
-                    raise ValueError('All arrays must have the same shape')
+        for i in arrays:
+            if (arrays[i] is None):
+                arrays[i] = np.zeros(shape)
         
-        self.set_arrays(z, xz, yz, xxz, yyz, xyz)
+        self.set_arrays(**arrays)
 
     def arrays(self):
         return self._z, self._xz, self._yz, self._xxz, self._yyz, self._xyz
@@ -44,22 +40,22 @@ class Dem_data:
     def xyz(self):
         return self._xyz
 
+    # TODO should these be set to floats? Should I check dtype?
     def set_arrays(self, z, xz, yz, xxz, yyz, xyz):
         shape = z.shape
-        dtype = z.dtype
 
+        if (len(z.shape) != 2):
+            raise ValueError('All arrays must be 2 dimensional')
         for array in [xz, yz, xxz, yyz, xyz]:
             if (array.shape != shape):
                 raise ValueError('All arrays must have the same shape')
-            if (array.dtype != dtype):
-                raise ValueError('All arrays must have the same data type')
 
-        self._z = z
-        self._xz = xz
-        self._yz = yz
-        self._xxz = xxz
-        self._yyz = yyz
-        self._xyz = xyz
+        self._z = z.astype(float)
+        self._xz = xz.astype(float)
+        self._yz = yz.astype(float)
+        self._xxz = xxz.astype(float)
+        self._yyz = yyz.astype(float)
+        self._xyz = xyz.astype(float)
 
     @staticmethod
     def from_import(file_name):
@@ -72,7 +68,7 @@ class Dem_data:
             xyz = npz['xyz']
             num_aggre = npz['num_aggre']
 
-        return Dem_data(z, num_aggre, xz, yz, xxz, yyz, xyz)
+        return Dem_data(z, xz, yz, xxz, yyz, xyz, num_aggre)
     
     def export(self, file_name):
         np.savez(

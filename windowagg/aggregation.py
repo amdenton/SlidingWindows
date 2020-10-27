@@ -81,16 +81,21 @@ def aggregate(arr_in, operation, num_aggre=1, start_window_power=0):
 
     # remove last removal_num rows and columns, they are not aggregate pixels
     removal_num = (2**(start_window_power + num_aggre)) - (2**start_window_power)
-    arr_out = np.delete(arr_out, np.s_[(x_max - removal_num)::x_max])
-    arr_out = np.reshape(arr_out, [(y_max - removal_num), (x_max - removal_num)])
     
+    if (removal_num > 0):
+        arr_out = np.pad(arr_out, (0, removal_num), 'constant')
+        arr_out = np.reshape(arr_out, [(y_max - removal_num), x_max])
+        arr_out = np.delete(arr_out, np.s_[-removal_num::], 1)
+    else:
+        arr_out = np.reshape(arr_out, [y_max, x_max])
+
     return arr_out
 
 def aggregate_dem(dem_data, num_aggre=1):
     if (not isinstance(dem_data, Dem_data)):
         raise ValueError('den_data must be of type Dem_data')
 
-    z, xz, yz, xxz, yyz, xyz = dem_data.get_arrays()
+    z, xz, yz, xxz, yyz, xyz = dem_data.arrays()
     num_prev_aggre = dem_data.num_aggre
     window_size = 2**num_prev_aggre
 

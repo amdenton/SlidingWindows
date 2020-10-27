@@ -95,7 +95,7 @@ class ImageGenerator:
                 value = (1/math.sqrt(2*math.pi*sigma**2))*math.exp(-((y-mu)**2 / (2*sigma**2)) + noise*rand.normal())
                 arr[y][x] = value
 
-        arr = helepr.arr_dtype_conversion(arr, self.dtype)
+        arr = helper.arr_dtype_conversion(arr, self.dtype)
         fn = self.test_dir + 'gauss_horizontal.tif'
         helper.create_tif(arr, fn)
         return fn
