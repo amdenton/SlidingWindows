@@ -43,3 +43,4 @@ test-results.xml
 ## LOCAL DEBUGGING ##
 Main.py
 /dem/*
+*.npz
