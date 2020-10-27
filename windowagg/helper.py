@@ -97,8 +97,6 @@ def create_tif(arr_in, file_name, profile=None, num_aggre=0):
         for i in range(len(arr_in)): 
             dst.write(arr_in[i], i + 1)
 
-    return file_name
-
 # TODO fix later, not the best way to do this
 # arr_in: array to be converted
 # dtype: numpy type to convert to
