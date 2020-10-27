@@ -2,7 +2,6 @@ import rasterio
 import math
 import affine
 import numpy as np
-from windowagg.utilities import _Utilities
 from windowagg.sliding_window import SlidingWindow
 import numpy.random as rand
 import os
@@ -55,7 +54,7 @@ class ImageGenerator:
                 j += 1
             
         fn = self.test_dir + 'star_' + str(angle) + 'skew_' + str(x_offset) + '-' + str(y_offset) + 'offset.tif'
-        _Utilities._create_new_tif(arr.astype(self.dtype), fn, angle, x_offset, y_offset)
+        helper.create_tif(arr.astype(self.dtype), fn)
         return fn
 
     def gauss(self, image_size=300, sigma=None, mu=None, noise=0, angle=0, x_offset=1, y_offset=1):
@@ -130,7 +129,7 @@ class ImageGenerator:
             j += 1
         
         fn = self.test_dir + 'se_gradient_' + str(angle) + 'skew_' + str(x_offset) + '-' + str(y_offset) + 'offset.tif'
-        _Utilities._create_new_tif(arr.astype(self.dtype), fn, angle, x_offset, y_offset)
+        helper.create_tif(arr.astype(self.dtype), fn)
         return fn
 
     def nw_gradient(self, image_size=300, angle=0, x_offset=1, y_offset=1):
@@ -145,7 +144,7 @@ class ImageGenerator:
             j -= 1
         
         fn = self.test_dir + 'nw_gradient_' + str(angle) + 'skew_' + str(x_offset) + '-' + str(y_offset) + 'offset.tif'
-        _Utilities._create_new_tif(arr.astype(self.dtype), fn, angle, x_offset, y_offset)
+        helper.create_tif(arr.astype(self.dtype), fn)
         return fn
 
     def s_gradient(self, image_size=300, angle=0, x_offset=1, y_offset=1):
@@ -158,7 +157,7 @@ class ImageGenerator:
             i += 1
         
         fn = self.test_dir + 's_gradient_' + str(angle) + 'skew_' + str(x_offset) + '-' + str(y_offset) + 'offset.tif'
-        _Utilities._create_new_tif(arr.astype(self.dtype), fn, angle, x_offset, y_offset)
+        helper.create_tif(arr.astype(self.dtype), fn)
         return fn
 
     def n_gradient(self, image_size=300, angle=0, x_offset=1, y_offset=1):
@@ -171,7 +170,7 @@ class ImageGenerator:
             i -= 1
         
         fn = self.test_dir + 'n_gradient_' + str(angle) + 'skew_' + str(x_offset) + '-' + str(y_offset) + 'offset.tif'
-        _Utilities._create_new_tif(arr.astype(self.dtype), fn, angle, x_offset, y_offset)
+        helper.create_tif(arr.astype(self.dtype), fn)
         return fn
 
     def random(self, image_size=300, num_bands=4, angle=0, x_offset=1, y_offset=1):
