@@ -47,7 +47,7 @@ def aspect(dem_data):
     xz = dem_data.xz()
     yz = dem_data.yz()
     
-    aspect = (-np.arctan(xz / yz) - (np.sign(yz) * math.pi / 2) + (math.pi / 2)) % (2 * math.pi)
+    aspect = np.arctan(xz / yz) + (-np.sign(xz) * math.pi / 2)
     return aspect
 
 # return array of aggregated profile curvature, second derivative parallel to steepest descent

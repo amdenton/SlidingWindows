@@ -1,9 +1,4 @@
-import zipfile
-import pickle
-import os
-
 import numpy as np
-import affine
 
 class Dem_data:
 

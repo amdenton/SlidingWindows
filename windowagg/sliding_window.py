@@ -261,7 +261,7 @@ class SlidingWindow:
             self.initializ_dem(1)
 
         aspect = dem.aspect(self._dem_data)
-        aspect = helper.arr_dtype_conversion(aspect, dtype=np.uint16, low_bound=0, high_bound=(2 * math.pi))
+        aspect = helper.arr_dtype_conversion(aspect, dtype=np.uint8)
 
         file_name = self._create_file_name('aspect', self._dem_data.num_aggre)
         helper.create_tif(aspect, file_name, self._img.profile, self._dem_data.num_aggre)
