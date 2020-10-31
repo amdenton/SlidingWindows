@@ -4,51 +4,34 @@ import math
 
 import numpy as np
 
-# return array of aggregated slope values
-def slope(dem_data, pixel_width=1, pixel_height=1):
-    w = pixel_width
-    h = pixel_height
-    agg_window_len = 2**dem_data.num_aggre
-    xz = dem_data.xz()
-    yz = dem_data.yz()
+# TODO What is the scale of the elevation, width and height of the image?
+# should I take in scale as a parameter? Or derive it from metadata?
 
+# return array of aggregated slope values
+def slope(dem_data):
+    agg_window_len = 2**dem_data.num_aggre
     xx = (agg_window_len**2 - 1) / 12
-    b0 = xz / xx
-    b1 = yz / xx
 
-    # directional derivative of the following equation
-    # in the direction of the positive gradient, derived in mathematica
-    # a00(x*w)**2 + 2a10(x*w)(y*h) + a11(y*h)**2 + b0(x*w) + b1(y*h) + cc
-    slope = np.sqrt((b1*h)**2 + (b0*w)**2)
-
-    return slope
+    return (
+        ( np.power(dem_data.xz(), 2) + np.power(dem_data.yz(), 2) )
+        /
+        ( xx * ( np.absolute(dem_data.xz()) + np.absolute(dem_data.yz()) ) )
+    )
 
 # return array of aggregated slope values
-def slope_angle(dem_data, pixel_width=1, pixel_height=1):
-    w = pixel_width
-    h = pixel_height
+def slope_angle(dem_data):
     agg_window_len = 2**dem_data.num_aggre
-    xz = dem_data.xz()
-    yz = dem_data.yz()
+    xx = (agg_window_len**2 - 1) / 12
 
-    slope_x = (xz * 12) / (agg_window_len**2 - 1)
-    slope_y = (yz * 12) / (agg_window_len**2 - 1)
-    mag = np.sqrt(np.power(slope_x, 2) + np.power(slope_y, 2))
-    x_unit = slope_x / mag
-    y_unit = slope_y / mag
-    len_opp = (x_unit * slope_x) + (y_unit * slope_y)
-    len_adj = np.sqrt( (x_unit * w)**2 + (y_unit * h)**2 )
-    slope_angle = np.arctan(len_opp / len_adj)
-
-    return slope_angle
+    return np.arctan(
+        ( np.power(dem_data.xz(), 2) + np.power(dem_data.yz(), 2) )
+        /
+        ( xx * ( np.absolute(dem_data.xz()) + np.absolute(dem_data.yz()) ) )
+    )
 
 # return array of aggregated angle of steepest descent, calculated as clockwise angle from north
 def aspect(dem_data):
-    xz = dem_data.xz()
-    yz = dem_data.yz()
-    
-    aspect = np.arctan(xz / yz) + (-np.sign(xz) * math.pi / 2)
-    return aspect
+    return np.arctan(dem_data.xz() / dem_data.yz()) + (-np.sign(dem_data.xz()) * math.pi / 2)
 
 # return array of aggregated profile curvature, second derivative parallel to steepest descent
 def profile(dem_data, pixel_width=1, pixel_height=1):

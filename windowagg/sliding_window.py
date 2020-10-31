@@ -228,8 +228,8 @@ class SlidingWindow:
         if (self._dem_data is None):
             self.initializ_dem(1)
 
-        slope = dem.slope(self._dem_data, self.pixel_width, self.pixel_height)
-        slope = helper.arr_dtype_conversion(slope, np.uint16, low_bound=0, high_bound=np.iinfo(np.uint16).max)
+        slope = dem.slope(self._dem_data)
+        slope = helper.arr_dtype_conversion(slope, np.uint16)
 
         file_name = self._create_file_name('slope', self._dem_data.num_aggre)
         helper.create_tif(slope, file_name, self._img.profile, self._dem_data.num_aggre)
@@ -244,8 +244,8 @@ class SlidingWindow:
         if (self._dem_data is None):
             self.initializ_dem(1)
 
-        slope_angle = dem.slope_angle(self._dem_data, self.pixel_width, self.pixel_height)
-        slope_angle = helper.arr_dtype_conversion(slope_angle, dtype=np.uint16, low_bound=0, high_bound=math.pi/2)
+        slope_angle = dem.slope_angle(self._dem_data)
+        slope_angle = helper.arr_dtype_conversion(slope_angle, dtype=np.uint16)
 
         file_name = self._create_file_name('slope_angle', self._dem_data.num_aggre)
         helper.create_tif(slope_angle, file_name, self._img.profile, self._dem_data.num_aggre)
@@ -261,7 +261,7 @@ class SlidingWindow:
             self.initializ_dem(1)
 
         aspect = dem.aspect(self._dem_data)
-        aspect = helper.arr_dtype_conversion(aspect, dtype=np.uint8)
+        aspect = helper.arr_dtype_conversion(aspect, dtype=np.uint16)
 
         file_name = self._create_file_name('aspect', self._dem_data.num_aggre)
         helper.create_tif(aspect, file_name, self._img.profile, self._dem_data.num_aggre)

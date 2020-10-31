@@ -45,14 +45,14 @@ def aggregate_brute(arr_in, operation, num_aggre=1):
 # Aggregate arr_in
 # Assuming 2*prev_aggre size windows are already aggregated
 # returns floating point array
-def aggregate(arr_in, operation, num_aggre=1, start_window_power=0):
+def aggregate(arr_in, operation, num_aggre=1, num_prev_aggre=0):
     if (not isinstance(operation, Agg_ops)):
         raise ValueError('operation must be of type Agg_ops')
 
     y_max = arr_in.shape[0]
     x_max = arr_in.shape[1]
     arr_out = arr_in.flatten().astype(float)
-    delta = 2**start_window_power
+    delta = 2**num_prev_aggre
     
     # iterate through sliding window sizes
     for _ in range(num_aggre):
@@ -80,7 +80,7 @@ def aggregate(arr_in, operation, num_aggre=1, start_window_power=0):
         delta *= 2
 
     # remove last removal_num rows and columns, they are not aggregate pixels
-    removal_num = (2**(start_window_power + num_aggre)) - (2**start_window_power)
+    removal_num = (2**(num_prev_aggre + num_aggre)) - (2**num_prev_aggre)
     
     if (removal_num > 0):
         arr_out = np.pad(arr_out, (0, removal_num), 'constant')
@@ -101,24 +101,24 @@ def aggregate_dem(dem_data, num_aggre=1):
 
     for _ in range(num_aggre):
 
-        z_sum_all = aggregate(z, Agg_ops.add_all, num_prev_aggre)
-        z_sum_bottom = aggregate(z, Agg_ops.add_bottom, num_prev_aggre)
-        z_sum_right = aggregate(z, Agg_ops.add_right, num_prev_aggre)
-        z_sum_main_diag = aggregate(z, Agg_ops.add_main_diag, num_prev_aggre)
+        z_sum_all = aggregate(z, Agg_ops.add_all, 1, num_prev_aggre)
+        z_sum_bottom = aggregate(z, Agg_ops.add_bottom, 1, num_prev_aggre)
+        z_sum_right = aggregate(z, Agg_ops.add_right, 1, num_prev_aggre)
+        z_sum_main_diag = aggregate(z, Agg_ops.add_main_diag, 1, num_prev_aggre)
 
-        xz_sum_all = aggregate(xz, Agg_ops.add_all, num_prev_aggre)
-        xz_sum_bottom = aggregate(xz, Agg_ops.add_bottom, num_prev_aggre)
-        xz_sum_right = aggregate(xz, Agg_ops.add_right, num_prev_aggre)
+        xz_sum_all = aggregate(xz, Agg_ops.add_all, 1, num_prev_aggre)
+        xz_sum_bottom = aggregate(xz, Agg_ops.add_bottom, 1, num_prev_aggre)
+        xz_sum_right = aggregate(xz, Agg_ops.add_right, 1, num_prev_aggre)
 
-        yz_sum_all = aggregate(yz, Agg_ops.add_all, num_prev_aggre)
-        yz_sum_bottom = aggregate(yz, Agg_ops.add_bottom, num_prev_aggre)
-        yz_sum_right = aggregate(yz, Agg_ops.add_right, num_prev_aggre)
+        yz_sum_all = aggregate(yz, Agg_ops.add_all, 1, num_prev_aggre)
+        yz_sum_bottom = aggregate(yz, Agg_ops.add_bottom, 1, num_prev_aggre)
+        yz_sum_right = aggregate(yz, Agg_ops.add_right, 1, num_prev_aggre)
 
-        xxz_sum_all = aggregate(xxz, Agg_ops.add_all, num_prev_aggre)
+        xxz_sum_all = aggregate(xxz, Agg_ops.add_all, 1, num_prev_aggre)
 
-        yyz_sum_all = aggregate(yyz, Agg_ops.add_all, num_prev_aggre)
+        yyz_sum_all = aggregate(yyz, Agg_ops.add_all, 1, num_prev_aggre)
 
-        xyz_sum_all = aggregate(xyz, Agg_ops.add_all, num_prev_aggre)
+        xyz_sum_all = aggregate(xyz, Agg_ops.add_all, 1, num_prev_aggre)
 
         window_size *= 2
         num_prev_aggre += 1
