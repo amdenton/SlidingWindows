@@ -46,12 +46,14 @@ def aggregate_brute(arr_in, operation, num_aggre=1):
 # Assuming 2*prev_aggre size windows are already aggregated
 # returns floating point array
 def aggregate(arr_in, operation, num_aggre=1, num_prev_aggre=0):
+    if (len(arr_in.shape) != 2):
+            raise ValueError('Array must be 2 dimensional')
     if (not isinstance(operation, Agg_ops)):
         raise ValueError('operation must be of type Agg_ops')
 
     y_max = arr_in.shape[0]
     x_max = arr_in.shape[1]
-    arr_out = arr_in.flatten().astype(float)
+    arr_out = arr_in.flatten()
     delta = 2**num_prev_aggre
     
     # iterate through sliding window sizes
@@ -66,11 +68,11 @@ def aggregate(arr_in, operation, num_aggre=1, num_prev_aggre=0):
 
         if operation == Agg_ops.add_all:
             arr_out = top_left + top_right + bottom_left + bottom_right
-        if operation == Agg_ops.add_bottom:
+        elif operation == Agg_ops.add_bottom:
             arr_out = -top_left - top_right + bottom_left + bottom_right
-        if operation == Agg_ops.add_right:
+        elif operation == Agg_ops.add_right:
             arr_out = -top_left + top_right - bottom_left + bottom_right
-        if operation == Agg_ops.add_main_diag:
+        elif operation == Agg_ops.add_main_diag:
             arr_out = top_left - top_right - bottom_left + bottom_right
         elif operation == Agg_ops.maximum:
             arr_out = np.maximum(np.maximum(np.maximum(top_left, top_right), bottom_left), bottom_right)

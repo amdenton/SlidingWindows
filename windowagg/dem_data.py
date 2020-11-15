@@ -2,15 +2,14 @@ import numpy as np
 
 class Dem_data:
 
-    # TODO set to float?
+    # TODO default arrays are float, is that good?
     def __init__(self, z, xz=None, yz=None, xxz=None, yyz=None, xyz=None, num_aggre=0):
         self.num_aggre = num_aggre
         arrays = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz}
         
-        shape = z.shape
         for i in arrays:
             if (arrays[i] is None):
-                arrays[i] = np.zeros(shape)
+                arrays[i] = np.zeros(z.shape, z.dtype)
         
         self.set_arrays(**arrays)
 
@@ -35,7 +34,6 @@ class Dem_data:
     def xyz(self):
         return self._xyz
 
-    # TODO should these be set to floats? Should I check dtype?
     def set_arrays(self, z, xz, yz, xxz, yyz, xyz):
         shape = z.shape
 
@@ -45,12 +43,12 @@ class Dem_data:
             if (array.shape != shape):
                 raise ValueError('All arrays must have the same shape')
 
-        self._z = z.astype(float)
-        self._xz = xz.astype(float)
-        self._yz = yz.astype(float)
-        self._xxz = xxz.astype(float)
-        self._yyz = yyz.astype(float)
-        self._xyz = xyz.astype(float)
+        self._z = z
+        self._xz = xz
+        self._yz = yz
+        self._xxz = xxz
+        self._yyz = yyz
+        self._xyz = xyz
 
     @staticmethod
     def from_import(file_name):
