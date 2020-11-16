@@ -11,27 +11,33 @@ import numpy as np
 def slope(dem_data):
     agg_window_len = 2**dem_data.num_aggre
     xx = (agg_window_len**2 - 1) / 12
+    xz = dem_data.xz()
+    yz = dem_data.yz()
 
     return (
-        ( np.power(dem_data.xz(), 2) + np.power(dem_data.yz(), 2) )
+        ( np.power(xz, 2) + np.power(yz, 2) )
         /
-        ( xx * ( np.absolute(dem_data.xz()) + np.absolute(dem_data.yz()) ) )
+        ( xx * ( np.absolute(xz) + np.absolute(yz) ) )
     )
 
 # return array of aggregated slope values
 def slope_angle(dem_data):
     agg_window_len = 2**dem_data.num_aggre
     xx = (agg_window_len**2 - 1) / 12
+    xz = dem_data.xz()
+    yz = dem_data.yz()
 
     return np.arctan(
-        ( np.power(dem_data.xz(), 2) + np.power(dem_data.yz(), 2) )
+        ( np.power(xz, 2) + np.power(yz, 2) )
         /
-        ( xx * ( np.absolute(dem_data.xz()) + np.absolute(dem_data.yz()) ) )
+        ( xx * ( np.absolute(xz) + np.absolute(yz) ) )
     )
 
 # return array of aggregated angle of steepest descent, calculated as clockwise angle from north
 def aspect(dem_data):
-    return np.arctan(dem_data.xz() / dem_data.yz()) + (-np.sign(dem_data.xz()) * math.pi / 2)
+    xz = dem_data.xz()
+    yz = dem_data.yz()
+    return np.arctan(xz / yz) + (-np.sign(xz) * math.pi / 2)
 
 # return array of aggregated profile curvature, second derivative parallel to steepest descent
 def profile(dem_data, pixel_width=1, pixel_height=1):

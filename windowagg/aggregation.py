@@ -102,35 +102,55 @@ def aggregate_dem(dem_data, num_aggre=1):
     window_size = 2**num_prev_aggre
 
     for _ in range(num_aggre):
-
-        z_sum_all = aggregate(z, Agg_ops.add_all, 1, num_prev_aggre)
-        z_sum_bottom = aggregate(z, Agg_ops.add_bottom, 1, num_prev_aggre)
-        z_sum_right = aggregate(z, Agg_ops.add_right, 1, num_prev_aggre)
-        z_sum_main_diag = aggregate(z, Agg_ops.add_main_diag, 1, num_prev_aggre)
-
-        xz_sum_all = aggregate(xz, Agg_ops.add_all, 1, num_prev_aggre)
-        xz_sum_bottom = aggregate(xz, Agg_ops.add_bottom, 1, num_prev_aggre)
-        xz_sum_right = aggregate(xz, Agg_ops.add_right, 1, num_prev_aggre)
-
-        yz_sum_all = aggregate(yz, Agg_ops.add_all, 1, num_prev_aggre)
-        yz_sum_bottom = aggregate(yz, Agg_ops.add_bottom, 1, num_prev_aggre)
-        yz_sum_right = aggregate(yz, Agg_ops.add_right, 1, num_prev_aggre)
-
-        xxz_sum_all = aggregate(xxz, Agg_ops.add_all, 1, num_prev_aggre)
-
-        yyz_sum_all = aggregate(yyz, Agg_ops.add_all, 1, num_prev_aggre)
-
-        xyz_sum_all = aggregate(xyz, Agg_ops.add_all, 1, num_prev_aggre)
-
         window_size *= 2
         num_prev_aggre += 1
 
-        z = 0.25 * z_sum_all
-        xz = 0.25 * (xz_sum_all + (0.25 * window_size * z_sum_right))
-        yz = 0.25 * (yz_sum_all + (0.25 * window_size * z_sum_bottom))
-        xxz = 0.25 * (xxz_sum_all + (.5 * window_size * xz_sum_right) + (0.0625 * window_size**2 * z_sum_all))
-        yyz = 0.25 * (yyz_sum_all + (.5 * window_size * yz_sum_bottom) + (0.0625 * window_size**2 * z_sum_all))
-        xyz = 0.25 * (xyz_sum_all + (0.25 * window_size * (xz_sum_bottom + yz_sum_right)) + (0.0625 * window_size**2 * z_sum_main_diag))
+        z_sum_all = aggregate(z, Agg_ops.add_all, 1, num_prev_aggre)
+
+        new_z = 0.25 * z_sum_all
+
+        xxz_sum_all = aggregate(xxz, Agg_ops.add_all, 1, num_prev_aggre)
+        xz_sum_right = aggregate(xz, Agg_ops.add_right, 1, num_prev_aggre)
+        new_xxz = 0.25 * (xxz_sum_all + (.5 * window_size * xz_sum_right) + (0.0625 * window_size**2 * z_sum_all))
+        del xxz_sum_all
+        del xz_sum_right
+
+        yyz_sum_all = aggregate(yyz, Agg_ops.add_all, 1, num_prev_aggre)
+        yz_sum_bottom = aggregate(yz, Agg_ops.add_bottom, 1, num_prev_aggre)
+        new_yyz = 0.25 * (yyz_sum_all + (.5 * window_size * yz_sum_bottom) + (0.0625 * window_size**2 * z_sum_all))
+        del yyz_sum_all
+        del yz_sum_bottom
+
+        del z_sum_all
+
+        xz_sum_all = aggregate(xz, Agg_ops.add_all, 1, num_prev_aggre)
+        z_sum_right = aggregate(z, Agg_ops.add_right, 1, num_prev_aggre)
+        new_xz = 0.25 * (xz_sum_all + (0.25 * window_size * z_sum_right))
+        del xz_sum_all
+        del z_sum_right
+        
+        yz_sum_all = aggregate(yz, Agg_ops.add_all, 1, num_prev_aggre)
+        z_sum_bottom = aggregate(z, Agg_ops.add_bottom, 1, num_prev_aggre)
+        new_yz = 0.25 * (yz_sum_all + (0.25 * window_size * z_sum_bottom))
+        del yz_sum_all
+        del z_sum_bottom
+
+        xyz_sum_all = aggregate(xyz, Agg_ops.add_all, 1, num_prev_aggre)
+        xz_sum_bottom = aggregate(xz, Agg_ops.add_bottom, 1, num_prev_aggre)
+        yz_sum_right = aggregate(yz, Agg_ops.add_right, 1, num_prev_aggre)
+        z_sum_main_diag = aggregate(z, Agg_ops.add_main_diag, 1, num_prev_aggre)
+        new_xyz = 0.25 * (xyz_sum_all + (0.25 * window_size * (xz_sum_bottom + yz_sum_right)) + (0.0625 * window_size**2 * z_sum_main_diag))
+        del xyz_sum_all
+        del xz_sum_bottom
+        del yz_sum_right
+        del z_sum_main_diag
+
+        z = new_z
+        xz = new_xz
+        yz = new_yz
+        xxz = new_xxz
+        yyz = new_yyz
+        xyz = new_xyz
 
     dem_data.set_arrays(z, xz, yz, xxz, yyz, xyz)
     dem_data.num_aggre = num_prev_aggre
