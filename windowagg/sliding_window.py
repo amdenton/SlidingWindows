@@ -214,19 +214,19 @@ class SlidingWindow:
                 file_name = self._file_name + '_w=' + str(2**self._dem_data.num_aggre)
             self._dem_data.export(file_name)
 
-    def initializ_dem(self, band=1):
+    def initialize_dem(self, band=1):
         self._dem_data = Dem_data(self._img.read(band))
 
     def aggregate_dem(self, num_aggre=1):
         if (self._dem_data is None):
-            self.initializ_dem(1)
+            self.initialize_dem(1)
 
         aggregation.aggregate_dem(self._dem_data, num_aggre)
 
     # generate image of aggregated slope values
     def dem_slope(self):
         if (self._dem_data is None):
-            self.initializ_dem(1)
+            self.initialize_dem(1)
 
         slope = dem.slope(self._dem_data)
         slope = helper.arr_dtype_conversion(slope, np.uint16)
@@ -242,7 +242,7 @@ class SlidingWindow:
     # generate image of aggregated slope values
     def dem_slope_angle(self):
         if (self._dem_data is None):
-            self.initializ_dem(1)
+            self.initialize_dem(1)
 
         slope_angle = dem.slope_angle(self._dem_data)
         slope_angle = helper.arr_dtype_conversion(slope_angle, dtype=np.uint16)
@@ -258,7 +258,7 @@ class SlidingWindow:
     # generate image of aggregated angle of steepest descent, calculated as clockwise angle from north 
     def dem_aspect(self):
         if (self._dem_data is None):
-            self.initializ_dem(1)
+            self.initialize_dem(1)
 
         aspect = dem.aspect(self._dem_data)
         aspect = helper.arr_dtype_conversion(aspect, dtype=np.uint16)
@@ -274,7 +274,7 @@ class SlidingWindow:
     # generate image of aggregated profile curvature, second derivative parallel to steepest descent
     def dem_profile(self):
         if (self._dem_data is None):
-            self.initializ_dem(1)
+            self.initialize_dem(1)
 
         profile = dem.profile(self._dem_data, self.pixel_width, self.pixel_height)
         profile = helper.arr_dtype_conversion(profile, np.uint16)
@@ -290,7 +290,7 @@ class SlidingWindow:
     # generate image of aggregated planform curvature, second derivative perpendicular to steepest descent
     def dem_planform(self):
         if (self._dem_data is None):
-            self.initializ_dem(1)
+            self.initialize_dem(1)
 
         planform = dem.planform(self._dem_data, self.pixel_width, self.pixel_height)
         planform = helper.arr_dtype_conversion(planform, np.uint16)
@@ -306,7 +306,7 @@ class SlidingWindow:
     # generate image of aggregated standard curvature
     def dem_standard(self):
         if (self._dem_data is None):
-            self.initializ_dem(1)
+            self.initialize_dem(1)
 
         standard = dem.standard(self._dem_data, self.pixel_width, self.pixel_height)
         standard = helper.arr_dtype_conversion(standard, np.uint16)
