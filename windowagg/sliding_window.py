@@ -39,7 +39,7 @@ class SlidingWindow:
     # TODO add more documentation
     # TODO should all these methods use floating point? datatypes?!?!
 
-    def __init__(self, file_path, cell_width=1, cell_height=1):
+    def __init__(self, file_path, map_width_to_meters=1.0, map_height_to_meters=1.0):
         file_basename = os.path.basename(file_path)
         self._file_name = os.path.splitext(file_basename)[0]
         self._img = rasterio.open(file_path)
@@ -47,8 +47,8 @@ class SlidingWindow:
         self.autoPlot = False
 
         transform = self._img.profile['transform']
-        self.pixel_width = math.sqrt(transform[0]**2 + transform[3]**2)
-        self.pixel_height = math.sqrt(transform[1]**2 + transform[4]**2)
+        self.pixel_width = math.sqrt(transform[0]**2 + transform[3]**2) * map_width_to_meters
+        self.pixel_height = math.sqrt(transform[1]**2 + transform[4]**2) * map_height_to_meters
 
     def __enter__(self):
         return self
@@ -228,7 +228,7 @@ class SlidingWindow:
         if (self._dem_data is None):
             self.initialize_dem(1)
 
-        slope = dem.slope(self._dem_data)
+        slope = dem.slope(self._dem_data, self.pixel_width, self.pixel_height)
         slope = helper.arr_dtype_conversion(slope, np.uint16)
 
         file_name = self._create_file_name('slope', self._dem_data.num_aggre)
@@ -244,7 +244,7 @@ class SlidingWindow:
         if (self._dem_data is None):
             self.initialize_dem(1)
 
-        slope_angle = dem.slope_angle(self._dem_data)
+        slope_angle = dem.slope_angle(self._dem_data, self.pixel_width, self.pixel_height)
         slope_angle = helper.arr_dtype_conversion(slope_angle, dtype=np.uint16)
 
         file_name = self._create_file_name('slope_angle', self._dem_data.num_aggre)

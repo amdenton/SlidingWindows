@@ -8,7 +8,7 @@ import numpy as np
 # should I take in scale as a parameter? Or derive it from metadata?
 
 # return array of aggregated slope values
-def slope(dem_data):
+def slope(dem_data, pixel_width, pixel_height):
     agg_window_len = 2**dem_data.num_aggre
     xx = (agg_window_len**2 - 1) / 12
     xz = dem_data.xz()
@@ -17,11 +17,11 @@ def slope(dem_data):
     return (
         ( np.power(xz, 2) + np.power(yz, 2) )
         /
-        ( xx * ( np.absolute(xz) + np.absolute(yz) ) )
+        ( xx * ( (np.absolute(xz) * pixel_width) + (np.absolute(yz) * pixel_height) ) )
     )
 
 # return array of aggregated slope values
-def slope_angle(dem_data):
+def slope_angle(dem_data, pixel_width, pixel_height):
     agg_window_len = 2**dem_data.num_aggre
     xx = (agg_window_len**2 - 1) / 12
     xz = dem_data.xz()
@@ -30,7 +30,7 @@ def slope_angle(dem_data):
     return np.arctan(
         ( np.power(xz, 2) + np.power(yz, 2) )
         /
-        ( xx * ( np.absolute(xz) + np.absolute(yz) ) )
+        ( xx * ( (np.absolute(xz) * pixel_width) + (np.absolute(yz) * pixel_height) ) )
     )
 
 # return array of aggregated angle of steepest descent, calculated as clockwise angle from north
