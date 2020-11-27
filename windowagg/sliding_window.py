@@ -45,6 +45,7 @@ class SlidingWindow:
         self._img = rasterio.open(file_path)
         self._dem_data = None
         self.autoPlot = False
+        self.dtype = np.float32
 
         transform = self._img.profile['transform']
         self.pixel_width = math.sqrt(transform[0]**2 + transform[3]**2) * map_width_to_meters
@@ -215,7 +216,7 @@ class SlidingWindow:
             self._dem_data.export(file_name)
 
     def initialize_dem(self, band=1):
-        self._dem_data = Dem_data(self._img.read(band))
+        self._dem_data = Dem_data(self._img.read(band).astype(self.dtype))
 
     def aggregate_dem(self, num_aggre=1):
         if (self._dem_data is None):
@@ -275,6 +276,9 @@ class SlidingWindow:
     def dem_profile(self):
         if (self._dem_data is None):
             self.initialize_dem(1)
+        if (2**self._dem_data.num_aggre <= 2):
+            print('Curvature cannot be calculated on windows of size 2 or 1')
+            return
 
         profile = dem.profile(self._dem_data, self.pixel_width, self.pixel_height)
         profile = helper.arr_dtype_conversion(profile, np.uint16)
@@ -291,6 +295,9 @@ class SlidingWindow:
     def dem_planform(self):
         if (self._dem_data is None):
             self.initialize_dem(1)
+        if (2**self._dem_data.num_aggre <= 2):
+            print('Curvature cannot be calculated on windows of size 2 or 1')
+            return
 
         planform = dem.planform(self._dem_data, self.pixel_width, self.pixel_height)
         planform = helper.arr_dtype_conversion(planform, np.uint16)
@@ -307,6 +314,9 @@ class SlidingWindow:
     def dem_standard(self):
         if (self._dem_data is None):
             self.initialize_dem(1)
+        if (2**self._dem_data.num_aggre <= 2):
+            print('Curvature cannot be calculated on windows of size 2 or 1')
+            return
 
         standard = dem.standard(self._dem_data, self.pixel_width, self.pixel_height)
         standard = helper.arr_dtype_conversion(standard, np.uint16)
