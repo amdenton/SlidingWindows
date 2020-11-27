@@ -47,7 +47,7 @@ def aggregate_brute(arr_in, operation, num_aggre=1):
 # returns floating point array
 def aggregate(arr_in, operation, num_aggre=1, num_prev_aggre=0):
     if (len(arr_in.shape) != 2):
-            raise ValueError('Array must be 2 dimensional')
+        raise ValueError('Array must be 2 dimensional')
     if (not isinstance(operation, Agg_ops)):
         raise ValueError('operation must be of type Agg_ops')
 
@@ -59,7 +59,7 @@ def aggregate(arr_in, operation, num_aggre=1, num_prev_aggre=0):
     # iterate through sliding window sizes
     for _ in range(num_aggre):
         size = arr_out.size
-        
+
         # create offset slices of the array to aggregate elements
         top_left = arr_out[0 : (size - ((delta * x_max) + delta))]
         top_right = arr_out[delta: size - (x_max * delta)]
@@ -103,7 +103,6 @@ def aggregate_dem(dem_data, num_aggre=1):
 
     for _ in range(num_aggre):
         window_size *= 2
-        num_prev_aggre += 1
 
         z_sum_all = aggregate(z, Agg_ops.add_all, 1, num_prev_aggre)
 
@@ -151,6 +150,7 @@ def aggregate_dem(dem_data, num_aggre=1):
         xxz = new_xxz
         yyz = new_yyz
         xyz = new_xyz
+        num_prev_aggre += 1
 
     dem_data.set_arrays(z, xz, yz, xxz, yyz, xyz)
     dem_data.num_aggre = num_prev_aggre
