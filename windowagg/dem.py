@@ -15,13 +15,17 @@ def slope(dem_data, pixel_width, pixel_height):
     xx = (agg_window_len**2 - 1) / 12
     xz = dem_data.xz()
     yz = dem_data.yz()
-    dir_mag = np.sqrt(xz**2 + yz**2)
 
-    return (
-        ( np.power(xz, 2) + np.power(yz, 2) )
-        /
-        (xx * (np.abs((w * xz) / dir_mag) + np.abs((h * yz) / dir_mag)))
-    )
+    with np.errstate(invalid='ignore'):
+        slope = -(
+            np.sqrt(xz**2 + yz**2)
+            /
+            (xx * np.sqrt(((w**2 * xz**2) + (h**2 * yz**2)) / (xz**2 + yz**2)))
+        )
+        # when (xz == yz == 0) result is NaN
+        slope[np.isnan(slope)] = 0
+
+    return slope
 
 # return array of aggregated slope values
 def slope_angle(dem_data, pixel_width, pixel_height):
@@ -31,19 +35,29 @@ def slope_angle(dem_data, pixel_width, pixel_height):
     xx = (agg_window_len**2 - 1) / 12
     xz = dem_data.xz()
     yz = dem_data.yz()
-    dir_mag = np.sqrt(xz**2 + yz**2)
 
-    return np.arctan(
-        ( np.power(xz, 2) + np.power(yz, 2) )
-        /
-        (xx * (np.abs((w * xz) / dir_mag) + np.abs((h * yz) / dir_mag)))
-    )
+    with np.errstate(invalid='ignore'):
+        slope_angle = -(
+            np.sqrt(xz**2 + yz**2)
+            /
+            (xx * np.sqrt(((w**2 * xz**2) + (h**2 * yz**2)) / (xz**2 + yz**2)))
+        )
+        # when (xz == yz == 0) result is NaN
+        slope_angle[np.isnan(slope_angle)] = 0
+        slope_angle = np.arctan(slope_angle)
 
+    return slope_angle
 # return array of aggregated angle of steepest descent, calculated as clockwise angle from north
 def aspect(dem_data):
     xz = dem_data.xz()
     yz = dem_data.yz()
-    return np.arctan(xz / yz) + (-np.sign(xz) * math.pi / 2)
+
+    aspect = (np.arctan2(-yz, -xz) + (math.pi / 2)) % (2 * math.pi)
+    # TODO change this to something more appropriate for nodata
+    # handle different noData in dtype conversion
+    aspect[(xz == 0) & (yz == 0)] = 0
+
+    return aspect
 
 # return array of aggregated profile curvature, second derivative parallel to steepest descent
 def profile(dem_data, pixel_width=1, pixel_height=1):
@@ -57,13 +71,15 @@ def profile(dem_data, pixel_width=1, pixel_height=1):
     a00 = (xxz - (xx * z)) / (xxxx - xx**2)
     a10 = xyz / (2 * xx**2)
     a11 = (yyz - (xx * z)) / (xxxx - xx**2)
-    dir_mag = np.sqrt(xz**2 + yz**2)
 
-    profile = (
-        (2 * ((xz**2 * a00) + (2 * xz * yz * a10) + (yz**2 * a11)))
-        /
-        ((xz**2 + yz**2) * (np.abs((w * xz) / dir_mag) + np.abs((h * yz) / dir_mag)))
-    )
+    with np.errstate(invalid='ignore'):
+        profile = (
+            (2 * ((xz**2 * a00) + (2 * xz * yz * a10) + (yz**2 * a11)))
+            /
+            ((xz**2 + yz**2) * np.sqrt(((w**2 * xz**2) + (h**2 * yz**2)) / (xz**2 + yz**2)))
+        )
+        # when (xz == yz == 0) result is NaN
+        #profile[np.isnan(profile)] = 0
 
     return profile
 
@@ -79,13 +95,15 @@ def planform(dem_data, pixel_width=1, pixel_height=1):
     a00 = (xxz - (xx * z)) / (xxxx - xx**2)
     a10 = xyz / (2 * xx**2)
     a11 = (yyz - (xx * z)) / (xxxx - xx**2)
-    dir_mag = np.sqrt(xz**2 + yz**2)
 
-    planform = (
-        (2 * ((xz**2 * a00) - (2 * xz * yz * a10) + (yz**2 * a11)))
-        /
-        ((xz**2 + yz**2) * (np.abs((w * xz) / dir_mag) + np.abs((h * yz) / dir_mag)))
-    )
+    with np.errstate(invalid='ignore'):
+        planform = (
+            (2 * ((xz**2 * a11) - (2 * xz * yz * a10) + (yz**2 * a00)))
+            /
+            ((xz**2 + yz**2) * np.sqrt(((w**2 * xz**2) + (h**2 * yz**2)) / (xz**2 + yz**2)))
+        )
+        # when (xz == yz == 0) result is NaN
+        planform[np.isnan(planform)] = 0
 
     return planform
 
@@ -100,12 +118,14 @@ def standard(dem_data, pixel_width=1, pixel_height=1):
     xx = (agg_window_len**2 - 1) / 12
     a00 = (xxz - (xx * z)) / (xxxx - xx**2)
     a11 = (yyz - (xx * z)) / (xxxx - xx**2)
-    dir_mag = np.sqrt(xz**2 + yz**2)
 
-    standard = (
-        (2 * ((xz**2 * a00) + (yz**2 * a11)))
-        /
-        ((xz**2 + yz**2) * (np.abs((w * xz) / dir_mag) + np.abs((h * yz) / dir_mag)))
-    )
+    with np.errstate(invalid='ignore'):
+        standard = (
+            (a00 + a11)
+            /
+            np.sqrt(((w**2 * xz**2) + (h**2 * yz**2)) / (xz**2 + yz**2))
+        )
+        # when (xz == yz == 0) result is NaN
+        standard[np.isnan(standard)] = 0
 
     return standard
