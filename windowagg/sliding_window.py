@@ -224,6 +224,12 @@ class SlidingWindow:
 
         aggregation.aggregate_dem(self._dem_data, num_aggre)
 
+    def _aggregate_dem_brute(self, num_aggre=1):
+        if (self._dem_data is None):
+            self.initialize_dem(1)
+
+        aggregation.aggregate_dem_brute(self._dem_data, num_aggre)
+
     # generate image of aggregated slope values
     def dem_slope(self):
         if (self._dem_data is None):

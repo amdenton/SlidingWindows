@@ -1,11 +1,17 @@
-import unittest
 from windowagg.sliding_window import SlidingWindow
+import windowagg.rbg as rbg
+import windowagg.dem as dem
+from windowagg.agg_ops import Agg_ops
+import windowagg.aggregation as aggregation
 from image_generator import ImageGenerator
-import numpy as np
-import rasterio
+
+import unittest
 import math
 import os
 import shutil
+
+import numpy as np
+import rasterio
 
 class TestSlidingWindow(unittest.TestCase):
 
@@ -17,50 +23,49 @@ class TestSlidingWindow(unittest.TestCase):
 
     # remove test folder after testing completes
     @classmethod
-    def tearDownClass(cls):
-        shutil.rmtree(TestSlidingWindow.test_dir)
+    def tearDownClass(self):
+        shutil.rmtree(self.test_dir)
 
     def test_aggregation(self):
         path = self.img_gen.random()
-        with SlidingWindow(path) as slide_window:
-            with rasterio.open(path) as img:
-                arr = img.read(1).astype(float)
+        with rasterio.open(path) as img:
+            arr = img.read(1).astype(float)
 
-            sum_all = slide_window._partial_aggregation(arr, 0, 5, '++++')
-            partial_sum_all = slide_window._partial_aggregation(arr, 0, 2, '++++')
-            partial_sum_all = slide_window._partial_aggregation(partial_sum_all, 2, 3, '++++')
-            partial_sum_all = slide_window._partial_aggregation(partial_sum_all, 3, 5, '++++')
-            brute_sum_all = slide_window._aggregation_brute(arr, '++++', 5)
+        sum_all = aggregation.aggregate(arr, Agg_ops.add_all, 5, 0)
+        partial_sum_all = aggregation.aggregate(arr, Agg_ops.add_all, 2, 0)
+        partial_sum_all = aggregation.aggregate(partial_sum_all, Agg_ops.add_all, 1, 2)
+        partial_sum_all = aggregation.aggregate(partial_sum_all, Agg_ops.add_all, 2, 3)
+        brute_sum_all = aggregation.aggregate_brute(arr, Agg_ops.add_all, 5, 0)
 
-            sum_bottom = slide_window._partial_aggregation(arr, 0, 5, '--++')
-            partial_sum_bottom = slide_window._partial_aggregation(arr, 0, 2, '--++')
-            partial_sum_bottom = slide_window._partial_aggregation(partial_sum_bottom, 2, 3, '--++')
-            partial_sum_bottom = slide_window._partial_aggregation(partial_sum_bottom, 3, 5, '--++')
-            brute_sum_bottom = slide_window._aggregation_brute(arr, '--++', 5)
+        sum_bottom = aggregation.aggregate(arr, Agg_ops.add_bottom, 5, 0)
+        partial_sum_bottom = aggregation.aggregate(arr, Agg_ops.add_bottom, 2, 0)
+        partial_sum_bottom = aggregation.aggregate(partial_sum_bottom, Agg_ops.add_bottom, 1, 2)
+        partial_sum_bottom = aggregation.aggregate(partial_sum_bottom, Agg_ops.add_bottom, 2, 3)
+        brute_sum_bottom = aggregation.aggregate_brute(arr, Agg_ops.add_bottom, 5, 0)
 
-            sum_right = slide_window._partial_aggregation(arr, 0, 5, '-+-+')
-            partial_sum_right = slide_window._partial_aggregation(arr, 0, 2, '-+-+')
-            partial_sum_right = slide_window._partial_aggregation(partial_sum_right, 2, 3, '-+-+')
-            partial_sum_right = slide_window._partial_aggregation(partial_sum_right, 3, 5, '-+-+')
-            brute_sum_right = slide_window._aggregation_brute(arr, '-+-+', 5)
+        sum_right = aggregation.aggregate(arr, Agg_ops.add_right, 5, 0)
+        partial_sum_right = aggregation.aggregate(arr, Agg_ops.add_right, 2, 0)
+        partial_sum_right = aggregation.aggregate(partial_sum_right, Agg_ops.add_right, 1, 2)
+        partial_sum_right = aggregation.aggregate(partial_sum_right, Agg_ops.add_right, 2, 3)
+        brute_sum_right = aggregation.aggregate_brute(arr, Agg_ops.add_right, 5, 0)
 
-            sum_main_diag = slide_window._partial_aggregation(arr, 0, 5, '+--+')
-            partial_sum_main_diag = slide_window._partial_aggregation(arr, 0, 2, '+--+')
-            partial_sum_main_diag = slide_window._partial_aggregation(partial_sum_main_diag, 2, 3, '+--+')
-            partial_sum_main_diag = slide_window._partial_aggregation(partial_sum_main_diag, 3, 5, '+--+')
-            brute_sum_main_diag = slide_window._aggregation_brute(arr, '+--+', 5)
+        sum_main_diag = aggregation.aggregate(arr, Agg_ops.add_main_diag, 5, 0)
+        partial_sum_main_diag = aggregation.aggregate(arr, Agg_ops.add_main_diag, 2, 0)
+        partial_sum_main_diag = aggregation.aggregate(partial_sum_main_diag, Agg_ops.add_main_diag, 1, 2)
+        partial_sum_main_diag = aggregation.aggregate(partial_sum_main_diag, Agg_ops.add_main_diag, 2, 3)
+        brute_sum_main_diag = aggregation.aggregate_brute(arr, Agg_ops.add_main_diag, 5, 0)
 
-            maximum = slide_window._partial_aggregation(arr, 0, 5, 'max')
-            partial_maximum = slide_window._partial_aggregation(arr, 0, 2, 'max')
-            partial_maximum = slide_window._partial_aggregation(partial_maximum, 2, 3, 'max')
-            partial_maximum = slide_window._partial_aggregation(partial_maximum, 3, 5, 'max')
-            brute_maximum = slide_window._aggregation_brute(arr, 'max', 5)
+        maximum = aggregation.aggregate(arr, Agg_ops.maximum, 5, 0)
+        partial_maximum = aggregation.aggregate(arr, Agg_ops.maximum, 2, 0)
+        partial_maximum = aggregation.aggregate(partial_maximum, Agg_ops.maximum, 1, 2)
+        partial_maximum = aggregation.aggregate(partial_maximum, Agg_ops.maximum, 2, 3)
+        brute_maximum = aggregation.aggregate_brute(arr, Agg_ops.maximum, 5, 0)
 
-            minimum = slide_window._partial_aggregation(arr, 0, 5, 'min')
-            partial_minimum = slide_window._partial_aggregation(arr, 0, 2, 'min')
-            partial_minimum = slide_window._partial_aggregation(partial_minimum, 2, 3, 'min')
-            partial_minimum = slide_window._partial_aggregation(partial_minimum, 3, 5, 'min')
-            brute_minimum = slide_window._aggregation_brute(arr, 'min', 5)
+        minimum = aggregation.aggregate(arr, Agg_ops.minimum, 5, 0)
+        partial_minimum = aggregation.aggregate(arr, Agg_ops.minimum, 2, 0)
+        partial_minimum = aggregation.aggregate(partial_minimum, Agg_ops.minimum, 1, 2)
+        partial_minimum = aggregation.aggregate(partial_minimum, Agg_ops.minimum, 2, 3)
+        brute_minimum = aggregation.aggregate_brute(arr, Agg_ops.minimum, 5, 0)
 
         self.assertTrue(np.array_equal(sum_all, brute_sum_all))
         self.assertTrue(np.array_equal(partial_sum_all, brute_sum_all))
@@ -83,27 +88,28 @@ class TestSlidingWindow(unittest.TestCase):
     def test_regression(self):
         path = self.img_gen.random()
         with SlidingWindow(path) as slide_window:
-            with rasterio.open(path) as img:
-                arr1 = img.read(1).astype(float)
-                arr2 = img.read(2).astype(float)
-            arr_good = slide_window._regression(arr1, arr2, 5)
-            arr_brute = slide_window._regression_brute(arr1, arr2, 5)
+            arr_good = slide_window.regression(1, 2, 5)
+            arr_brute = rbg.regression_brute(1, 2, 5)
 
         self.assertTrue(np.allclose(arr_good, arr_brute))
 
     def test_dem_aggregation(self):
         path = self.img_gen.random()
         with SlidingWindow(path) as slide_window:
-            slide_window.dem_initialize_arrays()
-            slide_window.dem_aggregation_step(5)
-            arr_dic = slide_window.dem_arr_dict
+            slide_window.initialize_dem()
+            slide_window.aggregate_dem(5)
+            dem_data = slide_window._dem_data
 
-            slide_window.dem_initialize_arrays()
-            slide_window._dem_aggregation_step_brute(5)
-            arr_dic_brute = slide_window.dem_arr_dict
+            slide_window.initialize_dem()
+            slide_window._aggregate_dem_brute(5)
+            dem_data_brute = slide_window._dem_data
 
-        for key in arr_dic:
-            self.assertTrue(np.array_equal(arr_dic[key], arr_dic_brute[key]))
+        self.assertTrue(np.array_equal(dem_data.z(), dem_data_brute.z()))
+        self.assertTrue(np.array_equal(dem_data.xz(), dem_data_brute.xz()))
+        self.assertTrue(np.array_equal(dem_data.yz(), dem_data_brute.yz()))
+        self.assertTrue(np.array_equal(dem_data.xxz(), dem_data_brute.xxz()))
+        self.assertTrue(np.array_equal(dem_data.yyz(), dem_data_brute.yyz()))
+        self.assertTrue(np.array_equal(dem_data.xyz(), dem_data_brute.xyz()))
 
     def test_dem_aggregation2(self):
         # image size must be even
@@ -111,19 +117,20 @@ class TestSlidingWindow(unittest.TestCase):
         path = self.img_gen.random(image_size=image_size, num_bands=1)
         with rasterio.open(path) as img:
                 arr = img.read(1).astype(float)
+                shape = arr.shape
         with SlidingWindow(path) as slide_window:
-            slide_window.dem_initialize_arrays()
-            arr_dict = slide_window.dem_arr_dict
-            new_arr_dict = {}
-            new_arr_dict['z'] = arr
-            for key in arr_dict:
-                if (key != 'z'):
-                    self.assertTrue(np.count_nonzero(arr_dict[key]) == 0)
-                elif (key == 'z'):
-                    self.assertTrue(np.array_equal(arr_dict[key], arr))
+            zeros = np.zeros(shape)
+            slide_window.initialize_dem()
+            arr_dict = slide_window._dem_data
+            self.assertTrue(np.array_equal(arr_dict.z(), arr))
+            self.assertTrue(np.array_equal(arr_dict.xz(), zeros))
+            self.assertTrue(np.array_equal(arr_dict.yz(), zeros))
+            self.assertTrue(np.array_equal(arr_dict.xxz(), zeros))
+            self.assertTrue(np.array_equal(arr_dict.yyz(), zeros))
+            self.assertTrue(np.array_equal(arr_dict.xyz(), zeros))[]
 
-            slide_window.dem_aggregation_step(2)
-            arr_dict = slide_window.dem_arr_dict
+            slide_window.aggregate_dem(2)
+            arr_dict = slide_window._dem_data
             new_arr_dict['z'] = np.array([np.sum(arr)/16])
 
             new_arr_dict['xz'] = np.zeros([1])

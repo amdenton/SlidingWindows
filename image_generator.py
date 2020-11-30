@@ -72,12 +72,66 @@ class ImageGenerator:
 
         for y in range (image_size):
             for x in range (image_size):
-                value = (1 / (sigma * np.sqrt(2 * math.pi))) * math.exp(-(((x - mu)**2 + (y - mu)**2) / (2 * sigma**2)) + noise*rand.normal())
+                value = (
+                    (
+                        1
+                        /
+                        (sigma * np.sqrt(2 * math.pi))
+                    )
+                    *
+                    math.exp(
+                        -(
+                            ((x - mu)**2 + (y - mu)**2)
+                            /
+                            (2 * sigma**2)
+                        )
+                        +
+                        noise*rand.normal()
+                    )
+                )
                 arr[y][x] = value
 
         fn = self.test_dir + 'gauss.tif'
         helper.create_tif(helper.arr_dtype_conversion(arr, self.dtype), fn)
         return fn
+
+    def gaussSlopePoint(self, x, y, mu, sigma):
+        # Formula for the first derivative in the direction of steepest descent
+        return -(
+            math.sqrt(
+                (
+                    math.exp(-(
+                        ((mu - x)**2 + (mu - y)**2)
+                        /
+                        sigma**2
+                    ))
+                    *
+                    ((2 * mu**2) + x**2 + y**2 - 2 * mu * (x + y))
+                )
+                /
+                sigma**6
+            )            
+            /
+            (math.sqrt( 2 * math.pi))
+        )
+
+    def gaussCurvaturePoint(self, x, y, mu, sigma):
+        # Formula for the average of:
+        # The second derivative in the direction of steepest descent
+        # The second derivative in the direction perpendicular to steepest descent
+        return (
+            (
+                math.exp(-(
+                    ((2 * mu**2) + x**2 + y**2 - (2 * mu * (x + y)))
+                    /
+                    (2 * sigma**2)
+                ))
+                *
+                ((2 * mu**2) - sigma**2 + x**2 + y**2 - (2 * mu * (x + y)))
+            )
+            /
+            (2 * math.sqrt(2 * math.pi) * sigma**5)
+        ) 
 
     def gauss_horizontal(self, image_size=300, sigma=None, mu=None, noise=0):
         # standard deviation

@@ -8,16 +8,20 @@ import math
 # non-vectorized aggregation method
 # very slow
 # returns floating point array
-def aggregate_brute(arr_in, operation, num_aggre=1):
+def aggregate_brute(arr_in, operation, num_aggre=1, num_prev_aggre=0):
+    if (len(arr_in.shape) != 2):
+        raise ValueError('Array must be 2 dimensional')
     if (not isinstance(operation, Agg_ops)):
         raise ValueError('operation must be of type Agg_ops')
 
-    arr_in = arr_in.astype(float)
     x_max = arr_in.shape[1]
     y_max = arr_in.shape[0]
+    removal_num = 2**(num_prev_aggre + num_aggre) - 2**num_prev_aggre
+    if ((removal_num > x_max) or (removal_num > y_max)):
+        raise ValueError('Image size is too small to aggregate ' + str(num_aggre) + ' times')
     arr_out = np.array(arr_in)
+    delta = 2**num_prev_aggre
 
-    # iterate through window sizes
     for i in range(num_aggre):
         delta = 2**i
         y_max -= delta
@@ -53,6 +57,9 @@ def aggregate(arr_in, operation, num_aggre=1, num_prev_aggre=0):
 
     y_max = arr_in.shape[0]
     x_max = arr_in.shape[1]
+    removal_num = 2**(num_prev_aggre + num_aggre) - 2**num_prev_aggre
+    if ((removal_num > x_max) or (removal_num > y_max)):
+        raise ValueError('Image size is too small to aggregate ' + str(num_aggre) + ' times')
     arr_out = arr_in.flatten()
     delta = 2**num_prev_aggre
     
@@ -80,9 +87,6 @@ def aggregate(arr_in, operation, num_aggre=1, num_prev_aggre=0):
             arr_out = np.minimum(np.minimum(np.minimum(top_left, top_right), bottom_left), bottom_right)
         
         delta *= 2
-
-    # remove last removal_num rows and columns, they are not aggregate pixels
-    removal_num = (2**(num_prev_aggre + num_aggre)) - (2**num_prev_aggre)
     
     if (removal_num > 0):
         arr_out = np.pad(arr_out, (0, removal_num), 'constant')
