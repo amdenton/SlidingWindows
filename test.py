@@ -17,6 +17,8 @@ class TestSlidingWindow(unittest.TestCase):
 
     # used in tearDownClass method
     test_dir = 'test_img/'
+    IMAGE_SIZE = 1024
+    NUM_AGGRE = 4
 
     img_gen = ImageGenerator()
     img_gen.test_dir = test_dir
@@ -111,65 +113,37 @@ class TestSlidingWindow(unittest.TestCase):
         self.assertTrue(np.array_equal(dem_data.yyz(), dem_data_brute.yyz()))
         self.assertTrue(np.array_equal(dem_data.xyz(), dem_data_brute.xyz()))
 
-    def test_dem_aggregation2(self):
-        # image size must be even
-        image_size = 4
-        path = self.img_gen.random(image_size=image_size, num_bands=1)
+    def test_data_init(self):
+        path = self.img_gen.random(image_size=self.IMAGE_SIZE, num_bands=1)
         with rasterio.open(path) as img:
-                arr = img.read(1).astype(float)
-                shape = arr.shape
+            arr = img.read(1).astype(float)
         with SlidingWindow(path) as slide_window:
-            zeros = np.zeros(shape)
             slide_window.initialize_dem()
             arr_dict = slide_window._dem_data
+            arr_zeros = np.zeros_like(arr)
             self.assertTrue(np.array_equal(arr_dict.z(), arr))
-            self.assertTrue(np.array_equal(arr_dict.xz(), zeros))
-            self.assertTrue(np.array_equal(arr_dict.yz(), zeros))
-            self.assertTrue(np.array_equal(arr_dict.xxz(), zeros))
-            self.assertTrue(np.array_equal(arr_dict.yyz(), zeros))
-            self.assertTrue(np.array_equal(arr_dict.xyz(), zeros))[]
+            self.assertTrue(np.array_equal(arr_dict.xz(), arr_zeros))
+            self.assertTrue(np.array_equal(arr_dict.yz(), arr_zeros))
+            self.assertTrue(np.array_equal(arr_dict.xxz(), arr_zeros))
+            self.assertTrue(np.array_equal(arr_dict.yyz(), arr_zeros)) 
+            self.assertTrue(np.array_equal(arr_dict.xyz(), arr_zeros))
 
-            slide_window.aggregate_dem(2)
+
+    def test_data_aggregation(self):
+        path = self.img_gen.random(image_size=self.IMAGE_SIZE, num_bands=1)
+        with rasterio.open(path) as img:
+            arr = img.read(1).astype(float)
+        with SlidingWindow(path) as slide_window:
+            slide_window.initialize_dem()
+            slide_window.aggregate_dem(self.NUM_AGGRE)
             arr_dict = slide_window._dem_data
-            new_arr_dict['z'] = np.array([np.sum(arr)/16])
-
-            new_arr_dict['xz'] = np.zeros([1])
-            new_arr_dict['xz'][0] += -1.5*arr[0][0] + -.5*arr[0][1] + .5*arr[0][2] + 1.5*arr[0][3]
-            new_arr_dict['xz'][0] += -1.5*arr[1][0] + -.5*arr[1][1] + .5*arr[1][2] + 1.5*arr[1][3]
-            new_arr_dict['xz'][0] += -1.5*arr[2][0] + -.5*arr[2][1] + .5*arr[2][2] + 1.5*arr[2][3]
-            new_arr_dict['xz'][0] += -1.5*arr[3][0] + -.5*arr[3][1] + .5*arr[3][2] + 1.5*arr[3][3]
-            new_arr_dict['xz'][0] /= 16
-
-            new_arr_dict['xxz'] = np.zeros([1])
-            new_arr_dict['xxz'][0] += (-1.5)**2*arr[0][0] + (-.5)**2*arr[0][1] + .5**2*arr[0][2] + 1.5**2*arr[0][3]
-            new_arr_dict['xxz'][0] += (-1.5)**2*arr[1][0] + (-.5)**2*arr[1][1] + .5**2*arr[1][2] + 1.5**2*arr[1][3]
-            new_arr_dict['xxz'][0] += (-1.5)**2*arr[2][0] + (-.5)**2*arr[2][1] + .5**2*arr[2][2] + 1.5**2*arr[2][3]
-            new_arr_dict['xxz'][0] += (-1.5)**2*arr[3][0] + (-.5)**2*arr[3][1] + .5**2*arr[3][2] + 1.5**2*arr[3][3]
-            new_arr_dict['xxz'][0] /= 16
-
-            new_arr_dict['yz'] = np.zeros([1])
-            new_arr_dict['yz'][0] += -1.5*arr[0][0] + -1.5*arr[0][1] + -1.5*arr[0][2] + -1.5*arr[0][3]
-            new_arr_dict['yz'][0] += -.5*arr[1][0] + -.5*arr[1][1] + -.5*arr[1][2] + -.5*arr[1][3]
-            new_arr_dict['yz'][0] += .5*arr[2][0] + .5*arr[2][1] + .5*arr[2][2] + .5*arr[2][3]
-            new_arr_dict['yz'][0] += 1.5*arr[3][0] + 1.5*arr[3][1] + 1.5*arr[3][2] + 1.5*arr[3][3]
-            new_arr_dict['yz'][0] /= 16
-
-            new_arr_dict['yyz'] = np.zeros([1])
-            new_arr_dict['yyz'][0] += (-1.5)**2*arr[0][0] + (-1.5)**2*arr[0][1] + (-1.5)**2*arr[0][2] + (-1.5)**2*arr[0][3]
-            new_arr_dict['yyz'][0] += (-.5)**2*arr[1][0] + (-.5)**2*arr[1][1] + (-.5)**2*arr[1][2] + (-.5)**2*arr[1][3]
-            new_arr_dict['yyz'][0] += .5**2*arr[2][0] + .5**2*arr[2][1] + .5**2*arr[2][2] + .5**2*arr[2][3]
-            new_arr_dict['yyz'][0] += 1.5**2*arr[3][0] + 1.5**2*arr[3][1] + 1.5**2*arr[3][2] + 1.5**2*arr[3][3]
-            new_arr_dict['yyz'][0] /= 16
-
-            new_arr_dict['xyz'] = np.zeros([1])
-            new_arr_dict['xyz'][0] += -1.5*-1.5*arr[0][0] + -1.5*-.5*arr[0][1] + -1.5*.5*arr[0][2] + -1.5*1.5*arr[0][3]
-            new_arr_dict['xyz'][0] += -.5*-1.5*arr[1][0] + -.5*-.5*arr[1][1] + -.5*.5*arr[1][2] + -.5*1.5*arr[1][3]
-            new_arr_dict['xyz'][0] += .5*-1.5*arr[2][0] + .5*-.5*arr[2][1] + .5*.5*arr[2][2] + .5*1.5*arr[2][3]
-            new_arr_dict['xyz'][0] += 1.5*-1.5*arr[3][0] + 1.5*-.5*arr[3][1] + 1.5*.5*arr[3][2] + 1.5*1.5*arr[3][3]
-            new_arr_dict['xyz'][0] /= 16
-
-            for key in arr_dict:
-                self.assertTrue(np.allclose(arr_dict[key], new_arr_dict[key]))
+            
+            self.assertTrue(np.array_equal(arr_dict.z(), aggregation.aggregate_z_brute(arr, self.NUM_AGGRE)))
+            self.assertTrue(np.array_equal(arr_dict.xz(), aggregation.aggregate_xz_brute(arr, self.NUM_AGGRE)))
+            self.assertTrue(np.array_equal(arr_dict.yz(), aggregation.aggregate_yz_brute(arr, self.NUM_AGGRE)))
+            self.assertTrue(np.array_equal(arr_dict.xxz(), aggregation.aggregate_xxz_brute(arr, self.NUM_AGGRE)))
+            self.assertTrue(np.array_equal(arr_dict.yyz(), aggregation.aggregate_yyz_brute(arr, self.NUM_AGGRE))) 
+            self.assertTrue(np.array_equal(arr_dict.xyz(), aggregation.aggregate_xyz_brute(arr, self.NUM_AGGRE)))
 
     def test_create_tif_transform(self):
         agg_num_1 = 2
