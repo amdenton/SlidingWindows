@@ -19,14 +19,14 @@ def aggregate_brute(arr_in, operation, num_aggre=1, num_prev_aggre=0):
     removal_num = 2**(num_prev_aggre + num_aggre) - 2**num_prev_aggre
     if ((removal_num > x_max) or (removal_num > y_max)):
         raise ValueError('Image size is too small to aggregate ' + str(num_aggre) + ' times')
-    arr_out = np.array(arr_in)
+    arr_out = arr_in
     delta = 2**num_prev_aggre
 
     for i in range(num_aggre):
         delta = 2**i
         y_max -= delta
         x_max -= delta
-        arr = np.empty([y_max, x_max])
+        arr = np.empty([y_max, x_max], dtype=arr_out.dtype)
 
         # iterate through pixels
         for j in range (y_max):
@@ -162,31 +162,31 @@ def aggregate_dem(dem_data, num_aggre=1):
 def aggregate_z_brute(z, num_aggre=1):
     y_max = z.shape[0]
     x_max = z.shape[1]
-    removal_num = 2**num_aggre
+    removal_num = 2**num_aggre - 1
     if ((removal_num > x_max) or (removal_num > y_max)):
         raise ValueError('Image size is too small to aggregate ' + str(num_aggre) + ' times')
 
-    z = np.zeros([x_max - removal_num, y_max - removal_num])
+    z_average = np.zeros([x_max - removal_num, y_max - removal_num], dtype=z.dtype)
 
-    for y in range(z.shape[0]):
-        for x in range(xz.shape[1]):
+    for y in range(z_average.shape[0]):
+        for x in range(z_average.shape[1]):
             for y_agg in range(2**num_aggre):
                 for x_agg in range(2**num_aggre):
-                    z[y, x] += z[(y + y_agg), (x + x_agg)]
+                    z_average[y, x] += z[(y + y_agg), (x + x_agg)]
 
-            z[y, x] /= num_aggre**2
+            z_average[y, x] /= (2**num_aggre)**2
 
-    return z
+    return z_average
 
 def aggregate_xz_brute(z, num_aggre=1):
     y_max = z.shape[0]
     x_max = z.shape[1]
     extremum = 2**(num_aggre - 1) - .5
-    removal_num = 2**num_aggre
+    removal_num = 2**num_aggre - 1
     if ((removal_num > x_max) or (removal_num > y_max)):
         raise ValueError('Image size is too small to aggregate ' + str(num_aggre) + ' times')
 
-    xz = np.zeros([x_max - removal_num, y_max - removal_num])
+    xz = np.zeros([x_max - removal_num, y_max - removal_num], dtype=z.dtype)
 
     for y in range(xz.shape[0]):
         for x in range(xz.shape[1]):
@@ -197,7 +197,7 @@ def aggregate_xz_brute(z, num_aggre=1):
                     xz[y, x] += z[(y + y_agg), (x + x_agg)] * x_val
                     x_val += 1
 
-            xz[y, x] /= num_aggre**2
+            xz[y, x] /= (2**num_aggre)**2
 
     return xz
 
@@ -205,11 +205,11 @@ def aggregate_yz_brute(z, num_aggre=1):
     y_max = z.shape[0]
     x_max = z.shape[1]
     extremum = 2**(num_aggre - 1) - .5
-    removal_num = 2**num_aggre
+    removal_num = 2**num_aggre - 1
     if ((removal_num > x_max) or (removal_num > y_max)):
         raise ValueError('Image size is too small to aggregate ' + str(num_aggre) + ' times')
 
-    yz = np.zeros([x_max - removal_num, y_max - removal_num])
+    yz = np.zeros([x_max - removal_num, y_max - removal_num], dtype=z.dtype)
 
     for y in range(yz.shape[0]):
         for x in range(yz.shape[1]):
@@ -220,7 +220,7 @@ def aggregate_yz_brute(z, num_aggre=1):
                     yz[y, x] += z[(y + y_agg), (x + x_agg)] * y_val
                     y_val += 1
                     
-            yz[y, x] /= num_aggre**2
+            yz[y, x] /= (2**num_aggre)**2
 
     return yz
         
@@ -228,11 +228,11 @@ def aggregate_xxz_brute(z, num_aggre=1):
     y_max = z.shape[0]
     x_max = z.shape[1]
     extremum = 2**(num_aggre - 1) - .5
-    removal_num = 2**num_aggre
+    removal_num = 2**num_aggre - 1
     if ((removal_num > x_max) or (removal_num > y_max)):
         raise ValueError('Image size is too small to aggregate ' + str(num_aggre) + ' times')
 
-    xxz = np.zeros([x_max - removal_num, y_max - removal_num])
+    xxz = np.zeros([x_max - removal_num, y_max - removal_num], dtype=z.dtype)
 
     for y in range(xxz.shape[0]):
         for x in range(xxz.shape[1]):
@@ -243,7 +243,7 @@ def aggregate_xxz_brute(z, num_aggre=1):
                     xxz[y, x] += z[(y + y_agg), (x + x_agg)] * x_val**2
                     x_val += 1
                     
-            xxz[y, x] /= num_aggre**2
+            xxz[y, x] /= (2**num_aggre)**2
 
     return xxz
 
@@ -251,11 +251,11 @@ def aggregate_yyz_brute(z, num_aggre=1):
     y_max = z.shape[0]
     x_max = z.shape[1]
     extremum = 2**(num_aggre - 1) - .5
-    removal_num = 2**num_aggre
+    removal_num = 2**num_aggre - 1
     if ((removal_num > x_max) or (removal_num > y_max)):
         raise ValueError('Image size is too small to aggregate ' + str(num_aggre) + ' times')
 
-    yyz = np.zeros([x_max - removal_num, y_max - removal_num])
+    yyz = np.zeros([x_max - removal_num, y_max - removal_num], dtype=z.dtype)
 
     for y in range(yyz.shape[0]):
         for x in range(yyz.shape[1]):
@@ -266,7 +266,7 @@ def aggregate_yyz_brute(z, num_aggre=1):
                     yyz[y, x] += z[(y + y_agg), (x + x_agg)] * y_val**2
                     y_val += 1
                     
-            yyz[y, x] /= num_aggre**2
+            yyz[y, x] /= (2**num_aggre)**2
 
     return yyz
 
@@ -274,11 +274,11 @@ def aggregate_xyz_brute(z, num_aggre=1):
     y_max = z.shape[0]
     x_max = z.shape[1]
     extremum = 2**(num_aggre - 1) - .5
-    removal_num = 2**num_aggre
+    removal_num = 2**num_aggre - 1
     if ((removal_num > x_max) or (removal_num > y_max)):
         raise ValueError('Image size is too small to aggregate ' + str(num_aggre) + ' times')
 
-    xyz = np.zeros([x_max - removal_num, y_max - removal_num])
+    xyz = np.zeros([x_max - removal_num, y_max - removal_num], dtype=z.dtype)
 
     for y in range(xyz.shape[0]):
         for x in range(xyz.shape[1]):
@@ -293,6 +293,6 @@ def aggregate_xyz_brute(z, num_aggre=1):
 
                 y_val += 1
                     
-            xyz[y, x] /= num_aggre**2
+            xyz[y, x] /= (2**num_aggre)**2
 
     return xyz
