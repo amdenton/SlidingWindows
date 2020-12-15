@@ -9,16 +9,29 @@ import affine
 import numpy as np
 import numpy.random as rand
 
+_image_size = 512
+
 class ImageGenerator:
 
-    test_dir = 'test_img/'
-    dtype = np.uint16
+    def __init__(self, path=None, dtype=None):
+        if (path is None):
+            path = 'img_gen/'
+        if (dtype is None):
+            dtype = np.uint16
+        self.path = path
+        self.dtype = dtype
 
-    def __init__(self):
-        if not os.path.exists(self.test_dir):
-            os.makedirs(self.test_dir)
+        if not os.path.exists(self.path):
+            os.makedirs(self.path)
 
-    def all(self, image_size=300, sigma=None, mu=None, noise=0, num_bands=4):
+    def all(self, image_size=_image_size, mu=None, sigma=None, noise=0, num_bands=4):
+        # Median offset
+        if (mu is None):
+            mu = (image_size - 1)  / 2
+        # Standard deviation
+        if (sigma is None):
+            sigma = (image_size - 1) / 4
+
         self.star(image_size=image_size)
         self.gauss(image_size=image_size, sigma=sigma, mu=mu, noise=noise)
         self.gauss_horizontal(image_size=image_size, sigma=sigma, mu=mu, noise=noise)
@@ -29,7 +42,7 @@ class ImageGenerator:
         self.n_gradient(image_size=image_size)
         self.random(image_size=image_size, num_bands=num_bands)
 
-    def star(self, image_size=300):
+    def star(self, image_size=_image_size):
         arr = np.zeros([image_size,image_size])
 
         i=j=1
@@ -56,17 +69,17 @@ class ImageGenerator:
             else:
                 j += 1
             
-        fn = self.test_dir + 'star.tif'
+        fn = self.path + 'star.tif'
         helper.create_tif(helper.arr_dtype_conversion(arr, self.dtype), fn)
         return fn
 
-    def gauss(self, image_size=300, sigma=None, mu=None, noise=0):
-        # standard deviation
-        if (sigma == None):
+    def gauss(self, image_size=_image_size, mu=None, sigma=None, noise=0):
+        # Median offset
+        if (mu is None):
+            mu = (image_size - 1)  / 2
+        # Standard deviation
+        if (sigma is None):
             sigma = (image_size - 1) / 4
-        # median offset
-        if (mu == None):
-            mu = (image_size - 1) / 2
 
         arr = np.empty([image_size, image_size])
 
@@ -91,11 +104,61 @@ class ImageGenerator:
                 )
                 arr[y][x] = value
 
-        fn = self.test_dir + 'gauss.tif'
+        fn = self.path + 'gauss.tif'
         helper.create_tif(helper.arr_dtype_conversion(arr, self.dtype), fn)
         return fn
 
-    def gaussSlopePoint(self, x, y, mu, sigma):
+    def gauss_aspect_point(self, x, y, image_size=_image_size, mu=None, sigma=None):
+        # Median offset
+        if (mu is None):
+            mu = (image_size - 1)  / 2
+        # Standard deviation
+        if (sigma is None):
+            sigma = (image_size - 1) / 4
+
+        dx = -(
+            (
+                np.exp(-(
+                    ((mu - x)**2 + (mu - y)**2)
+                    /
+                    (2 * sigma**2)
+                ))
+                *
+                (x - mu)
+            )
+            /
+            (np.sqrt(2 * math.pi) * sigma**3)
+        )
+
+        dy = -(
+            (
+                np.exp(-(
+                    ((mu - x)**2 + (mu - y)**2)
+                    /
+                    (2 * sigma**2)
+                ))
+                *
+                (y - mu)
+            )
+            /
+            (np.sqrt(2 * math.pi) * sigma**3)
+        )
+
+        aspect = (np.arctan2(-dy, -dx) + (math.pi / 2)) % (2 * math.pi)
+        # TODO change this to something more appropriate for nodata
+        if ((dx == 0) and (dy == 0)):
+            aspect = 0
+
+        return aspect
+
+    def gauss_slope_point(self, x, y, image_size=_image_size, mu=None, sigma=None):
+        # Median offset
+        if (mu is None):
+            mu = (image_size - 1)  / 2
+        # Standard deviation
+        if (sigma is None):
+            sigma = (image_size - 1) / 4
+
         # Formula for the first derivative in the direction of steepest descent
         return -(
             math.sqrt(
@@ -106,7 +169,7 @@ class ImageGenerator:
                         sigma**2
                     ))
                     *
-                    ((2 * mu**2) + x**2 + y**2 - 2 * mu * (x + y))
+                    ((2 * mu**2) + x**2 + y**2 - (2 * mu * (x + y)))
                 )
                 /
                 sigma**6
@@ -115,10 +178,15 @@ class ImageGenerator:
             (math.sqrt( 2 * math.pi))
         )
 
-    def gaussCurvaturePoint(self, x, y, mu, sigma):
-        # Formula for the average of:
-        # The second derivative in the direction of steepest descent
-        # The second derivative in the direction perpendicular to steepest descent
+    def gauss_standard_point(self, x, y, image_size=_image_size, mu=None, sigma=None):
+        # Median offset
+        if (mu is None):
+            mu = (image_size - 1)  / 2
+        # Standard deviation
+        if (sigma is None):
+            sigma = (image_size - 1) / 4
+        
+        # Standard curvature formula
         return (
             (
                 math.exp(-(
@@ -133,13 +201,13 @@ class ImageGenerator:
             (2 * math.sqrt(2 * math.pi) * sigma**5)
         ) 
 
-    def gauss_horizontal(self, image_size=300, sigma=None, mu=None, noise=0):
-        # standard deviation
-        if (sigma == None):
+    def gauss_horizontal(self, image_size=_image_size, mu=None, sigma=None, noise=0):
+        # Median offset
+        if (mu is None):
+            mu = (image_size - 1)  / 2
+        # Standard deviation
+        if (sigma is None):
             sigma = (image_size - 1) / 4
-        # median offset
-        if (mu == None):
-            mu = (image_size - 1) / 2
 
         arr = np.empty([image_size, image_size])
 
@@ -148,17 +216,17 @@ class ImageGenerator:
                 value = (1 / (sigma * np.sqrt(2 * math.pi))) * math.exp(-((y - mu)**2 / (2 * sigma**2)) + (noise * rand.normal()))
                 arr[y][x] = value
 
-        fn = self.test_dir + 'gauss_horizontal.tif'
+        fn = self.path + 'gauss_horizontal.tif'
         helper.create_tif(helper.arr_dtype_conversion(arr, self.dtype), fn)
         return fn
 
-    def gauss_vertical(self, image_size=300, sigma=None, mu=None, noise=0):
-        # standard deviation
-        if (sigma == None):
+    def gauss_vertical(self, image_size=_image_size, mu=None, sigma=None, noise=0):
+        # Median offset
+        if (mu is None):
+            mu = (image_size - 1)  / 2
+        # Standard deviation
+        if (sigma is None):
             sigma = (image_size - 1) / 4
-        # median offset
-        if (mu == None):
-            mu = (image_size - 1) / 2
 
         arr = np.empty([image_size, image_size])
 
@@ -167,11 +235,11 @@ class ImageGenerator:
                 value = (1 / (sigma * np.sqrt(2 * math.pi))) * math.exp(-((x - mu)**2 / (2 * sigma**2)) + (noise * rand.normal()))
                 arr[y][x] = value
 
-        fn = self.test_dir + 'gauss_vertical.tif'
+        fn = self.path + 'gauss_vertical.tif'
         helper.create_tif(helper.arr_dtype_conversion(arr, self.dtype), fn)
         return fn
 
-    def se_gradient(self, image_size=300):
+    def se_gradient(self, image_size=_image_size):
         arr = np.empty([image_size, image_size])
 
         i = j = 0
@@ -182,11 +250,11 @@ class ImageGenerator:
                 i += 1
             j += 1
         
-        fn = self.test_dir + 'se_gradient.tif'
+        fn = self.path + 'se_gradient.tif'
         helper.create_tif(helper.arr_dtype_conversion(arr, self.dtype), fn)
         return fn
 
-    def nw_gradient(self, image_size=300):
+    def nw_gradient(self, image_size=_image_size):
         arr = np.empty([image_size, image_size])
 
         i = j = np.iinfo(self.dtype).max
@@ -197,11 +265,11 @@ class ImageGenerator:
                 i -= 1
             j -= 1
         
-        fn = self.test_dir + 'nw_gradient.tif'
+        fn = self.path + 'nw_gradient.tif'
         helper.create_tif(helper.arr_dtype_conversion(arr, self.dtype), fn)
         return fn
 
-    def s_gradient(self, image_size=300):
+    def s_gradient(self, image_size=_image_size):
         arr = np.empty([image_size, image_size])
 
         i = 0
@@ -210,11 +278,11 @@ class ImageGenerator:
                 arr[y][x] = i
             i += 1
         
-        fn = self.test_dir + 's_gradient.tif'
+        fn = self.path + 's_gradient.tif'
         helper.create_tif(helper.arr_dtype_conversion(arr, self.dtype), fn)
         return fn
 
-    def n_gradient(self, image_size=300):
+    def n_gradient(self, image_size=_image_size):
         arr = np.empty([image_size, image_size])
 
         i = np.iinfo(self.dtype).max
@@ -223,15 +291,17 @@ class ImageGenerator:
                 arr[y][x] = i
             i -= 1
         
-        fn = self.test_dir + 'n_gradient.tif'
+        fn = self.path + 'n_gradient.tif'
         helper.create_tif(helper.arr_dtype_conversion(arr, self.dtype), fn)
         return fn
 
-    def random(self, image_size=300, num_bands=4):
+    def random(self, image_size=_image_size, num_bands=4):
         arr = []
         for _ in range(num_bands):
-            arr.append(np.random.randint(0, np.iinfo(self.dtype).max, [image_size, image_size], dtype=self.dtype))
+            rand_arr = np.random.random_sample(size=[image_size, image_size])
+            rand_arr = helper.arr_dtype_conversion(rand_arr, self.dtype)
+            arr.append(rand_arr)
         
-        fn = self.test_dir + 'rand.tif'
+        fn = self.path + 'rand.tif'
         helper.create_tif(arr, fn)
         return fn
