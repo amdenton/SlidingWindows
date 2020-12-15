@@ -1,15 +1,16 @@
+import windowagg.config as config
+
 import numpy as np
 
 class Dem_data:
 
-    # TODO default arrays are float, is that good?
     def __init__(self, z, xz=None, yz=None, xxz=None, yyz=None, xyz=None, num_aggre=0):
         self.num_aggre = num_aggre
         arrays = {'z':z, 'xz':xz, 'yz':yz, 'xxz':xxz, 'yyz':yyz, 'xyz':xyz}
         
         for i in arrays:
             if (arrays[i] is None):
-                arrays[i] = np.zeros(z.shape, z.dtype)
+                arrays[i] = np.zeros(z.shape, dtype=config.work_dtype)
         
         self.set_arrays(**arrays)
 
@@ -36,6 +37,7 @@ class Dem_data:
 
     def set_arrays(self, z, xz, yz, xxz, yyz, xyz):
         shape = z.shape
+        work_dtype = config.work_dtype
 
         if (len(z.shape) != 2):
             raise ValueError('All arrays must be 2 dimensional')
@@ -43,12 +45,12 @@ class Dem_data:
             if (array.shape != shape):
                 raise ValueError('All arrays must have the same shape')
 
-        self._z = z
-        self._xz = xz
-        self._yz = yz
-        self._xxz = xxz
-        self._yyz = yyz
-        self._xyz = xyz
+        self._z = z if (z.dtype is work_dtype) else z.astype(work_dtype)
+        self._xz = xz if (xz.dtype is work_dtype) else xz.astype(config.work_dtype)
+        self._yz = yz if (yz.dtype is work_dtype) else yz.astype(config.work_dtype)
+        self._xxz = xxz if (xxz.dtype is work_dtype) else xxz.astype(config.work_dtype)
+        self._yyz = yyz if (yyz.dtype is work_dtype) else yyz.astype(config.work_dtype)
+        self._xyz = xyz if (xyz.dtype is work_dtype) else xyz.astype(config.work_dtype)
 
     @staticmethod
     def from_import(file_name):
