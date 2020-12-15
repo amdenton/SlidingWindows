@@ -3,6 +3,7 @@ import windowagg.dem as dem
 import windowagg.aggregation as aggregation
 from windowagg.dem_data import Dem_data
 import windowagg.helper as helper
+import windowagg.config as config
 
 import math
 import os
@@ -19,7 +20,7 @@ class SlidingWindow:
 
     # TODO do I have all required functionality?
     # image creation with geoTransform update
-    # array conversion TODO needs updating
+    # array conversion TODO needs updating ??
     # ndvi
     # binary
     # regression
@@ -44,8 +45,10 @@ class SlidingWindow:
         self._file_name = os.path.splitext(file_basename)[0]
         self._img = rasterio.open(file_path)
         self._dem_data = None
-        self.autoPlot = False
-        self.dtype = np.float32
+        self.auto_plot = False
+        self.work_dtype = config.work_dtype
+        self.tif_dtype = config.tif_dtype
+        self.convert_image = True
 
         transform = self._img.profile['transform']
         self.pixel_width = math.sqrt(transform[0]**2 + transform[3]**2) * map_width_to_meters
@@ -90,13 +93,13 @@ class SlidingWindow:
         ir = self._img.read(ir_band)
         ndvi = rbg.ndvi(red, ir)
 
-        # TODO change later?
-        ndvi = helper.arr_dtype_conversion(ndvi, np.uint8)
+        if (self.convert_image):
+            ndvi = helper.arr_dtype_conversion(ndvi, self.tif_dtype)
 
         file_name = self._create_file_name('ndvi')
         helper.create_tif(ndvi, file_name, self._img.profile)
 
-        if (self.autoPlot):
+        if (self.auto_plot):
             self._plot(file_name)
 
         return file_name
@@ -110,13 +113,13 @@ class SlidingWindow:
         arr = self._img.read(band)
         arr = rbg.binary(arr, threshold)
         
-        # TODO change later?
-        arr = helper.arr_dtype_conversion(arr, np.uint8)
+        if (self.convert_image):
+            arr = helper.arr_dtype_conversion(arr, self.tif_dtype)
 
         file_name = self._create_file_name('binary')
         helper.create_tif(arr, file_name, self._img.profile)
 
-        if (self.autoPlot):
+        if (self.auto_plot):
             self._plot(file_name)
 
         return file_name
@@ -131,13 +134,13 @@ class SlidingWindow:
         arr_b = self._img.read(band2)
         arr_m = rbg.regression(arr_a, arr_b, num_aggre)
 
-        # TODO remove later
-        arr_m = helper.arr_dtype_conversion(arr_m, np.uint8)
+        if (self.convert_image):
+            arr_m = helper.arr_dtype_conversion(arr_m, self.tif_dtype)
 
         file_name = self._create_file_name('regression', num_aggre)
         helper.create_tif(arr_m, file_name, self._img.profile, num_aggre)
         
-        if (self.autoPlot):
+        if (self.auto_plot):
             self._plot(file_name)
 
         return file_name
@@ -154,13 +157,13 @@ class SlidingWindow:
         arr_b = self._img.read(band2)
         arr_r = rbg.pearson(arr_a, arr_b, num_aggre)
 
-        # TODO remove later
-        arr_r = helper.arr_dtype_conversion(arr_r, np.uint8)
+        if (self.convert_image):
+            arr_r = helper.arr_dtype_conversion(arr_r, self.tif_dtype)
 
         file_name = self._create_file_name('pearson', num_aggre)
         helper.create_tif(arr_r, file_name, self._img.profile, num_aggre)
 
-        if (self.autoPlot):
+        if (self.auto_plot):
             self._plot(file_name)
 
         return file_name
@@ -174,13 +177,13 @@ class SlidingWindow:
         arr = self._img.read(band)
         arr = rbg.fractal(arr, threshold, num_aggre)
 
-        # TODO remove later
-        arr = helper.arr_dtype_conversion(arr, np.uint16)
+        if (self.convert_image):
+            arr = helper.arr_dtype_conversion(arr, self.tif_dtype)
 
         file_name = self._create_file_name('fractal', num_aggre)
         helper.create_tif(arr, file_name, self._img.profile, num_aggre)
 
-        if (self.autoPlot):
+        if (self.auto_plot):
             self._plot(file_name)
         
         return file_name
@@ -193,13 +196,13 @@ class SlidingWindow:
         arr = self._img.read(band)
         arr = rbg.fractal_3d(arr, num_aggre)
 
-        # TODO remove later
-        arr = helper.arr_dtype_conversion(arr, np.uint8)
+        if (self.convert_image):
+            arr = helper.arr_dtype_conversion(arr, self.tif_dtype)
 
         file_name = self._create_file_name('fractal_3d', num_aggre)
         helper.create_tif(arr, file_name, self._img.profile, num_aggre)
 
-        if (self.autoPlot):
+        if (self.auto_plot):
             self._plot(file_name)
 
         return file_name
@@ -216,7 +219,7 @@ class SlidingWindow:
             self._dem_data.export(file_name)
 
     def initialize_dem(self, band=1):
-        self._dem_data = Dem_data(self._img.read(band).astype(self.dtype))
+        self._dem_data = Dem_data(self._img.read(band))
 
     def aggregate_dem(self, num_aggre=1):
         if (self._dem_data is None):
@@ -224,24 +227,20 @@ class SlidingWindow:
 
         aggregation.aggregate_dem(self._dem_data, num_aggre)
 
-    def _aggregate_dem_brute(self, num_aggre=1):
-        if (self._dem_data is None):
-            self.initialize_dem(1)
-
-        aggregation.aggregate_dem_brute(self._dem_data, num_aggre)
-
     # generate image of aggregated slope values
     def dem_slope(self):
         if (self._dem_data is None):
             self.initialize_dem(1)
 
         slope = dem.slope(self._dem_data, self.pixel_width, self.pixel_height)
-        slope = helper.arr_dtype_conversion(slope, np.uint16)
+
+        if (self.convert_image):
+            slope = helper.arr_dtype_conversion(slope, self.tif_dtype)
 
         file_name = self._create_file_name('slope', self._dem_data.num_aggre)
         helper.create_tif(slope, file_name, self._img.profile, self._dem_data.num_aggre)
 
-        if (self.autoPlot):
+        if (self.auto_plot):
             self._plot(file_name)
 
         return file_name
@@ -251,13 +250,15 @@ class SlidingWindow:
         if (self._dem_data is None):
             self.initialize_dem(1)
 
-        slope_angle = dem.slope_angle(self._dem_data, self.pixel_width, self.pixel_height)
-        slope_angle = helper.arr_dtype_conversion(slope_angle, dtype=np.uint16)
+        slope_angle = np.arctan(dem.slope(self._dem_data, self.pixel_width, self.pixel_height))
+
+        if (self.convert_image):
+            slope_angle = helper.arr_dtype_conversion(slope_angle, self.tif_dtype)
 
         file_name = self._create_file_name('slope_angle', self._dem_data.num_aggre)
         helper.create_tif(slope_angle, file_name, self._img.profile, self._dem_data.num_aggre)
 
-        if (self.autoPlot):
+        if (self.auto_plot):
             self._plot(file_name)
 
         return file_name
@@ -268,12 +269,14 @@ class SlidingWindow:
             self.initialize_dem(1)
 
         aspect = dem.aspect(self._dem_data)
-        aspect = helper.arr_dtype_conversion(aspect, dtype=np.uint16)
+
+        if (self.convert_image):
+            aspect = helper.arr_dtype_conversion(aspect, self.tif_dtype)
 
         file_name = self._create_file_name('aspect', self._dem_data.num_aggre)
         helper.create_tif(aspect, file_name, self._img.profile, self._dem_data.num_aggre)
 
-        if (self.autoPlot):
+        if (self.auto_plot):
             self._plot(file_name)
 
         return file_name
@@ -287,12 +290,14 @@ class SlidingWindow:
             return
 
         profile = dem.profile(self._dem_data, self.pixel_width, self.pixel_height)
-        profile = helper.arr_dtype_conversion(profile, np.uint16)
+
+        if (self.convert_image):
+            profile = helper.arr_dtype_conversion(profile, self.tif_dtype)
 
         file_name = self._create_file_name('profile', self._dem_data.num_aggre)
         helper.create_tif(profile, file_name, self._img.profile, self._dem_data.num_aggre)
 
-        if (self.autoPlot):
+        if (self.auto_plot):
             self._plot(file_name)
 
         return file_name
@@ -306,12 +311,14 @@ class SlidingWindow:
             return
 
         planform = dem.planform(self._dem_data, self.pixel_width, self.pixel_height)
-        planform = helper.arr_dtype_conversion(planform, np.uint16)
+
+        if (self.convert_image):
+            planform = helper.arr_dtype_conversion(planform, self.tif_dtype)
 
         file_name = self._create_file_name('planform', self._dem_data.num_aggre)
         helper.create_tif(planform, file_name, self._img.profile, self._dem_data.num_aggre)
 
-        if (self.autoPlot):
+        if (self.auto_plot):
             self._plot(file_name)
 
         return file_name
@@ -325,12 +332,14 @@ class SlidingWindow:
             return
 
         standard = dem.standard(self._dem_data, self.pixel_width, self.pixel_height)
-        standard = helper.arr_dtype_conversion(standard, np.uint16)
+
+        if (self.convert_image):
+            standard = helper.arr_dtype_conversion(standard, self.tif_dtype)
         
         file_name = self._create_file_name('standard', self._dem_data.num_aggre)
         helper.create_tif(standard, file_name, self._img.profile, self._dem_data.num_aggre)
 
-        if (self.autoPlot):
+        if (self.auto_plot):
             self._plot(file_name)
 
         return file_name
