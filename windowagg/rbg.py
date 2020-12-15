@@ -1,114 +1,105 @@
 from windowagg.agg_ops import Agg_ops
 import windowagg.aggregation as aggregation
 import windowagg.helper as helper
+import windowagg.config as config
 
 import numpy as np
 
-# i.e. Normalized Difference Vegetation Index
-# for viewing live green vegetation
-# requires red and infrared bands
-# returns floating point array
-def ndvi(red_arr, ir_arr):
-    red_arr = red_arr.astype(float)
-    ir_arr = ir_arr.astype(float)
-    return ( (ir_arr - red_arr) / (ir_arr + red_arr) )
+# Normalized Difference Vegetation Index
+def ndvi(arr_red, arr_ir):
+    return ( (arr_ir - arr_red) / (arr_ir + arr_red) )
 
-# create black and white image
-# values greater than or equal to threshold percentage will be white
-# threshold: percent in decimal of maximum
-# returns array of same data type
-# TODO can I assume minimum is always 0, how would I handle it otherwise?
+# Black and white image
+# TODO should this handle negative numbers
 def binary(arr, threshold):
     if (threshold < 0 or threshold > 1):
         raise ValueError('threshold must be between 0 and 1')
+
     dtype = arr.dtype
     maximum = helper.dtype_max(dtype)
-    return np.where(arr < (threshold * maximum), 0, maximum).astype(dtype)
+    return np.where(arr < (threshold * maximum), 0, maximum)
 
-# Do num_aggre aggregations and return the regression slope between two bands
-# returns floating point array
-def regression(arr_a, arr_b, num_aggre):
-    arr_a = arr_a.astype(float)
-    arr_b = arr_b.astype(float)
-    arr_aa = arr_a**2
-    arr_ab = (arr_a * arr_b)
+# Do num_aggre aggregations and return the regression slope between two arrays
+def regression(arr_x, arr_y, num_aggre):
+    arr_x = arr_x.astype(config.work_dtype)
+    arr_y = arr_y.astype(config.work_dtype)
+    arr_xx = arr_x**2
+    arr_xy = (arr_x * arr_y)
 
-    arr_a = aggregation.aggregate(arr_a, Agg_ops.add_all, num_aggre)
-    arr_b = aggregation.aggregate(arr_b, Agg_ops.add_all, num_aggre)
-    arr_aa = aggregation.aggregate(arr_aa, Agg_ops.add_all, num_aggre)
-    arr_ab = aggregation.aggregate(arr_ab, Agg_ops.add_all, num_aggre)
+    arr_x = aggregation.aggregate(arr_x, Agg_ops.add_all, num_aggre)
+    arr_y = aggregation.aggregate(arr_y, Agg_ops.add_all, num_aggre)
+    arr_xx = aggregation.aggregate(arr_xx, Agg_ops.add_all, num_aggre)
+    arr_xy = aggregation.aggregate(arr_xy, Agg_ops.add_all, num_aggre)
 
     # total input pixels aggregated per output pixel
     count = (2**num_aggre)**2
 
     # regression coefficient, i.e. slope of best fit line
-    numerator = count * arr_ab - arr_a * arr_b
-    denominator = count * arr_aa - arr_a**2
-    # avoid division by zero
-    # TODO is this required? Zero only occurs when there is no variance in the a band
-    denominator = np.maximum(denominator, 1)
-    arr_m = numerator/denominator
+    numerator = count * arr_xy - arr_x * arr_y
+    denominator = count * arr_xx - arr_x**2
+
+    with np.errstate(divide='ignore'):
+        arr_m = numerator/denominator
+        # TODO how should infinity be handled?
+        arr_m[np.isinf(arr_m)] = helper.dtype_max(arr_m.dtype)
 
     return arr_m
 
-# Do num_aggre aggregations and return the regression slope between two bands
-# returns floating point array
-def pearson(arr_a, arr_b, num_aggre):
-    arr_a = arr_a.astype(float)
-    arr_b = arr_b.astype(float)
-    arr_aa = arr_a**2
-    arr_bb = arr_b**2
-    arr_ab = (arr_a * arr_b)
+# Do num_aggre aggregations and return the Pearson Correlation coefficient between two bands
+def pearson(arr_x, arr_y, num_aggre):
+    arr_x = arr_x.astype(config.work_dtype)
+    arr_y = arr_y.astype(config.work_dtype)
+    arr_xx = arr_x**2
+    arr_yy = arr_y**2
+    arr_xy = (arr_x * arr_y)
 
-    arr_a = aggregation.aggregate(arr_a, Agg_ops.add_all, num_aggre)
-    arr_b = aggregation.aggregate(arr_b, Agg_ops.add_all, num_aggre)
-    arr_aa = aggregation.aggregate(arr_aa, Agg_ops.add_all, num_aggre)
-    arr_bb = aggregation.aggregate(arr_bb, Agg_ops.add_all, num_aggre)
-    arr_ab = aggregation.aggregate(arr_ab, Agg_ops.add_all, num_aggre)
+    arr_x = aggregation.aggregate(arr_x, Agg_ops.add_all, num_aggre)
+    arr_y = aggregation.aggregate(arr_y, Agg_ops.add_all, num_aggre)
+    arr_xx = aggregation.aggregate(arr_xx, Agg_ops.add_all, num_aggre)
+    arr_yy = aggregation.aggregate(arr_yy, Agg_ops.add_all, num_aggre)
+    arr_xy = aggregation.aggregate(arr_xy, Agg_ops.add_all, num_aggre)
 
     # total input pixels aggregated per output pixel
     count = (2**num_aggre)**2
 
     # pearson correlation
-    numerator = (count * arr_ab) - (arr_a * arr_b)
-    denominator = np.sqrt((count * arr_aa) - arr_a**2) * np.sqrt((count * arr_bb) - arr_b**2)
-    # avoid division by zero
-    # TODO is this required? Zero only occurs when there is no variance in the a or b bands
-    denominator = np.maximum(denominator, 1)
-    arr_r = numerator / denominator
+    numerator = (count * arr_xy) - (arr_x * arr_y)
+    denominator = np.sqrt((count * arr_xx) - arr_x**2) * np.sqrt((count * arr_yy) - arr_y**2)
+
+    with np.errstate(divide='ignore'):
+        arr_r = numerator/denominator
+        # TODO how should infinity be handled?
+        arr_r[np.isinf(arr_r)] = helper.dtype_max(arr_r.dtype)
     
     return arr_r
 
 # Do num_aggre aggregations and return the regression slope between two bands
-# non-vectorized using numpy's polyfit method
-# returns floating point array
-def regression_brute(arr_a, arr_b, num_aggre):
-    arr_a = arr_a.astype(float)
-    arr_b = arr_b.astype(float)
-    w_out = 2**num_aggre
-    y_max =  arr_a.shape[0] - (w_out - 1)
-    x_max = arr_a.shape[1] - (w_out - 1)
-    arr_m = np.empty([x_max, y_max])
+def regression_brute(arr_x, arr_y, num_aggre):
+    arr_x = arr_x.astype(config.work_dtype)
+    arr_y = arr_y.astype(config.work_dtype)
+    delta = 2**num_aggre
+    y_max =  arr_x.shape[0] - (delta - 1)
+    x_max = arr_x.shape[1] - (delta - 1)
+    arr_m = np.empty([y_max, x_max])
     
-    for j in range (y_max):
-        for i in range (x_max):
-            arr_1 = arr_a[j:(j + w_out), i:(i + w_out)].flatten()
-            arr_2 = arr_b[j:(j + w_out), i:(i + w_out)].flatten()
-            arr_coef = np.polynomial.polynomial.polyfit(arr_1, arr_2, 1)
-            arr_m[j][i] = arr_coef[1]
+    for y in range (y_max):
+        for x in range (x_max):
+            x_slice = arr_x[y:(y + delta), x:(x + delta)].flatten()
+            y_slice = arr_y[y:(y + delta), x:(x + delta)].flatten()
+            
+            y_indices = x_slice.argsort()
+
+            x_slice = x_slice[y_indices]
+            y_slice = y_slice[y_indices]
+
+            arr_coef = np.polynomial.polynomial.polyfit(x_slice, y_slice, 1)
+            arr_m[y][x] = arr_coef[1]
 
     return arr_m
 
-# check if an image is black and white or not
-# i.e. only contains values of dtype.min and dtype.max
-# TODO should min value be arr_in.dtype.min or 0?
-# TODO maybe remove this later
-def is_binary(arr_in):
-    max_val = np.amax(arr_in)
-    return ((arr_in==0) | (arr_in==max_val)).all()
-
 # Compute fractal dimension on 2**power_target wide pixel areas
 def fractal(arr_in, threshold, num_aggre):
+    arr_in = arr_in.astype(config.work_dtype)
     arr_binary = binary(arr_in, threshold)
     removal_num = (2**num_aggre - 1)
     y_max = arr_binary.shape[0] - removal_num
@@ -126,15 +117,15 @@ def fractal(arr_in, threshold, num_aggre):
         denom_regress[i] = i
         num_regress[i, ] = arr_sum.flatten()
 
-    arr_slope = np.polynomial.polynomial.Polynomial.fit(denom_regress, num_regress, 1)[1]
-    arr_out = np.reshape(arr_slope, (y_max, x_max))
-    return arr_out
+    arr_slope = np.polynomial.polynomial.polyfit(denom_regress, num_regress, 1)[1]
+    arr_slope = np.reshape(arr_slope, (y_max, x_max))
+    return arr_slope
 
 # This is for the 3D fractal dimension that is between 2 and 3, but it isn't tested yet
 def _boxed_array(arr_in, power_target):
     arr_min = np.amin(arr_in)
     arr_max = np.amax(arr_in)
-    arr_out = np.zeros(arr_in.size)
+    arr_out = np.zeros(arr_in.size, arr_in.dtype)
     if (arr_max > arr_min):
         n_boxes = 2**power_target - 1
         buffer = (arr_in - arr_min) / (arr_max - arr_min)
@@ -146,9 +137,10 @@ def _boxed_array(arr_in, power_target):
 def fractal_3d(arr_in, num_aggre):
     if (num_aggre <= 1):
         raise ValueError('number of aggregations must be greater than one')
+    arr_in = arr_in.astype(config.work_dtype)
     y_max = arr_in.shape[0] - (2**num_aggre - 1)
     x_max = arr_in.shape[1] - (2**num_aggre - 1)
-    arr_box = _boxed_array(arr_in, num_aggre).astype(float)
+    arr_box = _boxed_array(arr_in, num_aggre)
     arr_min = np.array(arr_box)
     arr_max = np.array(arr_box)
     denom_regress = np.empty(num_aggre - 1)
@@ -168,5 +160,5 @@ def fractal_3d(arr_in, num_aggre):
         arr_max /= 2
 
     arr_slope = np.polynomial.polynomial.polyfit(denom_regress, num_regress, 1)[1]
-    arr_out = np.reshape(arr_slope, (y_max, x_max))
-    return arr_out
+    arr_slope = np.reshape(arr_slope, (y_max, x_max))
+    return arr_slope
