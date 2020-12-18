@@ -86,18 +86,13 @@ def regression_brute(arr_x, arr_y, num_aggre):
         for x in range (x_max):
             x_slice = arr_x[y:(y + delta), x:(x + delta)].flatten()
             y_slice = arr_y[y:(y + delta), x:(x + delta)].flatten()
-            
-            y_indices = x_slice.argsort()
-
-            x_slice = x_slice[y_indices]
-            y_slice = y_slice[y_indices]
 
             arr_coef = np.polynomial.polynomial.polyfit(x_slice, y_slice, 1)
             arr_m[y][x] = arr_coef[1]
 
     return arr_m
 
-# Compute fractal dimension on 2**power_target wide pixel areas
+# Compute fractal dimension on 2**num_aggre wide pixel areas
 def fractal(arr_in, threshold, num_aggre):
     arr_in = arr_in.astype(config.work_dtype)
     arr_binary = binary(arr_in, threshold)
@@ -109,31 +104,28 @@ def fractal(arr_in, threshold, num_aggre):
     
     for i in range(num_aggre):
         if (i > 0):
-            arr_binary = aggregation.aggregate(arr_binary, Agg_ops.maximum, 1, i - 1)
+            arr_binary = aggregation.aggregate(arr_binary, Agg_ops.maximum, 1, (i - 1))
 
-        arr_sum = aggregation.aggregate(arr_binary, Agg_ops.add_all, num_aggre - i, i)
+        arr_sum = aggregation.aggregate(arr_binary, Agg_ops.add_all, (num_aggre - i), i)
 
         arr_sum = np.log2(arr_sum)
         denom_regress[i] = i
         num_regress[i, ] = arr_sum.flatten()
 
-    arr_slope = np.polynomial.polynomial.polyfit(denom_regress, num_regress, 1)[1]
-    arr_slope = np.reshape(arr_slope, (y_max, x_max))
-    return arr_slope
+    arr_fractal_dim = np.polynomial.polynomial.polyfit(denom_regress, num_regress, 1)[1]
+    arr_fractal_dim = np.reshape(arr_fractal_dim, (y_max, x_max))
+    return arr_fractal_dim
 
-# This is for the 3D fractal dimension that is between 2 and 3, but it isn't tested yet
-def _boxed_array(arr_in, power_target):
+def _boxed_array(arr_in, num_aggre):
     arr_min = np.amin(arr_in)
     arr_max = np.amax(arr_in)
-    arr_out = np.zeros(arr_in.size, arr_in.dtype)
+    arr_out = np.zeros(arr_in.size, dtype=arr_in.dtype)
     if (arr_max > arr_min):
-        n_boxes = 2**power_target - 1
+        n_boxes = 2**num_aggre - 1
         buffer = (arr_in - arr_min) / (arr_max - arr_min)
         arr_out = np.floor(n_boxes * buffer)
     return arr_out
 
-# TODO does this need to be binary too? probably not?
-# TODO should this have a power_start?
 def fractal_3d(arr_in, num_aggre):
     if (num_aggre <= 1):
         raise ValueError('number of aggregations must be greater than one')
@@ -141,16 +133,19 @@ def fractal_3d(arr_in, num_aggre):
     y_max = arr_in.shape[0] - (2**num_aggre - 1)
     x_max = arr_in.shape[1] - (2**num_aggre - 1)
     arr_box = _boxed_array(arr_in, num_aggre)
-    arr_min = np.array(arr_box)
-    arr_max = np.array(arr_box)
+    arr_min = np.array(arr_box, dtype=arr_in.dtype)
+    arr_max = np.array(arr_box, dtype=arr_in.dtype)
     denom_regress = np.empty(num_aggre - 1)
     num_regress = np.empty([(num_aggre - 1), (x_max * y_max)])
     
     # TODO is this supposed to start at 1?
-    for i in range(1, num_aggre):
-        arr_min = aggregation.aggregate(arr_min, Agg_ops.minimum, 1, (i-1))
-        arr_max = aggregation.aggregate(arr_max, Agg_ops.maximum, 1, (i-1))
-        arr_sum = aggregation.aggregate((arr_max - arr_min + 1), i, num_aggre, Agg_ops.add_all)
+    for i in range(num_aggre):
+        if (i > 0):
+            arr_min = aggregation.aggregate(arr_min, Agg_ops.minimum, 1, (i-1))
+            arr_max = aggregation.aggregate(arr_max, Agg_ops.maximum, 1, (i-1))
+
+        arr_sum = aggregation.aggregate((arr_max - arr_min + 1), Agg_ops.add_all, (num_aggre - i), i)
+
         arr_num = np.log2(arr_sum)
         denom_regress[i - 1] = num_aggre - i
         num_regress[(i - 1), ] = arr_num.flatten()
@@ -159,6 +154,6 @@ def fractal_3d(arr_in, num_aggre):
         arr_min /= 2
         arr_max /= 2
 
-    arr_slope = np.polynomial.polynomial.polyfit(denom_regress, num_regress, 1)[1]
-    arr_slope = np.reshape(arr_slope, (y_max, x_max))
-    return arr_slope
+    arr_fractal_dim = np.polynomial.polynomial.polyfit(denom_regress, num_regress, 1)[1]
+    arr_fractal_dim = np.reshape(arr_fractal_dim, (y_max, x_max))
+    return arr_fractal_dim
