@@ -74,14 +74,14 @@ class SlidingWindow:
         return file_name
 
     def _plot(self, file_name):
-        img = rasterio.open(file_name)
+        with rasterio.open(file_name) as img:
 
-        data = np.empty([img.shape[0], img.shape[1], img.count])
-        for i in range(img.count):
-            data[...,i] = img.read(i + 1)
+            data = np.empty([img.shape[0], img.shape[1], img.count]).astype(np.uint8)
+            for i in range(img.count):
+                data[...,i] = helper.arr_dtype_conversion(img.read(i + 1), np.uint8)
 
-        plt.imshow(data)
-        plt.savefig(os.path.splitext(file_name)[0] + '.png')
+            plt.imshow(data)
+            plt.savefig(os.path.splitext(file_name)[0] + '.png')
 
     # create NDVI image
     def ndvi(self, red_band, ir_band):
@@ -161,7 +161,7 @@ class SlidingWindow:
             arr_r = helper.arr_dtype_conversion(arr_r, self.tif_dtype)
 
         file_name = self._create_file_name('pearson', num_aggre)
-        helper.create_tif(arr_r, file_name, self._img.profile, num_aggre)
+        helper.create_tif(arr_r , file_name, self._img.profile, num_aggre)
 
         if (self.auto_plot):
             self._plot(file_name)
@@ -215,7 +215,7 @@ class SlidingWindow:
             print('No DEM data to export')
         else:
             if (file_name == None):
-                file_name = self._file_name + '_w=' + str(2**self._dem_data.num_aggre)
+                file_name = self._file_name + '_w=' + str(2**self._dem_data.num_aggre) + '.npz'
             self._dem_data.export(file_name)
 
     def initialize_dem(self, band=1):
