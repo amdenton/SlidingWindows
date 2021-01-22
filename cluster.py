@@ -42,7 +42,11 @@ def gen_clustered_image(file_path, analyses, num_aggres, bands, num_clusters=3, 
 
     with rasterio.open(file_path) as img:
         band_range = range(1, img.count + 1)
-        if (np.amax(bands) not in band_range):
+        max_band = 0
+        for i in range(len(bands)):
+            if (np.amax(bands[i]) > max_band):
+                max_band = np.amax(bands[i])
+        if (max_band not in band_range):
             raise ValueError('Band must be in range of %r.' % band_range)
         
         if (
@@ -80,7 +84,7 @@ def gen_clustered_image(file_path, analyses, num_aggres, bands, num_clusters=3, 
         if (not os.path.exists(path(file_path, 'output'))):
             os.makedirs(path(file_path, 'output'))
 
-        for band in np.unique(bands):
+        for band in band_range:
             dem_data = Dem_data(sub_img[band - 1])
             for num_aggre in range(maxNumAggre):
                 aggregation.aggregate_dem(dem_data, 1)
@@ -197,8 +201,8 @@ def gen_clustered_image(file_path, analyses, num_aggres, bands, num_clusters=3, 
             shutil.rmtree(path(file_path, 'work'))
 
 
-analyses = [Analyses.aspect, Analyses.aspect, Analyses.aspect, Analyses.standard, Analyses.standard, Analyses.standard]
-num_aggres = [3, 3, 3, 3, 3, 3]
-bands = [1, 2, 3, 1, 2, 3]
+analyses = [Analyses.fractal, Analyses.fractal, Analyses.pearson]
+num_aggres = [3, 3, 3]
+bands = [2, 3, [2, 3]]
 
 gen_clustered_image(test_file_name, analyses=analyses, num_aggres=num_aggres, bands=bands, num_clusters=10, sub_image_size=512)
