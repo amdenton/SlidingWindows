@@ -1,4 +1,0 @@
-matplotlib
-GDAL-[VERSION_INFO].whl
-rasterio-[VERSION_INFO].whl
-scikit-learn

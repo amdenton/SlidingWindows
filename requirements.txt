@@ -1,4 +1,5 @@
-numpy
 rasterio
+numpy
+affine
 matplotlib
-scikit-learn
+sklearn

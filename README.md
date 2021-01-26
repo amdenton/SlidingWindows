@@ -1,35 +1,25 @@
-# WindowAgg
+# SlidingWindow
 
 ## Window based aggregation methods for analyzing geographic images
 
 ### METHODS
-#### RGB IR IMAGES
+#### RGB-IR IMAGES
 * ndvi
-* binary
-* aggregation
 * regression
 * Pearson
 * fractal
 * fractal 3D
 
 #### DEM IMAGES
-* window mean
 * slope
 * aspect
 * standard curve
-* profile curve
-* planform curve
 
+### Rasterio
+Rasterio, a dependency of this package, has special dependencies of its own. See the rasterio [installation guide](https://rasterio.readthedocs.io/en/latest/installation.html) for more information.
 
 ### INSTALL
-`pip install windowagg`
+`pip install slidingwindow`
 
 ### IMPORT
 `from windowagg.sliding_window import SlidingWindow`
-
-### BUT FIRST!
-You must download and install rasterio/GDAL Binaries  
-[rasterio](https://www.lfd.uci.edu/~gohlke/pythonlibs/#rasterio) - 
-[GDAL](https://www.lfd.uci.edu/~gohlke/pythonlibs/#gdal)  
-`pip install /path/to/GDAL_binaries`  
-`pip install /path/to/rasterio_binaries`  
