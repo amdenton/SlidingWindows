@@ -3,11 +3,7 @@ from windowagg.dem_data import Dem_data
 import numpy as np
 import math
 
-# TODO Do the input arrays have to be converted to float?
-
 # non-vectorized aggregation method
-# very slow
-# returns floating point array
 def aggregate_brute(arr_in, operation, num_aggre=1, num_prev_aggre=0):
     if (len(arr_in.shape) != 2):
         raise ValueError('Array must be 2 dimensional')
@@ -28,7 +24,6 @@ def aggregate_brute(arr_in, operation, num_aggre=1, num_prev_aggre=0):
         x_max -= delta
         arr = np.empty([y_max, x_max], dtype=arr_out.dtype)
 
-        # iterate through pixels
         for j in range (y_max):
             for i in range (x_max):
                 if (operation == Agg_ops.add_all):
@@ -46,9 +41,7 @@ def aggregate_brute(arr_in, operation, num_aggre=1, num_prev_aggre=0):
         arr_out = arr
     return arr_out
 
-# Aggregate arr_in
-# Assuming 2*prev_aggre size windows are already aggregated
-# returns floating point array
+# vectorized aggregation method
 def aggregate(arr_in, operation, num_aggre=1, num_prev_aggre=0):
     if (len(arr_in.shape) != 2):
         raise ValueError('Array must be 2 dimensional')
@@ -63,7 +56,6 @@ def aggregate(arr_in, operation, num_aggre=1, num_prev_aggre=0):
     arr_out = arr_in.flatten()
     delta = 2**num_prev_aggre
     
-    # iterate through sliding window sizes
     for _ in range(num_aggre):
         size = arr_out.size
 

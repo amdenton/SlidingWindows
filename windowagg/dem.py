@@ -4,9 +4,6 @@ import math
 
 import numpy as np
 
-# TODO What is the scale of the elevation, width and height of the image?
-# should I take in scale as a parameter? Or derive it from metadata?
-
 # return array of aggregated slope values
 def slope(dem_data, pixel_width, pixel_height):
     w = pixel_width

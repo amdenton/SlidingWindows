@@ -31,12 +31,11 @@ def regression(arr_x, arr_y, num_aggre):
     arr_xx = aggregation.aggregate(arr_xx, Agg_ops.add_all, num_aggre)
     arr_xy = aggregation.aggregate(arr_xy, Agg_ops.add_all, num_aggre)
 
-    # total input pixels aggregated per output pixel
-    count = (2**num_aggre)**2
+    pixel_count = (2**num_aggre)**2
 
     # regression coefficient, i.e. slope of best fit line
-    numerator = count * arr_xy - arr_x * arr_y
-    denominator = count * arr_xx - arr_x**2
+    numerator = pixel_count * arr_xy - arr_x * arr_y
+    denominator = pixel_count * arr_xx - arr_x**2
 
     with np.errstate(divide='ignore'):
         arr_m = numerator/denominator
@@ -60,11 +59,11 @@ def pearson(arr_x, arr_y, num_aggre):
     arr_xy = aggregation.aggregate(arr_xy, Agg_ops.add_all, num_aggre)
 
     # total input pixels aggregated per output pixel
-    count = (2**num_aggre)**2
+    pixel_count = (2**num_aggre)**2
 
     # pearson correlation
-    numerator = (count * arr_xy) - (arr_x * arr_y)
-    denominator = np.sqrt((count * arr_xx) - arr_x**2) * np.sqrt((count * arr_yy) - arr_y**2)
+    numerator = (pixel_count * arr_xy) - (arr_x * arr_y)
+    denominator = np.sqrt((pixel_count * arr_xx) - arr_x**2) * np.sqrt((pixel_count * arr_yy) - arr_y**2)
 
     with np.errstate(divide='ignore'):
         arr_r = numerator/denominator

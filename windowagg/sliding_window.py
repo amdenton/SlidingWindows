@@ -14,31 +14,7 @@ import matplotlib.pyplot as plt
 
 class SlidingWindow:
 
-    # TODO create more tests
-    # test geoTransform update in _create_tif()
-    # test averages (e.g. xz, yz) in DEM_UTILS
-
-    # TODO do I have all required functionality?
-    # image creation with geoTransform update
-    # array conversion TODO needs updating ??
-    # ndvi
-    # binary
-    # regression
-    # Pearson
-    # fractal
-    # fractal 3D TODO ensure this method is written properly (check _boxed_array() for sure)
-    # DEM window mean
-    # DEM array intialization
-    # DEM double_w TODO this has 3 methods, do we need all 3?
-    # DEM slope
-    # DEM aspect
-    # DEM standard curve
-    # DEM profile curve
-    # DEM planform curve
-
-    # TODO research how to create python package
-    # TODO add more documentation
-    # TODO should all these methods use floating point? datatypes?!?!
+    # TODO potentially add R squared method?
 
     def __init__(self, file_path, map_width_to_meters=1.0, map_height_to_meters=1.0):
         file_basename = os.path.basename(file_path)
@@ -104,26 +80,6 @@ class SlidingWindow:
 
         return file_name
 
-    # create binary image
-    def binary(self, band, threshold):
-        bands = np.array(range(self._img.count)) + 1
-        if (band not in bands):
-            raise ValueError('band must be in range of %r.' % bands)
-
-        arr = self._img.read(band)
-        arr = rbg.binary(arr, threshold)
-        
-        if (self.convert_image):
-            arr = helper.arr_dtype_conversion(arr, self.tif_dtype)
-
-        file_name = self._create_file_name('binary')
-        helper.create_tif(arr, file_name, self._img.profile)
-
-        if (self.auto_plot):
-            self._plot(file_name)
-
-        return file_name
-
     # create image with pixel values cooresponding to their aggregated regression slope
     def regression(self, band1, band2, num_aggre):
         bands = np.array(range(self._img.count)) + 1
@@ -144,8 +100,6 @@ class SlidingWindow:
             self._plot(file_name)
 
         return file_name
-
-    # TODO potentially add R squared method?
 
     # create image with pixel values cooresponding to their aggregated pearson correlation
     def pearson(self, band1, band2, num_aggre):
@@ -188,6 +142,7 @@ class SlidingWindow:
         
         return file_name
 
+    # create image with pixel values cooresponding to their aggregated 3D fractal dimension
     def fractal_3d(self, band, num_aggre):
         bands = np.array(range(self._img.count)) + 1
         if (band not in bands):
@@ -275,48 +230,6 @@ class SlidingWindow:
 
         file_name = self._create_file_name('aspect', self._dem_data.num_aggre)
         helper.create_tif(aspect, file_name, self._img.profile, self._dem_data.num_aggre)
-
-        if (self.auto_plot):
-            self._plot(file_name)
-
-        return file_name
-
-    # generate image of aggregated profile curvature, second derivative parallel to steepest descent
-    def dem_profile(self):
-        if (self._dem_data is None):
-            self.initialize_dem(1)
-        if (2**self._dem_data.num_aggre <= 2):
-            print('Curvature cannot be calculated on windows of size 2 or 1')
-            return
-
-        profile = dem.profile(self._dem_data, self.pixel_width, self.pixel_height)
-
-        if (self.convert_image):
-            profile = helper.arr_dtype_conversion(profile, self.tif_dtype)
-
-        file_name = self._create_file_name('profile', self._dem_data.num_aggre)
-        helper.create_tif(profile, file_name, self._img.profile, self._dem_data.num_aggre)
-
-        if (self.auto_plot):
-            self._plot(file_name)
-
-        return file_name
-
-    # generate image of aggregated planform curvature, second derivative perpendicular to steepest descent
-    def dem_planform(self):
-        if (self._dem_data is None):
-            self.initialize_dem(1)
-        if (2**self._dem_data.num_aggre <= 2):
-            print('Curvature cannot be calculated on windows of size 2 or 1')
-            return
-
-        planform = dem.planform(self._dem_data, self.pixel_width, self.pixel_height)
-
-        if (self.convert_image):
-            planform = helper.arr_dtype_conversion(planform, self.tif_dtype)
-
-        file_name = self._create_file_name('planform', self._dem_data.num_aggre)
-        helper.create_tif(planform, file_name, self._img.profile, self._dem_data.num_aggre)
 
         if (self.auto_plot):
             self._plot(file_name)
