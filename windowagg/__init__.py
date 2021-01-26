@@ -1,1 +1,1 @@
-name = "windowagg"
+name = "slidingwindow"
