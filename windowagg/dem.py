@@ -1,4 +1,4 @@
-from windowagg.dem_data import Dem_data
+from dem_data import Dem_data
 
 import math
 

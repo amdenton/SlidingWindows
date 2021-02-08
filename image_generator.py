@@ -25,13 +25,6 @@ class ImageGenerator:
             os.makedirs(self.path)
 
     def all(self, image_size=_image_size, mu=None, sigma=None, noise=0, num_bands=4):
-        # Median offset
-        if (mu is None):
-            mu = (image_size - 1)  / 2
-        # Standard deviation
-        if (sigma is None):
-            sigma = (image_size - 1) / 4
-
         self.star(image_size=image_size)
         self.gauss(image_size=image_size, sigma=sigma, mu=mu, noise=noise)
         self.gauss_horizontal(image_size=image_size, sigma=sigma, mu=mu, noise=noise)

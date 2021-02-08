@@ -1,4 +1,4 @@
-import windowagg.config as config
+import config as config
 
 import numpy as np
 

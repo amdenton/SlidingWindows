@@ -1,9 +1,9 @@
-import windowagg.rbg as rbg
-import windowagg.dem as dem
-import windowagg.aggregation as aggregation
-from windowagg.dem_data import Dem_data
-import windowagg.helper as helper
-from windowagg.analyses import Analyses
+import rbg as rbg
+import dem as dem
+import aggregation as aggregation
+from dem_data import Dem_data
+import helper as helper
+from analyses import Analyses
 
 from enum import Enum
 import os
@@ -140,10 +140,10 @@ def gen_clustered_image(file_path, analyses, num_aggres, bands, num_clusters=3, 
                 if (not isinstance(bands[index], int)):
                     raise ValueError('Unexpected band format. Factal_3d analysis requires 1 band')
                 dem_data = Dem_data.from_import(demExportPath(file_path, bands[index], num_aggres[index]))
-                standard = dem.standard(dem_data, map_width_to_meters, map_height_to_meters)
+                analysis = dem.standard(dem_data, map_width_to_meters, map_height_to_meters)
 
             if (local_removal_num > 0):
-                analysis = standard[local_removal_num:-local_removal_num, local_removal_num:-local_removal_num]
+                analysis = analysis[local_removal_num:-local_removal_num, local_removal_num:-local_removal_num]
             analysis = helper.arr_dtype_conversion(analysis, np.uint8)
             cluster_data = np.concatenate((cluster_data, analysis.flatten()[:,np.newaxis]), 1)
 

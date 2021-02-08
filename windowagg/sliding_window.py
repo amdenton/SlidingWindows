@@ -1,9 +1,9 @@
-import windowagg.rbg as rbg
-import windowagg.dem as dem
-import windowagg.aggregation as aggregation
-from windowagg.dem_data import Dem_data
-import windowagg.helper as helper
-import windowagg.config as config
+import rbg as rbg
+import dem as dem
+import aggregation as aggregation
+from dem_data import Dem_data
+import helper as helper
+import config as config
 
 import math
 import os
