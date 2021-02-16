@@ -1,7 +1,7 @@
-from agg_ops import Agg_ops
-import aggregation as aggregation
-import helper as helper
-import config as config
+from windowagg.agg_ops import Agg_ops
+import windowagg.aggregation as aggregation
+import windowagg.helper as helper
+import windowagg.config as config
 
 import numpy as np
 

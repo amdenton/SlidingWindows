@@ -1,6 +1,8 @@
-from agg_ops import Agg_ops
-from dem_data import Dem_data
+from windowagg.agg_ops import Agg_ops
+from windowagg.dem_data import Dem_data
+
 import numpy as np
+
 import math
 
 # non-vectorized aggregation method

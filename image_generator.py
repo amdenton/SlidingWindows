@@ -69,10 +69,10 @@ class ImageGenerator:
     def gauss(self, image_size=_image_size, mu=None, sigma=None, noise=0):
         # Median offset
         if (mu is None):
-            mu = (image_size - 1)  / 2
+            mu = image_size  / 2
         # Standard deviation
         if (sigma is None):
-            sigma = (image_size - 1) / 4
+            sigma = image_size / 8
 
         arr = np.empty([image_size, image_size])
 
@@ -104,10 +104,10 @@ class ImageGenerator:
     def gauss_aspect_point(self, x, y, image_size=_image_size, mu=None, sigma=None):
         # Median offset
         if (mu is None):
-            mu = (image_size - 1)  / 2
+            mu = image_size  / 2
         # Standard deviation
         if (sigma is None):
-            sigma = (image_size - 1) / 4
+            sigma = image_size / 8
 
         dx = -(
             (
@@ -147,10 +147,10 @@ class ImageGenerator:
     def gauss_slope_point(self, x, y, image_size=_image_size, mu=None, sigma=None):
         # Median offset
         if (mu is None):
-            mu = (image_size - 1)  / 2
+            mu = image_size  / 2
         # Standard deviation
         if (sigma is None):
-            sigma = (image_size - 1) / 4
+            sigma = image_size / 8
 
         # Formula for the first derivative in the direction of steepest descent
         return -(
@@ -174,10 +174,10 @@ class ImageGenerator:
     def gauss_standard_point(self, x, y, image_size=_image_size, mu=None, sigma=None):
         # Median offset
         if (mu is None):
-            mu = (image_size - 1)  / 2
+            mu = image_size  / 2
         # Standard deviation
         if (sigma is None):
-            sigma = (image_size - 1) / 4
+            sigma = image_size / 8
         
         # Standard curvature formula
         return (
@@ -197,10 +197,10 @@ class ImageGenerator:
     def gauss_horizontal(self, image_size=_image_size, mu=None, sigma=None, noise=0):
         # Median offset
         if (mu is None):
-            mu = (image_size - 1)  / 2
+            mu = image_size  / 2
         # Standard deviation
         if (sigma is None):
-            sigma = (image_size - 1) / 4
+            sigma = image_size / 8
 
         arr = np.empty([image_size, image_size])
 
@@ -216,10 +216,10 @@ class ImageGenerator:
     def gauss_vertical(self, image_size=_image_size, mu=None, sigma=None, noise=0):
         # Median offset
         if (mu is None):
-            mu = (image_size - 1)  / 2
+            mu = image_size  / 2
         # Standard deviation
         if (sigma is None):
-            sigma = (image_size - 1) / 4
+            sigma = image_size / 8
 
         arr = np.empty([image_size, image_size])
 
