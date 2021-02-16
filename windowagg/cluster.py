@@ -16,6 +16,8 @@ import rasterio
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from sklearn.cluster import KMeans
+import seaborn as sns
+import pandas as pd
 
 def _path(file_path, postfix, file_extension=''):
     if ((file_extension != '') and (file_extension.index('.') != 0)):
@@ -27,6 +29,9 @@ def _demExportPath(file_path, band, num_aggre):
     return _path(file_path, 'work') + '\\' + _path(file_path, 'band=' + str(band) + '_w=' + str(2**num_aggre), '.npz')
 
 def gen_clustered_img(file_path, analyses, num_aggres, bands, num_clusters=3, sub_img_size=256, sub_img_start=[0, 0], map_width_to_meters=1.0, map_height_to_meters=1.0, output_file_path=None, average_cluster_values=False):
+
+    if (output_file_path is None):
+        output_file_path = _path(file_path, 'output') + '\\' + _path(file_path, 'output', '.tif')
 
     band_range, profile, sub_img = _extract_img_info(file_path, bands, sub_img_start, sub_img_size)
 
@@ -48,7 +53,38 @@ def gen_clustered_img(file_path, analyses, num_aggres, bands, num_clusters=3, su
         
         _export_dem_data(file_path, sub_img, band_range, maxNumAggre)
         _create_adjusted_img(file_path, sub_img, maxNumAggre, profile)
-        _create_clustered_img(analyses, num_aggres, bands, sub_img, num_clusters, average_cluster_values, file_path, output_file_path, profile)
+        _create_clustered_img(analyses, num_aggres, bands, sub_img, num_clusters, average_cluster_values, file_path, output_file_path, profile, map_width_to_meters, map_height_to_meters)
+
+    finally:
+        if os.path.exists(_path(file_path, 'work')):
+            shutil.rmtree(_path(file_path, 'work'))
+
+def gen_pairplot_img(file_path, analyses, num_aggres, bands, num_clusters=3, sub_img_size=256, sub_img_start=[0, 0], map_width_to_meters=1.0, map_height_to_meters=1.0, output_file_path=None):
+
+    if (output_file_path is None):
+        output_file_path = _path(file_path, 'output') + '\\' + _path(file_path, 'output', '.tif')
+
+    band_range, profile, sub_img = _extract_img_info(file_path, bands, sub_img_start, sub_img_size)
+
+    maxNumAggre = np.amax(num_aggres)
+    if (np.amin(num_aggres) == 1):
+        raise ValueError('Cannot aggregate images less than 2 times')
+
+    try:
+        if (not os.path.exists(_path(file_path, 'work'))):
+            os.makedirs(_path(file_path, 'work'))
+        else:
+            raise ValueError('Work directory %s already exists' % _path(file_path, 'work'))
+
+        if (not os.path.exists(_path(file_path, 'output'))):
+            os.makedirs(_path(file_path, 'output'))
+
+        if ((2**maxNumAggre - 1) > sub_img_size):
+            raise ValueError('Sub image size is too small to aggregate %s times' + str(maxNumAggre))
+        
+        _export_dem_data(file_path, sub_img, band_range, maxNumAggre)
+        _create_adjusted_img(file_path, sub_img, maxNumAggre, profile)
+        _create_pairplot_img(analyses, num_aggres, bands, sub_img, num_clusters, file_path, output_file_path, profile, map_width_to_meters, map_height_to_meters)
 
     finally:
         if os.path.exists(_path(file_path, 'work')):
@@ -97,8 +133,8 @@ def _export_dem_data(file_path, sub_img, band_range, num_aggre):
                 dem_data.export(_demExportPath(file_path, band, i + 1))
 
 
-def _create_clustered_img(analyses, num_aggres, bands, sub_img, num_clusters, average_cluster_values, file_path, output_file_path, profile):
-    cluster_data = _gen_cluster_data(analyses, num_aggres, bands, sub_img)
+def _create_clustered_img(analyses, num_aggres, bands, sub_img, num_clusters, average_cluster_values, file_path, output_file_path, profile, map_width_to_meters, map_height_to_meters):
+    cluster_data = _gen_cluster_data(analyses, num_aggres, bands, sub_img, file_path, map_width_to_meters, map_height_to_meters)
     kmeans = KMeans(n_clusters=num_clusters, random_state=0).fit(cluster_data)
     maxNumAggre = np.amax(num_aggres)
     removal_num = 2**maxNumAggre - 1
@@ -111,10 +147,27 @@ def _create_clustered_img(analyses, num_aggres, bands, sub_img, num_clusters, av
             output[kmeans.labels_ == i] = kmeans.cluster_centers_[i].sum() / kmeans.cluster_centers_[i].size
         else:
             output[kmeans.labels_ == i] =  math.floor(step * i)
-    if (output_file_path is None):
-        output_file_path = _path(file_path, 'output') + '\\' + _path(file_path, 'output', '.tif')
 
     helper.create_tif(output.reshape([(output_length), (output_length)]), output_file_path, profile, maxNumAggre)
+    print("Output image saved to ", output_file_path)
+
+def _create_pairplot_img(analyses, num_aggres, bands, sub_img, num_clusters, file_path, output_file_path, profile, map_width_to_meters, map_height_to_meters):
+    labels = []
+    for i in range(len(analyses)):
+        concat_bands = ""
+        if isinstance(bands[i], int):
+            concat_bands = str(bands[i])
+        else:
+            for j in range(len(bands[i])):
+                if (j != 0):
+                    concat_bands += "+"
+                concat_bands += str(bands[i][j])
+        labels.append(str(analyses[i].name) + "_b" + concat_bands + "_w" + str(2**num_aggres[i]))
+
+    cluster_data = _gen_cluster_data(analyses, num_aggres, bands, sub_img, file_path, map_width_to_meters, map_height_to_meters)
+    data = pd.DataFrame(cluster_data, columns=labels)
+    sns_plot = sns.pairplot(data, kind="hist")
+    sns_plot.savefig(output_file_path)
     print("Output image saved to ", output_file_path)
 
 def _create_adjusted_img(file_path, sub_img, num_aggre, profile):
@@ -130,7 +183,7 @@ def _create_adjusted_img(file_path, sub_img, num_aggre, profile):
         helper.create_tif(adjusted_img, adjust_file_path, profile, num_aggre)
         print("Adjusted image saved to ", adjust_file_path)
 
-def _gen_cluster_data(analyses, num_aggres, bands, sub_img):
+def _gen_cluster_data(analyses, num_aggres, bands, sub_img, file_path, map_width_to_meters, map_height_to_meters):
     maxNumAggre = np.amax(num_aggres)
     removal_num = 2**maxNumAggre - 1
     cluster_data = np.empty([(sub_img[0].shape[0] - removal_num)**2, 0 ]).astype(np.uint8)
