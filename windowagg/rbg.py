@@ -10,14 +10,17 @@ def ndvi(arr_red, arr_ir):
     return ( (arr_ir - arr_red) / (arr_ir + arr_red) )
 
 # Black and white image
-# TODO should this handle negative numbers
+# TODO should this handle negative numbers?
 def binary(arr, threshold):
     if (threshold < 0 or threshold > 1):
         raise ValueError('threshold must be between 0 and 1')
 
     dtype = arr.dtype
-    maximum = helper.dtype_max(dtype)
-    return np.where(arr < (threshold * maximum), 0, maximum)
+    dtype_maximum = helper.dtype_max(dtype)
+    maximum = np.amax(arr)
+    minimum = np.amin(arr)
+    threshold_val = (threshold * (maximum - minimum)) + minimum
+    return np.where(arr < threshold_val, 0, dtype_maximum)
 
 # Do num_aggre aggregations and return the regression slope between two arrays
 def regression(arr_x, arr_y, num_aggre):

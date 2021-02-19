@@ -62,7 +62,7 @@ def gen_clustered_img(file_path, analyses, num_aggres, bands, num_clusters=3, su
 def gen_pairplot_img(file_path, analyses, num_aggres, bands, num_clusters=3, sub_img_size=256, sub_img_start=[0, 0], map_width_to_meters=1.0, map_height_to_meters=1.0, output_file_path=None):
 
     if (output_file_path is None):
-        output_file_path = _path(file_path, 'output') + '\\' + _path(file_path, 'output', '.tif')
+        output_file_path = _path(file_path, 'output') + '\\' + _path(file_path, 'output', '.png')
 
     band_range, profile, sub_img = _extract_img_info(file_path, bands, sub_img_start, sub_img_size)
 
