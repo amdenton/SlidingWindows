@@ -2,6 +2,7 @@ import windowagg.rbg as rbg
 import windowagg.dem as dem
 import windowagg.aggregation as aggregation
 from windowagg.dem_data import Dem_data
+from windowagg.agg_ops import Agg_ops
 import windowagg.helper as helper
 from windowagg.analyses import Analyses
 
@@ -171,17 +172,25 @@ def _create_pairplot_img(analyses, num_aggres, bands, sub_img, num_clusters, fil
     print("Output image saved to ", output_file_path)
 
 def _create_adjusted_img(file_path, sub_img, num_aggre, profile):
-        removal_num = 2**num_aggre - 1
-        adjust_file_path = _path(file_path, 'output') + '\\' + _path(file_path, 'adjusted', '.tif')
+        trun_num = int((2**num_aggre - 2) / 2)
+        adjusted_file_path = _path(file_path, 'output') + '\\' + _path(file_path, 'adjusted', '.tif')
         adjusted_img = []
 
         for index in range(sub_img.shape[0]):
-            adjusted_img_band = np.delete(np.delete(sub_img[index], np.s_[-removal_num::], 0), np.s_[-removal_num::], 1)
+            arr = sub_img[index]
+
+            dtype = arr.dtype
+            adjusted_img_band = arr.astype(np.float64)
+            adjusted_img_band = aggregation.aggregate(adjusted_img_band, Agg_ops.add_all, 1)
+            adjusted_img_band = (adjusted_img_band / 4).astype(dtype)
+
+            adjusted_img_band = adjusted_img_band[trun_num:-trun_num:1, trun_num:-trun_num:1]
             adjusted_img_band = helper.arr_dtype_conversion(adjusted_img_band, np.uint8)
+            
             adjusted_img.append(adjusted_img_band)
 
-        helper.create_tif(adjusted_img, adjust_file_path, profile, num_aggre)
-        print("Adjusted image saved to ", adjust_file_path)
+        helper.create_tif(adjusted_img, adjusted_file_path, profile, num_aggre)
+        print("Adjusted image saved to ", adjusted_file_path)
 
 def _gen_cluster_data(analyses, num_aggres, bands, sub_img, file_path, map_width_to_meters, map_height_to_meters):
     maxNumAggre = np.amax(num_aggres)
