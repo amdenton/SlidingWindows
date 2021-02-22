@@ -102,7 +102,7 @@ def fractal(arr_in, threshold, num_aggre):
     y_max = arr_binary.shape[0] - removal_num
     x_max = arr_binary.shape[1] - removal_num
     denom_regress = np.empty(num_aggre)
-    num_regress = np.empty([(num_aggre), (x_max * y_max)])
+    num_regress = np.empty([num_aggre, (x_max * y_max)])
     
     for i in range(num_aggre):
         if (i > 0):
@@ -138,8 +138,8 @@ def fractal_3d(arr_in, num_aggre):
     arr_box = _boxed_array(arr_in, num_aggre)
     arr_min = np.array(arr_box, dtype=arr_in.dtype)
     arr_max = np.array(arr_box, dtype=arr_in.dtype)
-    denom_regress = np.empty(num_aggre - 1)
-    num_regress = np.empty([(num_aggre - 1), (x_max * y_max)])
+    denom_regress = np.empty(num_aggre)
+    num_regress = np.empty([num_aggre, (x_max * y_max)])
     
     for i in range(num_aggre):
         if (i > 0):
@@ -151,8 +151,8 @@ def fractal_3d(arr_in, num_aggre):
         arr_sum = aggregation.aggregate((arr_max - arr_min + 1), Agg_ops.add_all, (num_aggre - i), i)
 
         arr_num = np.log2(arr_sum)
-        denom_regress[i - 1] = -i
-        num_regress[(i - 1), ] = arr_num.flatten()
+        denom_regress[i] = -i
+        num_regress[i, ] = arr_num.flatten()
 
     arr_fractal_dim = np.polynomial.polynomial.polyfit(denom_regress, num_regress, 1)[1]
     arr_fractal_dim = np.reshape(arr_fractal_dim, (y_max, x_max))

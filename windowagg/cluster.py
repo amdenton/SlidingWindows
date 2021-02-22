@@ -53,7 +53,7 @@ def gen_clustered_img(file_path, analyses, num_aggres, bands, num_clusters=3, su
             raise ValueError('Sub image size is too small to aggregate %s times' + str(maxNumAggre))
         
         _export_dem_data(file_path, sub_img, band_range, maxNumAggre)
-        _create_adjusted_img(file_path, sub_img, maxNumAggre, profile)
+        _create_adjusted_img(file_path, sub_img, maxNumAggre, profile, np.uint8)
         _create_clustered_img(analyses, num_aggres, bands, sub_img, num_clusters, average_cluster_values, file_path, output_file_path, profile, map_width_to_meters, map_height_to_meters)
 
     finally:
@@ -84,7 +84,7 @@ def gen_pairplot_img(file_path, analyses, num_aggres, bands, num_clusters=3, sub
             raise ValueError('Sub image size is too small to aggregate %s times' + str(maxNumAggre))
         
         _export_dem_data(file_path, sub_img, band_range, maxNumAggre)
-        _create_adjusted_img(file_path, sub_img, maxNumAggre, profile)
+        _create_adjusted_img(file_path, sub_img, maxNumAggre, profile, np.uint8)
         _create_pairplot_img(analyses, num_aggres, bands, sub_img, num_clusters, file_path, output_file_path, profile, map_width_to_meters, map_height_to_meters)
 
     finally:
@@ -135,7 +135,7 @@ def _export_dem_data(file_path, sub_img, band_range, num_aggre):
 
 
 def _create_clustered_img(analyses, num_aggres, bands, sub_img, num_clusters, average_cluster_values, file_path, output_file_path, profile, map_width_to_meters, map_height_to_meters):
-    cluster_data = _gen_cluster_data(analyses, num_aggres, bands, sub_img, file_path, map_width_to_meters, map_height_to_meters)
+    cluster_data = _gen_cluster_data(analyses, num_aggres, bands, sub_img, file_path, map_width_to_meters, map_height_to_meters, np.uint8)
     kmeans = KMeans(n_clusters=num_clusters, random_state=0).fit(cluster_data)
     maxNumAggre = np.amax(num_aggres)
     removal_num = 2**maxNumAggre - 1
@@ -171,7 +171,7 @@ def _create_pairplot_img(analyses, num_aggres, bands, sub_img, num_clusters, fil
     sns_plot.savefig(output_file_path)
     print("Output image saved to ", output_file_path)
 
-def _create_adjusted_img(file_path, sub_img, num_aggre, profile):
+def _create_adjusted_img(file_path, sub_img, num_aggre, profile, dtype=None):
         trun_num = int((2**num_aggre - 2) / 2)
         adjusted_file_path = _path(file_path, 'output') + '\\' + _path(file_path, 'adjusted', '.tif')
         adjusted_img = []
@@ -179,20 +179,21 @@ def _create_adjusted_img(file_path, sub_img, num_aggre, profile):
         for index in range(sub_img.shape[0]):
             arr = sub_img[index]
 
-            dtype = arr.dtype
+            old_dtype = arr.dtype
             adjusted_img_band = arr.astype(np.float64)
             adjusted_img_band = aggregation.aggregate(adjusted_img_band, Agg_ops.add_all, 1)
-            adjusted_img_band = (adjusted_img_band / 4).astype(dtype)
+            adjusted_img_band = (adjusted_img_band / 4).astype(old_dtype)
 
             adjusted_img_band = adjusted_img_band[trun_num:-trun_num:1, trun_num:-trun_num:1]
-            adjusted_img_band = helper.arr_dtype_conversion(adjusted_img_band, np.uint8)
+            if (not dtype is None):
+                adjusted_img_band = helper.arr_dtype_conversion(adjusted_img_band, dtype)
             
             adjusted_img.append(adjusted_img_band)
 
         helper.create_tif(adjusted_img, adjusted_file_path, profile, num_aggre)
         print("Adjusted image saved to ", adjusted_file_path)
 
-def _gen_cluster_data(analyses, num_aggres, bands, sub_img, file_path, map_width_to_meters, map_height_to_meters):
+def _gen_cluster_data(analyses, num_aggres, bands, sub_img, file_path, map_width_to_meters, map_height_to_meters, dtype=None):
     maxNumAggre = np.amax(num_aggres)
     removal_num = 2**maxNumAggre - 1
     cluster_data = np.empty([(sub_img[0].shape[0] - removal_num)**2, 0 ]).astype(np.uint8)
@@ -245,7 +246,8 @@ def _gen_cluster_data(analyses, num_aggres, bands, sub_img, file_path, map_width
 
         if (local_removal_num > 0):
             analysis = analysis[local_removal_num:-local_removal_num, local_removal_num:-local_removal_num]
-        analysis = helper.arr_dtype_conversion(analysis, np.uint8)
+        if (not dtype is None):
+            analysis = helper.arr_dtype_conversion(analysis, dtype)
         cluster_data = np.concatenate((cluster_data, analysis.flatten()[:,np.newaxis]), 1)
 
     return cluster_data
