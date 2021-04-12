@@ -1,6 +1,6 @@
 # SlidingWindow  
 
-## Spatial analysese for geographic images predominantly using a log(n) aggregation algorithm  
+## Spatial analyses for geographic images predominantly using a log(n) aggregation algorithm  
 
 ### Methods  
 #### Sectral  
