@@ -1,25 +1,20 @@
-# SlidingWindow
+# SlidingWindow  
 
-## Window based aggregation methods for analyzing geographic images
+## Spatial analysese for geographic images predominantly using a log(n) aggregation algorithm  
 
-### METHODS
-#### RGB-IR IMAGES
-* ndvi
-* regression
-* Pearson
-* fractal
-* fractal 3D
+### Methods  
+#### Sectral  
+* NDVI  
+* Regression  
+* Pearson  
+* Fractal  
+* Fractal 3D  
 
-#### DEM IMAGES
-* slope
-* aspect
-* standard curve
+#### Topographical  
+* Slope  
+* Aspect  
+* Standard Curvature  
 
 ### Rasterio
-Rasterio, a dependency of this package, has special dependencies of its own. See the rasterio [installation guide](https://rasterio.readthedocs.io/en/latest/installation.html) for more information.
-
-### INSTALL
-`pip install slidingwindow`
-
-### IMPORT
-`from windowagg.sliding_window import SlidingWindow`
+Rasterio, a dependency of this package, has special dependencies of its own that must be satisfied before using this code.  
+See the rasterio [installation guide](https://rasterio.readthedocs.io/en/latest/installation.html) for more information.
