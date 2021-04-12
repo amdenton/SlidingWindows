@@ -5,6 +5,10 @@ env/
 *.tif
 *.dot
 *.svg
+*.png
+
+## NumPy export file ##
+*.npz
 
 ## VSCODE-PYTHON ##
 .DS_Store
@@ -39,9 +43,3 @@ tmp/**
 .vs/
 test-results.xml
 !build/
-
-## LOCAL DEBUGGING ##
-Main.py
-/dem/*
-*.npz
-*.png
