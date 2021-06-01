@@ -3,7 +3,7 @@
 ## Spatial analyses for geographic images predominantly using a log(n) aggregation algorithm  
 
 ### Methods  
-##### Sectral  
+##### Spectral  
 * NDVI  
 * Regression  
 * Pearson  
