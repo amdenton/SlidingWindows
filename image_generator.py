@@ -18,7 +18,7 @@ class ImageGenerator:
             path = 'img_gen/'
         if (dtype is None):
             dtype = np.uint16
-        self.path = path
+        self.path = os.path.join(path, '')
         self.dtype = dtype
 
         if not os.path.exists(self.path):
