@@ -206,7 +206,7 @@ class TestSlidingWindow(unittest.TestCase):
                 size = arr_slope.shape[0]
                 for y in range(size):
                     for x in range(size):
-                        slope = self.img_gen.gauss_standard_point(x, y, size)
+                        slope = self.img_gen.gauss_slope_point(x, y, size)
 
                 math.isclose(arr_slope[y, x], slope)
 
