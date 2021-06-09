@@ -139,7 +139,7 @@ class ImageGenerator:
 
         aspect = (np.arctan2(-dy, -dx) + (math.pi / 2)) % (2 * math.pi)
         # TODO change this to something more appropriate for nodata
-        if ((dx == 0) and (dy == 0)):
+        if (math.isclose(dx + 1, 1) and math.isclose(dy + 1, 1)):
             aspect = 0
 
         return aspect

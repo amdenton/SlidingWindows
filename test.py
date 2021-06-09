@@ -185,8 +185,7 @@ class TestSlidingWindow(unittest.TestCase):
                 for y in range(size):
                     for x in range(size):
                         standard = self.img_gen.gauss_standard_point(x, y, size)
-
-                math.isclose(arr_standard[y, x], standard)
+                        self.assertTrue(math.isclose(arr_standard[y, x], standard))
 
             finally:
                 if (os.path.exists(standard_path)):
@@ -207,8 +206,7 @@ class TestSlidingWindow(unittest.TestCase):
                 for y in range(size):
                     for x in range(size):
                         slope = self.img_gen.gauss_slope_point(x, y, size)
-
-                math.isclose(arr_slope[y, x], slope)
+                        self.assertTrue(math.isclose(arr_slope[y, x], slope))
 
             finally:
                 if (os.path.exists(slope_path)):
