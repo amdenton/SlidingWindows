@@ -4,6 +4,7 @@ import windowagg.aggregation as aggregation
 from windowagg.dem_data import Dem_data
 import windowagg.helper as helper
 import windowagg.config as config
+from mpl_toolkits import mplot3d
 
 import math
 import os
@@ -17,8 +18,9 @@ class SlidingWindow:
     # TODO potentially add R squared method?
 
     def __init__(self, file_path, map_width_to_meters=1.0, map_height_to_meters=1.0):
-        file_basename = os.path.basename(file_path)
-        self._file_name = os.path.splitext(file_basename)[0]
+        print(file_path)
+        self._file_name = os.path.splitext(file_path)[0]
+        print(self._file_name)
         self._img = rasterio.open(file_path)
         self._dem_data = None
         self.auto_plot = False
@@ -29,7 +31,10 @@ class SlidingWindow:
         transform = self._img.profile['transform']
         self.pixel_width = math.sqrt(transform[0]**2 + transform[3]**2) * map_width_to_meters
         self.pixel_height = math.sqrt(transform[1]**2 + transform[4]**2) * map_height_to_meters
-
+        
+        if (self.auto_plot):
+            self._plot(file_path)
+            
     def __enter__(self):
         return self
     def __exit__(self, exc_type, exc_val, traceback):
@@ -51,13 +56,28 @@ class SlidingWindow:
 
     def _plot(self, file_name):
         with rasterio.open(file_name) as img:
+            if img.count > 1:
+                data = np.empty([img.shape[0], img.shape[1], img.count]).astype(np.uint8)
+                for i in range(img.count):
+                    data[...,i] = helper.arr_dtype_conversion(img.read(i + 1), np.uint8)
 
-            data = np.empty([img.shape[0], img.shape[1], img.count]).astype(np.uint8)
-            for i in range(img.count):
-                data[...,i] = helper.arr_dtype_conversion(img.read(i + 1), np.uint8)
+                plt.figure()
+                plt.imshow(data)
+                plt.savefig(os.path.splitext(file_name)[0] + '.png')
+            else:
+                data = helper.arr_dtype_conversion(img.read(1), np.uint8)
 
-            plt.imshow(data)
-            plt.savefig(os.path.splitext(file_name)[0] + '.png')
+                plt.figure()
+                plt.imshow(data)
+                plt.savefig(os.path.splitext(file_name)[0] + '.png')
+                
+                plt.figure()
+                ax = plt.axes(projection='3d')
+                #print('data.shape[0]: ',data.shape)
+                #print(data)
+                x = np.linspace(0,data.shape[0]-1,data.shape[0])
+                y = np.linspace(0,data.shape[1]-1,data.shape[1])
+                ax.plot_surface(x,y,data,cmap='viridis')
 
     # create NDVI image
     def ndvi(self, red_band, ir_band):
@@ -182,7 +202,78 @@ class SlidingWindow:
 
         aggregation.aggregate_dem(self._dem_data, num_aggre)
 
+    def aggregate_basic(self, num_aggre=1):
+        if (self._dem_data is None):
+            self.initialize_dem(1)
+
+        aggregation.aggregate_basic(self._dem_data, num_aggre)
+        
+    def aggregate_basic_brute(self, num_aggre=1):
+        if (self._dem_data is None):
+            self.initialize_dem(1)
+
+        aggregation.aggregate_basic_brute(self._dem_data, num_aggre)
+
     # generate image of aggregated slope values
+    def dem_slope_arr(self):
+        if (self._dem_data is None):
+            self.initialize_dem(1)
+
+        slope = dem.slope_simple(self._dem_data)
+
+        return slope
+    
+    def dem_profile_arr(self):
+        if (self._dem_data is None):
+            self.initialize_dem(1)
+
+        if (2**self._dem_data.num_aggre <= 2):
+            print('Profile curvature cannot be calculated on windows of size 2 or 1')
+            return
+
+        profile = dem.profile_simple(self._dem_data)
+        #profile = dem.profile(self._dem_data)
+
+        return profile
+    
+    def dem_planform_arr(self):
+        if (self._dem_data is None):
+            self.initialize_dem(1)
+
+        if (2**self._dem_data.num_aggre <= 2):
+            print('Profile curvature cannot be calculated on windows of size 2 or 1')
+            return
+
+        planform = dem.planform_simple(self._dem_data)
+        #planform = dem.planform(self._dem_data)
+
+        return planform
+    
+    def dem_horizontal_arr(self):
+        if (self._dem_data is None):
+            self.initialize_dem(1)
+
+        if (2**self._dem_data.num_aggre <= 2):
+            print('Profile curvature cannot be calculated on windows of size 2 or 1')
+            return
+
+        #planform = dem.planform_simple(self._dem_data)
+        horizontal = dem.horizontal_simple(self._dem_data)
+
+        return horizontal
+
+    def dem_combination_arr(self):
+        if (self._dem_data is None):
+            self.initialize_dem(1)
+
+        if (2**self._dem_data.num_aggre <= 2):
+            print('Profile curvature cannot be calculated on windows of size 2 or 1')
+            return
+
+        slope, profile, horizontal = dem.combination_simple(self._dem_data)
+
+        return slope, profile, horizontal
+
     def dem_slope(self):
         if (self._dem_data is None):
             self.initialize_dem(1)
@@ -240,6 +331,7 @@ class SlidingWindow:
     def dem_standard(self):
         if (self._dem_data is None):
             self.initialize_dem(1)
+
         if (2**self._dem_data.num_aggre <= 2):
             print('Curvature cannot be calculated on windows of size 2 or 1')
             return
@@ -251,6 +343,73 @@ class SlidingWindow:
         
         file_name = self._create_file_name('standard', self._dem_data.num_aggre)
         helper.create_tif(standard, file_name, self._img.profile, self._dem_data.num_aggre)
+
+        if (self.auto_plot):
+            self._plot(file_name)
+
+        return file_name
+    
+    # generate image of aggregated standard curvature
+    def dem_profile(self):
+        if (self._dem_data is None):
+            self.initialize_dem(1)
+
+        if (2**self._dem_data.num_aggre <= 2):
+            print('Profile curvature cannot be calculated on windows of size 2 or 1')
+            return
+
+        profile = dem.profile(self._dem_data, self.pixel_width, self.pixel_height)
+
+        if (self.convert_image):
+            profile = helper.arr_dtype_conversion(profile, self.tif_dtype)
+        
+        file_name = self._create_file_name('profile', self._dem_data.num_aggre)
+        # profile means two completely different things in the following line
+        helper.create_tif(profile, file_name, self._img.profile, self._dem_data.num_aggre)
+
+        if (self.auto_plot):
+            self._plot(file_name)
+
+        return file_name
+    
+    def dem_planform(self):
+        if (self._dem_data is None):
+            self.initialize_dem(1)
+
+        if (2**self._dem_data.num_aggre <= 2):
+            print('Profile curvature cannot be calculated on windows of size 2 or 1')
+            return
+
+        planform = dem.planform(self._dem_data, self.pixel_width, self.pixel_height)
+
+        if (self.convert_image):
+            planform = helper.arr_dtype_conversion(planform, self.tif_dtype)
+        
+        file_name = self._create_file_name('planform', self._dem_data.num_aggre)
+        # profile means two completely different things in the following line
+        helper.create_tif(planform, file_name, self._img.profile, self._dem_data.num_aggre)
+
+        if (self.auto_plot):
+            self._plot(file_name)
+
+        return file_name
+    
+    def dem_horizontal(self):
+        if (self._dem_data is None):
+            self.initialize_dem(1)
+
+        if (2**self._dem_data.num_aggre <= 2):
+            print('Profile curvature cannot be calculated on windows of size 2 or 1')
+            return
+
+        horizontal = dem.horizontal(self._dem_data, self.pixel_width, self.pixel_height)
+
+        if (self.convert_image):
+            horizontal = helper.arr_dtype_conversion(horizontal, self.tif_dtype)
+        
+        file_name = self._create_file_name('horizontal', self._dem_data.num_aggre)
+        # profile means two completely different things in the following line
+        helper.create_tif(horizontal, file_name, self._img.profile, self._dem_data.num_aggre)
 
         if (self.auto_plot):
             self._plot(file_name)
