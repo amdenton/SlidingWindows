@@ -22,6 +22,13 @@ def binary(arr, threshold):
     threshold_val = (threshold * (maximum - minimum)) + minimum
     return np.where(arr < threshold_val, 0, dtype_maximum)
 
+# Do num_aggre aggregations and mean
+def mean(arr_x, num_aggre):
+    arr_x = arr_x.astype(config.work_dtype)
+    arr_x = aggregation.aggregate(arr_x, Agg_ops.add_all, num_aggre)
+
+    return arr_x
+
 # Do num_aggre aggregations and return the regression slope between two arrays
 def regression(arr_x, arr_y, num_aggre):
     arr_x = arr_x.astype(config.work_dtype)
