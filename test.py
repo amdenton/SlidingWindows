@@ -20,7 +20,7 @@ class TestSlidingWindow(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         self.test_dir = 'test_img/'
-        self.image_size = 512
+        self.image_size = 64
         self.num_aggre = 4
         self.num_test_points = 20
         self.dtype = config.work_dtype
@@ -201,6 +201,7 @@ class TestSlidingWindow(unittest.TestCase):
                 slope_path = slide_window.dem_slope()
                 with rasterio.open(slope_path) as img:
                     arr_slope = img.read(1)
+                print(arr_slope)
 
                 # assumed to be square
                 size = arr_slope.shape[0]
