@@ -1,3 +1,4 @@
+# Guy's test file 
 # SlidingWindow  
 
 ## Spatial analyses for geographic images predominantly using a log(n) aggregation algorithm  
