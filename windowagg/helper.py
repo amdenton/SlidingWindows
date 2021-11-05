@@ -90,11 +90,12 @@ def create_tif(arr_in, file_name, profile=None, num_aggre=0):
         'nodata': 0,
         'dtype': dtype,
         'count': len(arr_in),
-        'height' : len(arr_in[0]),
+        'height': len(arr_in[0]),
         'width': len(arr_in[0][0])
     })
         
     with rasterio.open(file_name, 'w', **profile, BIGTIFF=big_tiff) as dst:
+        print('Writing to: ',dst)
         for i in range(len(arr_in)): 
             dst.write(arr_in[i], i + 1)
 
