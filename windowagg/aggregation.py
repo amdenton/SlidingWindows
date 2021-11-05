@@ -91,6 +91,41 @@ def aggregate(arr_in, operation, num_aggre=1, num_prev_aggre=0):
 
     return arr_out
 
+def aggregate_basic_brute(dem_data, num_aggre=1):
+    if (not isinstance(dem_data, Dem_data)):
+        raise ValueError('dem_data must be of type Dem_data')
+
+    z = dem_data.z()
+    num_prev_aggre = dem_data.num_aggre
+    window_size = 2**num_prev_aggre
+
+    for _ in range(num_aggre):
+        window_size *= 2
+        z_sum_all = aggregate_z_brute(z, num_aggre)
+
+        new_z = 0.25 * z_sum_all
+
+        z = new_z
+    dem_data.num_aggre = num_prev_aggre
+    
+def aggregate_basic(dem_data, num_aggre=1):
+    if (not isinstance(dem_data, Dem_data)):
+        raise ValueError('dem_data must be of type Dem_data')
+
+    z = dem_data.z()
+    num_prev_aggre = dem_data.num_aggre
+    window_size = 2**num_prev_aggre
+
+    for _ in range(num_aggre):
+        window_size *= 2
+        z_sum_all = aggregate(z, Agg_ops.add_all, 1, num_prev_aggre)
+
+        new_z = 0.25 * z_sum_all
+
+        z = new_z
+    dem_data.set_array_basic(z)
+    dem_data.num_aggre = num_prev_aggre
+    
 def aggregate_dem(dem_data, num_aggre=1):
     if (not isinstance(dem_data, Dem_data)):
         raise ValueError('dem_data must be of type Dem_data')
@@ -101,7 +136,6 @@ def aggregate_dem(dem_data, num_aggre=1):
 
     for _ in range(num_aggre):
         window_size *= 2
-
         z_sum_all = aggregate(z, Agg_ops.add_all, 1, num_prev_aggre)
 
         new_z = 0.25 * z_sum_all
