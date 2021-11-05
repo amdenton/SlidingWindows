@@ -35,6 +35,15 @@ class Dem_data:
     def xyz(self):
         return self._xyz
 
+    def set_array_basic(self, z):
+        shape = z.shape
+        work_dtype = config.work_dtype
+
+        if (len(z.shape) != 2):
+            raise ValueError('All arrays must be 2 dimensional')
+
+        self._z = z if (z.dtype is work_dtype) else z.astype(work_dtype)
+
     def set_arrays(self, z, xz, yz, xxz, yyz, xyz):
         shape = z.shape
         work_dtype = config.work_dtype
@@ -46,11 +55,11 @@ class Dem_data:
                 raise ValueError('All arrays must have the same shape')
 
         self._z = z if (z.dtype is work_dtype) else z.astype(work_dtype)
-        self._xz = xz if (xz.dtype is work_dtype) else xz.astype(config.work_dtype)
-        self._yz = yz if (yz.dtype is work_dtype) else yz.astype(config.work_dtype)
-        self._xxz = xxz if (xxz.dtype is work_dtype) else xxz.astype(config.work_dtype)
-        self._yyz = yyz if (yyz.dtype is work_dtype) else yyz.astype(config.work_dtype)
-        self._xyz = xyz if (xyz.dtype is work_dtype) else xyz.astype(config.work_dtype)
+        self._xz = xz if (xz.dtype is work_dtype) else xz.astype(work_dtype)
+        self._yz = yz if (yz.dtype is work_dtype) else yz.astype(work_dtype)
+        self._xxz = xxz if (xxz.dtype is work_dtype) else xxz.astype(work_dtype)
+        self._yyz = yyz if (yyz.dtype is work_dtype) else yyz.astype(work_dtype)
+        self._xyz = xyz if (xyz.dtype is work_dtype) else xyz.astype(work_dtype)
 
     @staticmethod
     def from_import(file_name):
