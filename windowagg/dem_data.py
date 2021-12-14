@@ -1,3 +1,11 @@
+"""
+Last updated on Tue Dec 14
+
+@authors: Anne Denton, David Schwarz, Rahul Gomes
+
+License information:
+https://opensource.org/licenses/GPL-3.0
+"""
 import windowagg.config as config
 
 import numpy as np
@@ -36,7 +44,6 @@ class Dem_data:
         return self._xyz
 
     def set_array_basic(self, z):
-        shape = z.shape
         work_dtype = config.work_dtype
 
         if (len(z.shape) != 2):
