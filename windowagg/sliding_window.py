@@ -1,48 +1,53 @@
-import windowagg.rbg as rbg
+"""
+Last updated on Tue Dec 14
+
+@authors: Anne Denton, David Schwarz, Rahul Gomes
+
+License information:
+https://opensource.org/licenses/GPL-3.0
+"""
 import windowagg.dem as dem
 import windowagg.aggregation as aggregation
 from windowagg.dem_data import Dem_data
 import windowagg.helper as helper
 import windowagg.config as config
-from mpl_toolkits import mplot3d
 
-import math
 import os
 
-import numpy as np
 import rasterio
-import matplotlib.pyplot as plt
 
 class SlidingWindow:
 
     # TODO potentially add R squared method?
 
     def __init__(self, file_path, map_width_to_meters=1.0, map_height_to_meters=1.0):
-        print(file_path)
         self._file_name = os.path.splitext(file_path)[0]
-        print(self._file_name)
         self._img = rasterio.open(file_path)
+        self._orig_profile = self._img.profile
         self._dem_data = None
         self.auto_plot = False
         self.work_dtype = config.work_dtype
         self.tif_dtype = config.tif_dtype
-        self.convert_image = True
 
-        transform = self._img.profile['transform']
-        self.pixel_width = math.sqrt(transform[0]**2 + transform[3]**2) * map_width_to_meters
-        self.pixel_height = math.sqrt(transform[1]**2 + transform[4]**2) * map_height_to_meters
+#       Algorith is derived using assumption of square windows
+#        transform = self._img.profile['transform']
+#        self.pixel_width = math.sqrt(transform[0]**2 + transform[3]**2) * map_width_to_meters
+#        self.pixel_height = math.sqrt(transform[1]**2 + transform[4]**2) * map_height_to_meters
         
         if (self.auto_plot):
-            self._plot(file_path)
+            helper.plot(file_path)
             
     def __enter__(self):
         return self
+    
     def __exit__(self, exc_type, exc_val, traceback):
         if (self._img):
             self._img.close()
+            
     def close(self):
         if (self._img):
             self._img.close()
+            
     def __del__(self):
         if (self._img):
             self._img.close()
@@ -54,133 +59,6 @@ class SlidingWindow:
             file_name = self._file_name + '_' + algo_name + '_w=' + str(2**num_aggre) + '.tif'
         return file_name
 
-    def _plot(self, file_name):
-        with rasterio.open(file_name) as img:
-            if img.count > 1:
-                data = np.empty([img.shape[0], img.shape[1], img.count]).astype(np.uint8)
-                for i in range(img.count):
-                    data[...,i] = helper.arr_dtype_conversion(img.read(i + 1), np.uint8)
-
-                plt.figure()
-                plt.imshow(data)
-                plt.savefig(os.path.splitext(file_name)[0] + '.png')
-            else:
-                data = helper.arr_dtype_conversion(img.read(1), np.uint8)
-
-                plt.figure()
-                plt.imshow(data)
-                plt.savefig(os.path.splitext(file_name)[0] + '.png')
-                
-                plt.figure()
-                ax = plt.axes(projection='3d')
-                #print('data.shape[0]: ',data.shape)
-                #print(data)
-                x = np.linspace(0,data.shape[0]-1,data.shape[0])
-                y = np.linspace(0,data.shape[1]-1,data.shape[1])
-                ax.plot_surface(x,y,data,cmap='viridis')
-
-    # create NDVI image
-    def ndvi(self, red_band, ir_band):
-        bands = np.array(range(self._img.count)) + 1
-        if (red_band not in bands or ir_band not in bands):
-            raise ValueError('bands must be in range of %r.' % bands)
-        
-        red = self._img.read(red_band)
-        ir = self._img.read(ir_band)
-        ndvi = rbg.ndvi(red, ir)
-
-        if (self.convert_image):
-            ndvi = helper.arr_dtype_conversion(ndvi, self.tif_dtype)
-
-        file_name = self._create_file_name('ndvi')
-        helper.create_tif(ndvi, file_name, self._img.profile)
-
-        if (self.auto_plot):
-            self._plot(file_name)
-
-        return file_name
-
-    # create image with pixel values cooresponding to their aggregated regression slope
-    def regression(self, band1, band2, num_aggre):
-        bands = np.array(range(self._img.count)) + 1
-        if (band1 not in bands or band2 not in bands):
-            raise ValueError('bands must be in range of %r.' % bands)
-
-        arr_a = self._img.read(band1)
-        arr_b = self._img.read(band2)
-        arr_m = rbg.regression(arr_a, arr_b, num_aggre)
-
-        if (self.convert_image):
-            arr_m = helper.arr_dtype_conversion(arr_m, self.tif_dtype)
-
-        file_name = self._create_file_name('regression', num_aggre)
-        helper.create_tif(arr_m, file_name, self._img.profile, num_aggre)
-        
-        if (self.auto_plot):
-            self._plot(file_name)
-
-        return file_name
-
-    # create image with pixel values cooresponding to their aggregated pearson correlation
-    def pearson(self, band1, band2, num_aggre):
-        bands = np.array(range(self._img.count)) + 1
-        if (band1 not in bands or band2 not in bands):
-            raise ValueError('bands must be in range of %r.' % bands)
-
-        arr_a = self._img.read(band1)
-        arr_b = self._img.read(band2)
-        arr_r = rbg.pearson(arr_a, arr_b, num_aggre)
-
-        if (self.convert_image):
-            arr_r = helper.arr_dtype_conversion(arr_r, self.tif_dtype)
-
-        file_name = self._create_file_name('pearson', num_aggre)
-        helper.create_tif(arr_r , file_name, self._img.profile, num_aggre)
-
-        if (self.auto_plot):
-            self._plot(file_name)
-
-        return file_name
-
-    # create image with pixel values cooresponding to their aggregated fractal dimension
-    def fractal(self, band, threshold, num_aggre):
-        bands = np.array(range(self._img.count)) + 1
-        if (band not in bands):
-            raise ValueError('band must be in range of %r.' % bands)
-
-        arr = self._img.read(band)
-        arr = rbg.fractal(arr, threshold, num_aggre)
-
-        if (self.convert_image):
-            arr = helper.arr_dtype_conversion(arr, self.tif_dtype)
-
-        file_name = self._create_file_name('fractal', num_aggre)
-        helper.create_tif(arr, file_name, self._img.profile, num_aggre)
-
-        if (self.auto_plot):
-            self._plot(file_name)
-        
-        return file_name
-
-    # create image with pixel values cooresponding to their aggregated 3D fractal dimension
-    def fractal_3d(self, band, num_aggre):
-        bands = np.array(range(self._img.count)) + 1
-        if (band not in bands):
-            raise ValueError('band must be in range of %r.' % bands)
-
-        arr = self._img.read(band)
-        arr = rbg.fractal_3d(arr, num_aggre)
-
-        if (self.convert_image):
-            arr = helper.arr_dtype_conversion(arr, self.tif_dtype)
-
-        file_name = self._create_file_name('fractal_3d', num_aggre)
-        helper.create_tif(arr, file_name, self._img.profile, num_aggre)
-
-        if (self.auto_plot):
-            self._plot(file_name)
-
-        return file_name
 
     def import_dem(self, file_name):
         self._dem_data = Dem_data.from_import(file_name)
@@ -214,138 +92,17 @@ class SlidingWindow:
 
         aggregation.aggregate_basic_brute(self._dem_data, num_aggre)
 
-    # generate image of aggregated slope values
-    def dem_slope_arr(self):
-        if (self._dem_data is None):
-            self.initialize_dem(1)
-
-        slope = dem.slope_simple(self._dem_data)
-
-        return slope
-    
-    def dem_profile_arr(self):
-        if (self._dem_data is None):
-            self.initialize_dem(1)
-
-        if (2**self._dem_data.num_aggre <= 2):
-            print('Profile curvature cannot be calculated on windows of size 2 or 1')
-            return
-
-        profile = dem.profile_simple(self._dem_data)
-        #profile = dem.profile(self._dem_data)
-
-        return profile
-    
-    def dem_planform_arr(self):
-        if (self._dem_data is None):
-            self.initialize_dem(1)
-
-        if (2**self._dem_data.num_aggre <= 2):
-            print('Profile curvature cannot be calculated on windows of size 2 or 1')
-            return
-
-        planform = dem.planform_simple(self._dem_data)
-        #planform = dem.planform(self._dem_data)
-
-        return planform
-    
-    def dem_horizontal_arr(self):
-        if (self._dem_data is None):
-            self.initialize_dem(1)
-
-        if (2**self._dem_data.num_aggre <= 2):
-            print('Profile curvature cannot be calculated on windows of size 2 or 1')
-            return
-
-        #planform = dem.planform_simple(self._dem_data)
-        horizontal = dem.horizontal_simple(self._dem_data)
-
-        return horizontal
-
-    def dem_combination_arr(self):
-        if (self._dem_data is None):
-            self.initialize_dem(1)
-
-        if (2**self._dem_data.num_aggre <= 2):
-            print('Profile curvature cannot be calculated on windows of size 2 or 1')
-            return
-
-        slope, profile, horizontal = dem.combination_simple(self._dem_data)
-
-        return slope, profile, horizontal
-
     def dem_slope(self):
         if (self._dem_data is None):
             self.initialize_dem(1)
 
-        slope = dem.slope(self._dem_data, self.pixel_width, self.pixel_height)
-
-        if (self.convert_image):
-            slope = helper.arr_dtype_conversion(slope, self.tif_dtype)
+        slope = dem.slope(self._dem_data)
 
         file_name = self._create_file_name('slope', self._dem_data.num_aggre)
-        helper.create_tif(slope, file_name, self._img.profile, self._dem_data.num_aggre)
+        helper.create_tif(slope, file_name, self._orig_profile, self._dem_data.num_aggre)
 
         if (self.auto_plot):
-            self._plot(file_name)
-
-        return file_name
-
-    # generate image of aggregated slope values
-    def dem_slope_angle(self):
-        if (self._dem_data is None):
-            self.initialize_dem(1)
-
-        slope_angle = np.arctan(dem.slope(self._dem_data, self.pixel_width, self.pixel_height))
-
-        if (self.convert_image):
-            slope_angle = helper.arr_dtype_conversion(slope_angle, self.tif_dtype)
-
-        file_name = self._create_file_name('slope_angle', self._dem_data.num_aggre)
-        helper.create_tif(slope_angle, file_name, self._img.profile, self._dem_data.num_aggre)
-
-        if (self.auto_plot):
-            self._plot(file_name)
-
-        return file_name
-
-    # generate image of aggregated angle of steepest descent, calculated as clockwise angle from north 
-    def dem_aspect(self):
-        if (self._dem_data is None):
-            self.initialize_dem(1)
-
-        aspect = dem.aspect(self._dem_data)
-
-        if (self.convert_image):
-            aspect = helper.arr_dtype_conversion(aspect, self.tif_dtype)
-
-        file_name = self._create_file_name('aspect', self._dem_data.num_aggre)
-        helper.create_tif(aspect, file_name, self._img.profile, self._dem_data.num_aggre)
-
-        if (self.auto_plot):
-            self._plot(file_name)
-
-        return file_name
-
-    # generate image of aggregated standard curvature
-    def dem_standard(self):
-        if (self._dem_data is None):
-            self.initialize_dem(1)
-
-        if (2**self._dem_data.num_aggre <= 2):
-            print('Curvature cannot be calculated on windows of size 2 or 1')
-            return
-
-        standard = dem.standard(self._dem_data, self.pixel_width, self.pixel_height)
-
-        if (self.convert_image):
-            standard = helper.arr_dtype_conversion(standard, self.tif_dtype)
-        
-        file_name = self._create_file_name('standard', self._dem_data.num_aggre)
-        helper.create_tif(standard, file_name, self._img.profile, self._dem_data.num_aggre)
-
-        if (self.auto_plot):
-            self._plot(file_name)
+            helper.plot(file_name)
 
         return file_name
     
@@ -358,21 +115,18 @@ class SlidingWindow:
             print('Profile curvature cannot be calculated on windows of size 2 or 1')
             return
 
-        profile = dem.profile(self._dem_data, self.pixel_width, self.pixel_height)
+        profile = dem.profile(self._dem_data)
 
-        if (self.convert_image):
-            profile = helper.arr_dtype_conversion(profile, self.tif_dtype)
-        
         file_name = self._create_file_name('profile', self._dem_data.num_aggre)
         # profile means two completely different things in the following line
-        helper.create_tif(profile, file_name, self._img.profile, self._dem_data.num_aggre)
+        helper.create_tif(profile, file_name, self._orig_profile, self._dem_data.num_aggre)
 
         if (self.auto_plot):
-            self._plot(file_name)
+            helper.plot(file_name)
 
         return file_name
     
-    def dem_planform(self):
+    def dem_tangential(self):
         if (self._dem_data is None):
             self.initialize_dem(1)
 
@@ -380,21 +134,17 @@ class SlidingWindow:
             print('Profile curvature cannot be calculated on windows of size 2 or 1')
             return
 
-        planform = dem.planform(self._dem_data, self.pixel_width, self.pixel_height)
-
-        if (self.convert_image):
-            planform = helper.arr_dtype_conversion(planform, self.tif_dtype)
-        
-        file_name = self._create_file_name('planform', self._dem_data.num_aggre)
-        # profile means two completely different things in the following line
-        helper.create_tif(planform, file_name, self._img.profile, self._dem_data.num_aggre)
+        tangential = dem.tangential(self._dem_data)
+  
+        file_name = self._create_file_name('tangential', self._dem_data.num_aggre)
+        helper.create_tif(tangential, file_name, self._orig_profile, self._dem_data.num_aggre)
 
         if (self.auto_plot):
-            self._plot(file_name)
+            helper.plot(file_name)
 
         return file_name
-    
-    def dem_horizontal(self):
+
+    def dem_contour(self):
         if (self._dem_data is None):
             self.initialize_dem(1)
 
@@ -402,16 +152,50 @@ class SlidingWindow:
             print('Profile curvature cannot be calculated on windows of size 2 or 1')
             return
 
-        horizontal = dem.horizontal(self._dem_data, self.pixel_width, self.pixel_height)
-
-        if (self.convert_image):
-            horizontal = helper.arr_dtype_conversion(horizontal, self.tif_dtype)
+        contour = dem.contour(self._dem_data)
         
-        file_name = self._create_file_name('horizontal', self._dem_data.num_aggre)
-        # profile means two completely different things in the following line
-        helper.create_tif(horizontal, file_name, self._img.profile, self._dem_data.num_aggre)
+        file_name = self._create_file_name('contour', self._dem_data.num_aggre)
+        helper.create_tif(contour, file_name, self._orig_profile, self._dem_data.num_aggre)
 
         if (self.auto_plot):
-            self._plot(file_name)
+            helper.plot(file_name)
 
         return file_name
+
+    def dem_proper_profile(self):
+        if (self._dem_data is None):
+            self.initialize_dem(1)
+
+        if (2**self._dem_data.num_aggre <= 2):
+            print('Profile curvature cannot be calculated on windows of size 2 or 1')
+            return
+
+        proper_profile = dem.proper_profile(self._dem_data)
+        
+        file_name = self._create_file_name('proper_profile', self._dem_data.num_aggre)
+        # profile means two completely different things in the following line
+        helper.create_tif(proper_profile, file_name, self._orig_profile, self._dem_data.num_aggre)
+
+        if (self.auto_plot):
+            helper.plot(file_name)
+
+        return file_name
+    
+    def dem_proper_tangential(self):
+        if (self._dem_data is None):
+            self.initialize_dem(1)
+
+        if (2**self._dem_data.num_aggre <= 2):
+            print('Profile curvature cannot be calculated on windows of size 2 or 1')
+            return
+
+        proper_tangential = dem.proper_tangential(self._dem_data)
+      
+        file_name = self._create_file_name('proper_tangential', self._dem_data.num_aggre)
+        helper.create_tif(proper_tangential, file_name, self._orig_profile, self._dem_data.num_aggre)
+
+        if (self.auto_plot):
+            helper.plot(file_name)
+
+        return file_name
+    
