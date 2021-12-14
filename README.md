@@ -1,41 +1,36 @@
 # SlidingWindow  
 
-## Spatial analyses for geographic images predominantly using a log(n) aggregation algorithm  
+## Spatial analyses for geographic images using Iterative Aggregation of Regression Terms algorithm 
 
-### Methods  
-##### Spectral  
-* NDVI  
-* Regression  
-* Pearson  
-* Fractal  
-* Fractal 3D  
+### Files
 
-##### Topographical  
-* Slope  
-* Aspect  
-* Standard Curvature  
+* demo.py:  
+Five example analyses, including generating window-based slope and curvatures for artificial data 
+with or without noise, curvatures of an example landscape, a speed test, and a visualization of 
+differences between computed and analytical curvatures. 
+Defaults to artificial data with noise, but other choices can be selected at the beginning of the file.
 
-### Files  
-* test.py:  
-unit test file  
 * image_generator.py:  
-generate point values and entire images with analytical formulae  
+generate artificial images, in some cases including their analytical devatives
+
 * windowagg/agg_ops.py:  
 Enum of available aggregation operations  
+
 * windowagg/aggregation.py:  
 agggregation methods, vectorized and brute force  
+
 * windowagg/analyses.py:  
 Enum of available analyses  
-* windowagg/cluster.py:  
-functions to combine analyses in interesting ways  
+
 * windowagg/dem.py:  
 spatial analyses for topographical calculations  
+
 * windowagg/dem_data.py:  
 class to hold, export, and import data required for topographical calculations  
+
 * windowagg/helper.py:  
 auxiliary functions  
-* windowagg/rbg.py:  
-spatial analyses formulae for spectral images  
+
 * windowagg/sliding_window.py:  
 high-level class to handle entire analysis operations  
 
