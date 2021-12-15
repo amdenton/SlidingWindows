@@ -2,6 +2,3 @@ rasterio
 numpy
 affine
 matplotlib
-sklearn
-seaborn
-pandas
