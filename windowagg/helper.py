@@ -1,6 +1,17 @@
+"""
+Last updated on Tue Dec 14
+
+@authors: Anne Denton, David Schwarz, Rahul Gomes
+
+License information:
+https://opensource.org/licenses/GPL-3.0
+"""
 import numpy as np
-import affine
+from affine import Affine
+import matplotlib.pyplot as plt
 import rasterio
+import copy
+import os
 
 # get max and min of numpy data type
 # returns tuple (max, min)
@@ -38,43 +49,50 @@ def dtype_min(dtype):
 
     return min_val
 
+def plot(file_name):
+    with rasterio.open(file_name) as img:
+        if img.count > 1:
+            data = np.empty([img.shape[0], img.shape[1], img.count]).astype(np.uint8)
+            for i in range(img.count):
+                data[...,i] = arr_dtype_conversion(img.read(i + 1), np.uint8)
+
+            plt.figure()
+            plt.imshow(data)
+            plt.savefig(os.path.splitext(file_name)[0] + '.png')
+        else:
+            data = img.read(1)
+            
+            plt.figure()
+#            plt.title(file_name)
+            shift = int(round(data.shape[0]/50))
+            plt.text(0,-4*shift,file_name)
+            plt.text(0,-shift,'min: '+str(round(np.amin(data),3))+' max: '+str(round(np.amax(data),3)))
+            plt.imshow(data,'gray_r')
+
 # create tif with array of numpy arrays representing image bands
 # adjust geoTransform according to how many pixels were aggregated
 def create_tif(arr_in, file_name, profile=None, num_aggre=0):
-    if (type(arr_in) != list):
-        arr_in = [arr_in]
 
-    dtype = arr_in[0].dtype
-    shape = arr_in[0].shape
-    for i in range(1, len(arr_in)):
-        if (arr_in[i].dtype != dtype):
-            raise ValueError('arrays must have the same dtype')
-        if (arr_in[i].shape != shape):
-            raise ValueError('arrays must have the same shape')
-
+    dtype = np.dtype(arr_in[0,0])
     if (profile == None):
-        transform = affine.Affine(1, 0, 1, 0, -1, 1)
-        # TODO should nodata be 0?
         # TODO is the crs appropriate?
+        geotransform = (500000, 1.0, 0.0, 5000000.0, 0.0, -1.0)
+        transform = Affine.from_gdal(*geotransform)
         profile = {
-            'nodata': 0,
             'driver': 'GTiff',
-            'crs': '+proj=latlong',
-            'transform': transform,
+            'crs': 'EPSG:26914',# Same as for Landscape file
             'dtype': dtype,
-            'count': len(arr_in),
-            'height': len(arr_in[0]),
-            'width': len(arr_in[0][0])
+            'transform': transform,
+            'count': 1,
+            'height': np.size(arr_in,0),
+            'width': np.size(arr_in,1)
         }
-    else:
-        transform = profile["transform"]
 
+    old_transform = profile['transform']
     num_trunc = (2**num_aggre - 1)
     img_offset = num_trunc / 2
-
-    x = transform[2] + ((transform[0] + transform[1]) * img_offset)
-    y = transform[5] + ((transform[3] + transform[4]) * img_offset)
-    transform = affine.Affine(transform[0], transform[1], x, transform[3] , transform[4], y)
+    new_transform = Affine.translation(img_offset,img_offset) * old_transform
+    new_profile = copy.deepcopy(profile)
 
     big_tiff = 'NO'
     n_bytes = 0
@@ -84,19 +102,18 @@ def create_tif(arr_in, file_name, profile=None, num_aggre=0):
     if (n_bytes > (2 * gigabyte)):
         big_tiff = 'YES'
 
-    # TODO should nodata be 0?
-    profile.update({
-        'transform': transform,
-        'nodata': 0,
+    new_profile.update({
         'dtype': dtype,
-        'count': len(arr_in),
-        'height' : len(arr_in[0]),
-        'width': len(arr_in[0][0])
+        'count': 1,
+        'height': np.size(arr_in,0),
+        'width': np.size(arr_in,1),
+        'transform': new_transform,
     })
-        
-    with rasterio.open(file_name, 'w', **profile, BIGTIFF=big_tiff) as dst:
-        for i in range(len(arr_in)): 
-            dst.write(arr_in[i], i + 1)
+    with rasterio.open(file_name, 'w', **new_profile, BIGTIFF=big_tiff) as dst:
+        print('Writing to: ',dst)
+        print('with transform: ')
+        print(new_transform)
+        dst.write(arr_in,indexes=1)
 
 # TODO fix later, not the best way to do this
 # arr_in: array to be converted
