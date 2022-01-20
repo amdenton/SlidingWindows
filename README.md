@@ -34,6 +34,18 @@ auxiliary functions
 * windowagg/sliding_window.py:  
 high-level class to handle entire analysis operations  
 
-### Rasterio
-Rasterio, a dependency of this package, has special dependencies of its own that must be satisfied before using this code.  
+### Python Dependencies
+
+* **Rasterio:** 
+Reads and writes GeoTIFF and other GIS formats to organize and store gridded raster datasets and provid a Python API based on Numpy N-dimensional arrays.
+Rasterio, has special dependencies of its own that must be satisfied before using this code.  
 See the rasterio [installation guide](https://rasterio.readthedocs.io/en/latest/installation.html) for more information.
+
+* **NumPy:**
+Provides multidimensional array objects, and an assortment of routines for fast operations on arrays.
+
+* **Affine:**
+Matrices describing affine transformations of georeferenced raster datasets to map from image coordinates to world coordinates.
+
+* **Matplotlib:**
+A comprehensive library for creating static, animated, and interactive visualizations.
