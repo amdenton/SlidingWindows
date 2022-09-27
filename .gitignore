@@ -6,6 +6,11 @@ env/
 *.dot
 *.svg
 *.png
+*.jpg
+
+## Test Folder ##
+img_artificial/
+
 
 ## NumPy export file ##
 *.npz

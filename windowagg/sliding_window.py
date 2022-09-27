@@ -11,6 +11,7 @@ import windowagg.aggregation as aggregation
 from windowagg.dem_data import Dem_data
 import windowagg.helper as helper
 import windowagg.config as config
+from osgeo import gdal
 
 import os
 
@@ -20,7 +21,7 @@ class SlidingWindow:
 
     # TODO potentially add R squared method?
 
-    def __init__(self, file_path, map_width_to_meters=1.0, map_height_to_meters=1.0):
+    def __init__(self, file_path, map_width_to_meters=1.0, map_height_to_meters=1.0, save_jpg = False):
         self._file_name = os.path.splitext(file_path)[0]
         self._img = rasterio.open(file_path)
         self._orig_profile = self._img.profile
@@ -28,6 +29,8 @@ class SlidingWindow:
         self.auto_plot = False
         self.work_dtype = config.work_dtype
         self.tif_dtype = config.tif_dtype
+        self._jpg_options = "-ot Byte -of JPEG -b 1 -scale"
+        self.save_jpg = save_jpg
 
 #       Algorith is derived using assumption of square windows
 #        transform = self._img.profile['transform']
@@ -42,15 +45,21 @@ class SlidingWindow:
     
     def __exit__(self, exc_type, exc_val, traceback):
         if (self._img):
-            self._img.close()
+            self.close()
             
     def close(self):
         if (self._img):
             self._img.close()
+            if(self.save_jpg):
+                gdal.Translate(
+                        f'{self._file_name}.jpg',
+                        f'{self._file_name}.tif',
+                        options=self._jpg_options
+                )
             
     def __del__(self):
         if (self._img):
-            self._img.close()
+            self.close()
 
     def _create_file_name(self, algo_name, num_aggre=0):
         if (num_aggre == 0):
