@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import rasterio
 import copy
 import os
+from rasterio.windows import Window
 
 # get max and min of numpy data type
 # returns tuple (max, min)
@@ -72,10 +73,8 @@ def plot(file_name):
 # create tif with array of numpy arrays representing image bands
 # adjust geoTransform according to how many pixels were aggregated
 def create_tif(arr_in, file_name, profile=None, num_aggre=0):
-
     dtype = np.dtype(arr_in[0,0])
     if (profile == None):
-        # TODO is the crs appropriate?
         geotransform = (500000, 1.0, 0.0, 5000000.0, 0.0, -1.0)
         transform = Affine.from_gdal(*geotransform)
         profile = {
@@ -87,11 +86,7 @@ def create_tif(arr_in, file_name, profile=None, num_aggre=0):
             'height': np.size(arr_in,0),
             'width': np.size(arr_in,1)
         }
-
     old_transform = profile['transform']
-    num_trunc = (2**num_aggre - 1)
-    img_offset = num_trunc / 2
-    new_transform = Affine.translation(img_offset,img_offset) * old_transform
     new_profile = copy.deepcopy(profile)
 
     big_tiff = 'NO'
@@ -107,12 +102,12 @@ def create_tif(arr_in, file_name, profile=None, num_aggre=0):
         'count': 1,
         'height': np.size(arr_in,0),
         'width': np.size(arr_in,1),
-        'transform': new_transform,
+        'transform': old_transform,
     })
     with rasterio.open(file_name, 'w', **new_profile, BIGTIFF=big_tiff) as dst:
         print('Writing to: ',dst)
         print('with transform: ')
-        print(new_transform)
+        print(old_transform)
         dst.write(arr_in,indexes=1)
 
 # TODO fix later, not the best way to do this
@@ -140,3 +135,15 @@ def arr_dtype_conversion(arr_in, dtype=np.uint16, low_bound=None, high_bound=Non
         arr_out = ((arr_in - low_bound) / (high_bound - low_bound) * new_dtype_max).astype(dtype)
     
     return arr_out
+
+def trim_tiff(filepath, size_width_and_height):
+    with rasterio.open(filepath) as src:
+        window = Window(0, 0, size_width_and_height, size_width_and_height)
+        kwargs = src.meta.copy()
+        kwargs.update({
+            'height': window.height,
+            'width': window.width,
+            'transform': rasterio.windows.transform(window, src.transform)})
+
+        with rasterio.open('cropped.tif', 'w', **kwargs) as dst:
+            dst.write(src.read(window=window))

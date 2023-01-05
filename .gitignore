@@ -10,6 +10,8 @@ env/
 
 ## Test Folder ##
 img_artificial/
+img_souris/
+*.aux.xml
 
 
 ## NumPy export file ##
