@@ -33,7 +33,7 @@ class SlidingWindowComparison():
 #     Assumes that all plosts exist already, so please choice 1!
 # 5:  r_squared
         self.analyses = ['artificial_no_noise','artificial_noise','landscape','speed','difference']
-        analysis_id = 1
+        analysis_id = 2
 # Display Tiff images using matplotlib.pyplot as they are created (True/False)
 # Note that Choice 3 (speed) has auto_plot turned off unless it is changed further down
 # and Choice 4 (difference) only provides pyplot figures as output, and does so regardless of auto_plot setting

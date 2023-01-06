@@ -72,7 +72,7 @@ def plot(file_name):
 
 # create tif with array of numpy arrays representing image bands
 # adjust geoTransform according to how many pixels were aggregated
-def create_tif(arr_in, file_name, profile=None, num_aggre=0):
+def create_tif(arr_in, file_name, profile=None, num_aggre=0, spatialPixelExtent = (1,1)):
     dtype = np.dtype(arr_in[0,0])
     if (profile == None):
         geotransform = (500000, 1.0, 0.0, 5000000.0, 0.0, -1.0)
@@ -87,6 +87,9 @@ def create_tif(arr_in, file_name, profile=None, num_aggre=0):
             'width': np.size(arr_in,1)
         }
     old_transform = profile['transform']
+    num_trunc = (2**num_aggre - 1)
+    img_offset = num_trunc / 2
+    new_transform = Affine.translation(img_offset * spatialPixelExtent[0], img_offset  * spatialPixelExtent[1]) * old_transform
     new_profile = copy.deepcopy(profile)
 
     big_tiff = 'NO'
@@ -102,12 +105,12 @@ def create_tif(arr_in, file_name, profile=None, num_aggre=0):
         'count': 1,
         'height': np.size(arr_in,0),
         'width': np.size(arr_in,1),
-        'transform': old_transform,
+        'transform': new_transform,
     })
     with rasterio.open(file_name, 'w', **new_profile, BIGTIFF=big_tiff) as dst:
         print('Writing to: ',dst)
         print('with transform: ')
-        print(old_transform)
+        print(new_transform)
         dst.write(arr_in,indexes=1)
 
 # TODO fix later, not the best way to do this
