@@ -15,6 +15,7 @@ from osgeo import gdal
 import os
 import rasterio
 
+
 class SlidingWindow:
 
     # TODO potentially add R squared method?
@@ -48,13 +49,17 @@ class SlidingWindow:
 
     def close(self):
         if (self._img):
-            self._img.close()
-            if(self.save_jpg):
-                gdal.Translate(
-                    f'{self._file_name}.jpg',
-                    f'{self._file_name}.tif',
-                    options=self._jpg_options
-                )
+            try:
+                self._img.close()
+                if(self.save_jpg):
+                    gdal.Translate(
+                        f'{self._file_name}.jpg',
+                        f'{self._file_name}.tif',
+                        options=self._jpg_options
+                    )
+            except:
+                x = 1
+                # Failed to close
 
     def __del__(self):
         if (self._img):
@@ -109,7 +114,7 @@ class SlidingWindow:
 
         file_name = self._create_file_name('slope', self._dem_data.num_aggre)
         helper.create_tif(slope, file_name, self._orig_profile,
-                          self._dem_data.num_aggre, self.pixelSpatialExtent)
+                          self._dem_data.num_aggre, self.pixelSpatialResolution)
 
         if (self.auto_plot):
             helper.plot(file_name)
@@ -130,7 +135,7 @@ class SlidingWindow:
         file_name = self._create_file_name('profile', self._dem_data.num_aggre)
         # profile means two completely different things in the following line
         helper.create_tif(profile, file_name, self._orig_profile,
-                          self._dem_data.num_aggre, self.pixelSpatialExtent)
+                          self._dem_data.num_aggre, self.pixelSpatialResolution)
 
         if (self.auto_plot):
             helper.plot(file_name)
@@ -150,7 +155,7 @@ class SlidingWindow:
         file_name = self._create_file_name(
             'tangential', self._dem_data.num_aggre)
         helper.create_tif(tangential, file_name, self._orig_profile,
-                          self._dem_data.num_aggre, self.pixelSpatialExtent)
+                          self._dem_data.num_aggre, self.pixelSpatialResolution)
 
         if (self.auto_plot):
             helper.plot(file_name)
@@ -169,7 +174,7 @@ class SlidingWindow:
 
         file_name = self._create_file_name('contour', self._dem_data.num_aggre)
         helper.create_tif(contour, file_name, self._orig_profile,
-                          self._dem_data.num_aggre, self.pixelSpatialExtent)
+                          self._dem_data.num_aggre, self.pixelSpatialResolution)
 
         if (self.auto_plot):
             helper.plot(file_name)
@@ -190,7 +195,7 @@ class SlidingWindow:
             'proper_profile', self._dem_data.num_aggre)
         # profile means two completely different things in the following line
         helper.create_tif(proper_profile, file_name, self._orig_profile,
-                          self._dem_data.num_aggre, self.pixelSpatialExtent)
+                          self._dem_data.num_aggre, self.pixelSpatialResolution)
 
         if (self.auto_plot):
             helper.plot(file_name)
@@ -210,7 +215,7 @@ class SlidingWindow:
         file_name = self._create_file_name(
             'proper_tangential', self._dem_data.num_aggre)
         helper.create_tif(proper_tangential, file_name, self._orig_profile,
-                          self._dem_data.num_aggre, self.pixelSpatialExtent, self.pixelSpatialExtent)
+                          self._dem_data.num_aggre, self.pixelSpatialResolution, self.pixelSpatialResolution)
 
         if (self.auto_plot):
             helper.plot(file_name)
@@ -223,4 +228,4 @@ class SlidingWindow:
             self._orig_profile['width']
         yPixelSize = (bnds.bottom - bnds.top) / \
             self._orig_profile['height']
-        self.pixelSpatialExtent = (xPixelSize, yPixelSize)
+        self.pixelSpatialResolution = (xPixelSize, yPixelSize)
