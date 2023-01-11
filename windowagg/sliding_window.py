@@ -20,14 +20,14 @@ class SlidingWindow:
 
     # TODO potentially add R squared method?
 
-    def __init__(self, file_path, map_width_to_meters=1.0, map_height_to_meters=1.0, save_jpg=False):
+    def __init__(self, file_path, map_width_to_meters=1.0, map_height_to_meters=1.0, save_jpg=False, dtype=rasterio.int8):
         self._file_name = os.path.splitext(file_path)[0]
         self._img = rasterio.open(file_path)
         self._orig_profile = self._img.profile
         self._dem_data = None
         self.auto_plot = False
         self.work_dtype = config.work_dtype
-        self.tif_dtype = config.tif_dtype
+        self.tif_dtype = dtype
         self._jpg_options = "-ot Byte -of JPEG -b 1 -scale"
         self.save_jpg = save_jpg
         self.getPixelSpatialResolution()
@@ -113,8 +113,8 @@ class SlidingWindow:
         slope = dem.slope(self._dem_data)
 
         file_name = self._create_file_name('slope', self._dem_data.num_aggre)
-        helper.create_tif(slope, file_name, self._orig_profile,
-                          self._dem_data.num_aggre, self.pixelSpatialResolution)
+        helper.create_tif(slope, file_name=file_name, profile=self._orig_profile,
+                          num_aggre=self._dem_data.num_aggre, pixelSpatialResolution=self.pixelSpatialResolution, dtype=self.tif_dtype)
 
         if (self.auto_plot):
             helper.plot(file_name)
@@ -134,8 +134,8 @@ class SlidingWindow:
 
         file_name = self._create_file_name('profile', self._dem_data.num_aggre)
         # profile means two completely different things in the following line
-        helper.create_tif(profile, file_name, self._orig_profile,
-                          self._dem_data.num_aggre, self.pixelSpatialResolution)
+        helper.create_tif(profile, file_name=file_name, profile=self._orig_profile,
+                          num_aggre=self._dem_data.num_aggre, pixelSpatialResolution=self.pixelSpatialResolution, dtype=self.tif_dtype)
 
         if (self.auto_plot):
             helper.plot(file_name)
@@ -154,8 +154,8 @@ class SlidingWindow:
 
         file_name = self._create_file_name(
             'tangential', self._dem_data.num_aggre)
-        helper.create_tif(tangential, file_name, self._orig_profile,
-                          self._dem_data.num_aggre, self.pixelSpatialResolution)
+        helper.create_tif(tangential, file_name=file_name, profile=self._orig_profile,
+                          num_aggre=self._dem_data.num_aggre, pixelSpatialResolution=self.pixelSpatialResolution, dtype=self.tif_dtype)
 
         if (self.auto_plot):
             helper.plot(file_name)
@@ -173,8 +173,8 @@ class SlidingWindow:
         contour = dem.contour(self._dem_data)
 
         file_name = self._create_file_name('contour', self._dem_data.num_aggre)
-        helper.create_tif(contour, file_name, self._orig_profile,
-                          self._dem_data.num_aggre, self.pixelSpatialResolution)
+        helper.create_tif(contour, file_name=file_name, profile=self._orig_profile,
+                          num_aggre=self._dem_data.num_aggre, pixelSpatialResolution=self.pixelSpatialResolution, dtype=self.tif_dtype)
 
         if (self.auto_plot):
             helper.plot(file_name)
@@ -194,8 +194,8 @@ class SlidingWindow:
         file_name = self._create_file_name(
             'proper_profile', self._dem_data.num_aggre)
         # profile means two completely different things in the following line
-        helper.create_tif(proper_profile, file_name, self._orig_profile,
-                          self._dem_data.num_aggre, self.pixelSpatialResolution)
+        helper.create_tif(arr_in=proper_profile, file_name=file_name, profile=self._orig_profile,
+                          num_aggre=self._dem_data.num_aggre, pixelSpatialResolution=self.pixelSpatialResolution, dtype=self.tif_dtype)
 
         if (self.auto_plot):
             helper.plot(file_name)
@@ -214,8 +214,8 @@ class SlidingWindow:
 
         file_name = self._create_file_name(
             'proper_tangential', self._dem_data.num_aggre)
-        helper.create_tif(proper_tangential, file_name, self._orig_profile,
-                          self._dem_data.num_aggre, self.pixelSpatialResolution, self.pixelSpatialResolution)
+        helper.create_tif(proper_tangential, file_name=file_name, profile=self._orig_profile,
+                          num_aggre=self._dem_data.num_aggre, pixelSpatialResolution=self.pixelSpatialResolution, dtype=self.tif_dtype)
 
         if (self.auto_plot):
             helper.plot(file_name)
