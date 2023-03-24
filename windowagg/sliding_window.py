@@ -78,7 +78,7 @@ class SlidingWindow:
 
     def export_dem(self, file_name=None):
         if (self._dem_data is None):
-            print('No DEM data to export')
+            raise Exception('No DEM data to export')
         else:
             if (file_name == None):
                 file_name = self._file_name + '_w=' + \
@@ -127,8 +127,7 @@ class SlidingWindow:
             self.initialize_dem(1)
 
         if (2**self._dem_data.num_aggre <= 2):
-            print('Profile curvature cannot be calculated on windows of size 2 or 1')
-            return
+            raise Exception('Profile curvature cannot be calculated on windows of size 2 or 1')
 
         profile = dem.profile(self._dem_data)
 
@@ -147,8 +146,7 @@ class SlidingWindow:
             self.initialize_dem(1)
 
         if (2**self._dem_data.num_aggre <= 2):
-            print('Profile curvature cannot be calculated on windows of size 2 or 1')
-            return
+            raise Exception('Profile curvature cannot be calculated on windows of size 2 or 1')
 
         tangential = dem.tangential(self._dem_data)
 
@@ -167,8 +165,7 @@ class SlidingWindow:
             self.initialize_dem(1)
 
         if (2**self._dem_data.num_aggre <= 2):
-            print('Profile curvature cannot be calculated on windows of size 2 or 1')
-            return
+            raise Exception('Profile curvature cannot be calculated on windows of size 2 or 1')
 
         contour = dem.contour(self._dem_data)
 
@@ -186,8 +183,7 @@ class SlidingWindow:
             self.initialize_dem(1)
 
         if (2**self._dem_data.num_aggre <= 2):
-            print('Profile curvature cannot be calculated on windows of size 2 or 1')
-            return
+            raise Exception('Profile curvature cannot be calculated on windows of size 2 or 1')
 
         proper_profile = dem.proper_profile(self._dem_data)
 
@@ -207,8 +203,7 @@ class SlidingWindow:
             self.initialize_dem(1)
 
         if (2**self._dem_data.num_aggre <= 2):
-            print('Profile curvature cannot be calculated on windows of size 2 or 1')
-            return
+            raise Exception('Profile curvature cannot be calculated on windows of size 2 or 1')
 
         proper_tangential = dem.proper_tangential(self._dem_data)
 
