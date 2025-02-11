@@ -91,7 +91,7 @@ def create_tif(arr_in, file_name, profile=None, num_aggre=0):
     old_transform = profile['transform']
     num_trunc = (2**num_aggre - 1)
     img_offset = num_trunc / 2
-    new_transform = Affine.translation(img_offset,img_offset) * old_transform
+    new_transform = Affine.translation(img_offset, -img_offset) * old_transform
     new_profile = copy.deepcopy(profile)
 
     big_tiff = 'NO'
